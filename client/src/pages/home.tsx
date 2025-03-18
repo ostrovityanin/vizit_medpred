@@ -4,11 +4,12 @@ import AudioPlayer from '@/components/AudioPlayer';
 import Instructions from '@/components/Instructions';
 import PermissionModal from '@/components/PermissionModal';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Timer as TimerClass } from '@/lib/timer';
 import { audioRecorder } from '@/lib/audioRecorder';
 import { sendAudioToTelegram } from '@/lib/telegram';
 import { useToast } from '@/hooks/use-toast';
-import { PlayCircle, StopCircle, Send, Trash2 } from 'lucide-react';
+import { PlayCircle, StopCircle, Send, Trash2, Mail } from 'lucide-react';
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
@@ -17,6 +18,9 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const [emailInput, setEmailInput] = useState('');
+  const [sendToEmail, setSendToEmail] = useState(false);
+  const [recipient, setRecipient] = useState('@ostrovityanin');
   
   const timerRef = useRef(new TimerClass((seconds) => setTimerSeconds(seconds)));
   const { toast } = useToast();

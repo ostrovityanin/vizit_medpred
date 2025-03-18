@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
 import { resolveTelegramUsername, sendAudioToTelegram } from './telegram';
+import { sendAudioToEmail } from './email';
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -103,41 +104,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Recording not found' });
       }
 
-      // Resolve target username to chat ID
-      const username = recording.targetUsername.startsWith('@') 
-        ? recording.targetUsername.substring(1) 
-        : recording.targetUsername;
+      // Проверяем, похож ли target на email адрес
+      const isEmail = recording.targetUsername.includes('@') && !recording.targetUsername.startsWith('@');
       
-      log(`Attempting to send recording to user: ${username}`, 'telegram');
-      
-      // Get Telegram username with @ prefix for direct sending
-      const chatId = await resolveTelegramUsername(username);
-      
-      if (!chatId) {
-        return res.status(400).json({ 
-          message: `Could not resolve username: ${username}. Make sure the bot can message this user.` 
-        });
-      }
-      
-      // Full path to the audio file
+      // Полный путь к аудиофайлу
       const filePath = path.join(__dirname, 'uploads', recording.filename);
       
-      // Check if file exists
+      // Проверка существования файла
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
+
+      let success = false;
+      let successMessage = '';
       
-      log(`Sending audio file: ${filePath} to ${chatId}`, 'telegram');
-      
-      // Send audio to Telegram
-      const success = await sendAudioToTelegram(
-        filePath, 
-        chatId, 
-        `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
-      );
+      if (isEmail) {
+        // Отправка по email
+        log(`Sending audio file by email to: ${recording.targetUsername}`, 'email');
+        success = await sendAudioToEmail(
+          filePath, 
+          recording.targetUsername,
+          `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`,
+          'Вложена аудиозапись, сделанная через таймер визита Telegram'
+        );
+        successMessage = `Successfully sent to email: ${recording.targetUsername}`;
+      } else {
+        // Отправка в Telegram
+        const username = recording.targetUsername.startsWith('@') 
+          ? recording.targetUsername.substring(1) 
+          : recording.targetUsername;
+        
+        log(`Attempting to send recording to user: ${username}`, 'telegram');
+        
+        // Get Telegram username with @ prefix for direct sending
+        const chatId = await resolveTelegramUsername(username);
+        
+        if (!chatId) {
+          return res.status(400).json({ 
+            message: `Could not resolve username: ${username}. Make sure the bot can message this user.` 
+          });
+        }
+        
+        log(`Sending audio file: ${filePath} to ${chatId}`, 'telegram');
+        
+        // Send audio to Telegram
+        success = await sendAudioToTelegram(
+          filePath, 
+          chatId, 
+          `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
+        );
+        successMessage = `Successfully sent to @${username}`;
+      }
       
       if (!success) {
-        return res.status(500).json({ message: 'Failed to send audio to Telegram' });
+        return res.status(500).json({ message: 'Failed to send audio' });
       }
       
       // Mark as sent
@@ -145,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...updatedRecording,
-        message: `Successfully sent to @${username}`
+        message: successMessage
       });
     } catch (error) {
       log(`Error sending recording: ${error}`, 'telegram');
