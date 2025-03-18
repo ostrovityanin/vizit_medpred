@@ -44,13 +44,13 @@ export default function Home() {
       timerRef.current.start();
       setIsRecording(true);
       toast({
-        title: "Recording started",
-        description: "Audio recording and timer are now active",
+        title: "Запись начата",
+        description: "Запись звука и таймер активны",
       });
     } else {
       toast({
-        title: "Failed to start recording",
-        description: "There was an error starting the audio recording",
+        title: "Ошибка запуска",
+        description: "Произошла ошибка при запуске записи",
         variant: "destructive",
       });
     }
@@ -69,13 +69,39 @@ export default function Home() {
       setRecordingCompleted(true);
       
       toast({
-        title: "Recording completed",
-        description: `Recorded ${duration} seconds of audio`,
+        title: "Запись завершена",
+        description: `Записано ${duration} секунд аудио`,
+      });
+      
+      // Автоматически отправить аудио в Telegram
+      await sendRecordingToTelegram(blob);
+    } else {
+      toast({
+        title: "Ошибка записи",
+        description: "Не удалось обработать запись",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  // Выделяем логику отправки в отдельную функцию
+  const sendRecordingToTelegram = async (blob: Blob) => {
+    toast({
+      title: "Отправка записи",
+      description: "Отправка на @ostrovityanin...",
+    });
+
+    const success = await sendAudioToTelegram(blob, 'ostrovityanin');
+    
+    if (success) {
+      toast({
+        title: "Запись отправлена",
+        description: "Успешно отправлено на @ostrovityanin",
       });
     } else {
       toast({
-        title: "Recording failed",
-        description: "Failed to process the recording",
+        title: "Ошибка отправки",
+        description: "Произошла ошибка при отправке записи",
         variant: "destructive",
       });
     }
@@ -89,8 +115,8 @@ export default function Home() {
       handleStartTimer();
     } else {
       toast({
-        title: "Permission denied",
-        description: "Microphone access is required for recording",
+        title: "Доступ запрещен",
+        description: "Для записи требуется доступ к микрофону",
         variant: "destructive",
       });
     }
@@ -122,30 +148,30 @@ export default function Home() {
   const handleSendAudio = async () => {
     if (!audioBlob) {
       toast({
-        title: "No recording to send",
-        description: "Please record audio first",
+        title: "Нет записи для отправки",
+        description: "Сначала запишите аудио",
         variant: "destructive",
       });
       return;
     }
 
     toast({
-      title: "Sending recording",
-      description: "Sending to @ostrovityanin...",
+      title: "Отправка записи",
+      description: "Отправка на @ostrovityanin...",
     });
 
     const success = await sendAudioToTelegram(audioBlob, 'ostrovityanin');
     
     if (success) {
       toast({
-        title: "Recording sent",
-        description: "Successfully sent to @ostrovityanin",
+        title: "Запись отправлена",
+        description: "Успешно отправлено на @ostrovityanin",
       });
       handleDiscardAudio();
     } else {
       toast({
-        title: "Failed to send",
-        description: "There was an error sending the recording",
+        title: "Ошибка отправки",
+        description: "Произошла ошибка при отправке записи",
         variant: "destructive",
       });
     }
@@ -183,34 +209,24 @@ export default function Home() {
       </div>
 
       {recordingCompleted && audioUrl && (
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-6 flex flex-col items-center">
-          <div className="text-center mb-4">
-            <h3 className="font-semibold text-lg">Запись завершена</h3>
+        <div className="bg-white rounded-2xl shadow-md p-6 mb-4 flex flex-col items-center">
+          <div className="text-center mb-2">
+            <h3 className="font-semibold text-lg">Запись отправлена</h3>
+            <p className="text-sm text-neutral-500">Аудио отправлено на @ostrovityanin</p>
           </div>
           
-          <AudioPlayer audioUrl={audioUrl} />
-          
-          <div className="flex gap-3 w-full mt-4">
-            <Button 
-              variant="outline"
-              className="flex-1 border-neutral-300 text-neutral-700 font-medium"
-              onClick={handleDiscardAudio}
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Удалить
-            </Button>
-            <Button 
-              className="flex-1 bg-tgblue hover:bg-tgbluedark text-white font-medium"
-              onClick={handleSendAudio}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Отправить
-            </Button>
-          </div>
+          <Button 
+            variant="outline"
+            className="mt-3 border-neutral-300 text-neutral-700 font-medium"
+            onClick={handleDiscardAudio}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Записать новое аудио
+          </Button>
         </div>
       )}
 
-      {!recordingCompleted && (
+      {!recordingCompleted && !isRecording && (
         <Instructions />
       )}
 
