@@ -103,9 +103,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!recording) {
         return res.status(404).json({ message: 'Recording not found' });
       }
-
-      // Проверяем, похож ли target на email адрес
-      const isEmail = recording.targetUsername.includes('@') && !recording.targetUsername.startsWith('@');
       
       // Полный путь к аудиофайлу
       const filePath = path.join(__dirname, 'uploads', recording.filename);
@@ -115,57 +112,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
 
-      let success = false;
-      let successMessage = '';
-      
-      if (isEmail) {
-        // Отправка по email
-        log(`Sending audio file by email to: ${recording.targetUsername}`, 'email');
-        success = await sendAudioToEmail(
-          filePath, 
-          recording.targetUsername,
-          `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`,
-          'Вложена аудиозапись, сделанная через таймер визита Telegram'
-        );
-        successMessage = `Successfully sent to email: ${recording.targetUsername}`;
-      } else {
-        // Отправка в Telegram
-        const username = recording.targetUsername.startsWith('@') 
-          ? recording.targetUsername.substring(1) 
-          : recording.targetUsername;
-        
-        log(`Attempting to send recording to user: ${username}`, 'telegram');
-        
-        // Get Telegram username with @ prefix for direct sending
-        const chatId = await resolveTelegramUsername(username);
-        
-        if (!chatId) {
-          return res.status(400).json({ 
-            message: `Could not resolve username: ${username}. Make sure the bot can message this user.` 
-          });
-        }
-        
-        log(`Sending audio file: ${filePath} to ${chatId}`, 'telegram');
-        
-        // Send audio to Telegram
-        success = await sendAudioToTelegram(
-          filePath, 
-          chatId, 
-          `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
-        );
-        successMessage = `Successfully sent to @${username}`;
-      }
-      
-      if (!success) {
-        return res.status(500).json({ message: 'Failed to send audio' });
-      }
-      
-      // Mark as sent
+      // Просто помечаем запись как отправленную и возвращаем путь к файлу для скачивания
       const updatedRecording = await storage.markRecordingAsSent(id);
       
       res.json({
         ...updatedRecording,
-        message: successMessage
+        message: 'Запись доступна для скачивания',
+        fileUrl: `/api/recordings/${id}/download`
       });
     } catch (error) {
       log(`Error sending recording: ${error}`, 'telegram');
