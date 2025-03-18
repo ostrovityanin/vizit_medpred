@@ -6,6 +6,8 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
+import { resolveTelegramUsername, sendAudioToTelegram } from './telegram';
+import { log } from './vite';
 
 // Setup multer storage for audio files
 const storageConfig = multer.diskStorage({
@@ -95,12 +97,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Recording not found' });
       }
 
-      // In a real implementation, this would send the recording to Telegram
-      // For this implementation, we'll just mark it as sent
+      // Resolve target username to chat ID
+      const username = recording.targetUsername.startsWith('@') 
+        ? recording.targetUsername.substring(1) 
+        : recording.targetUsername;
+      
+      log(`Attempting to send recording to user: ${username}`, 'telegram');
+      
+      // Get Telegram user chat ID
+      const chatId = await resolveTelegramUsername(username);
+      
+      if (!chatId) {
+        return res.status(400).json({ 
+          message: `Could not resolve username: ${username}. Make sure the bot can message this user.` 
+        });
+      }
+      
+      // Full path to the audio file
+      const filePath = path.join(__dirname, 'uploads', recording.filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: 'Audio file not found on server' });
+      }
+      
+      // Send audio to Telegram
+      const success = await sendAudioToTelegram(
+        filePath, 
+        chatId, 
+        `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
+      );
+      
+      if (!success) {
+        return res.status(500).json({ message: 'Failed to send audio to Telegram' });
+      }
+      
+      // Mark as sent
       const updatedRecording = await storage.markRecordingAsSent(id);
       
-      res.json(updatedRecording);
+      res.json({
+        ...updatedRecording,
+        message: `Successfully sent to @${username}`
+      });
     } catch (error) {
+      log(`Error sending recording: ${error}`, 'telegram');
       res.status(500).json({ message: 'Failed to send recording', error });
     }
   });
