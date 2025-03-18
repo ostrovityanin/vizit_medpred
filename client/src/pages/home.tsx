@@ -1,15 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Timer from '@/components/Timer';
-import AudioPlayer from '@/components/AudioPlayer';
 import Instructions from '@/components/Instructions';
 import PermissionModal from '@/components/PermissionModal';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Timer as TimerClass } from '@/lib/timer';
 import { audioRecorder } from '@/lib/audioRecorder';
-import { sendAudioToTelegram, sendAudioToRecipient } from '@/lib/telegram';
+import { sendAudioToRecipient } from '@/lib/telegram';
 import { useToast } from '@/hooks/use-toast';
-import { PlayCircle, StopCircle, Send, Trash2, Mail } from 'lucide-react';
+import { PlayCircle, StopCircle, Send, Trash2 } from 'lucide-react';
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
@@ -128,8 +126,8 @@ export default function Home() {
   const handleCancelPermission = () => {
     setShowPermissionModal(false);
     toast({
-      title: "Permission denied",
-      description: "Microphone access is required for recording",
+      title: "Доступ запрещен",
+      description: "Для записи требуется доступ к микрофону",
     });
   };
 
@@ -143,8 +141,8 @@ export default function Home() {
     timerRef.current.reset();
     
     toast({
-      title: "Recording discarded",
-      description: "The audio has been discarded",
+      title: "Запись удалена",
+      description: "Аудио было удалено",
     });
   };
 
@@ -162,9 +160,7 @@ export default function Home() {
     handleDiscardAudio();
   };
   
-  const toggleSendMethod = () => {
-    setSendToEmail(!sendToEmail);
-  };
+  // Отправка только через Telegram
 
   return (
     <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen">
