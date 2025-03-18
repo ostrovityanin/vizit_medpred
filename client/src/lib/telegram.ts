@@ -1,12 +1,12 @@
-export async function sendAudioToTelegram(blob: Blob, targetUsername: string): Promise<boolean> {
+export async function sendAudioToRecipient(blob: Blob, recipient: string): Promise<boolean> {
   try {
-    console.log(`Sending audio to Telegram user: @${targetUsername}`);
+    console.log(`Sending audio to recipient: ${recipient}`);
     
     const formData = new FormData();
     formData.append('audio', blob, 'recording.wav');
     formData.append('duration', String(Math.floor(Date.now() / 1000)));
     formData.append('timestamp', new Date().toISOString());
-    formData.append('targetUsername', targetUsername);
+    formData.append('targetUsername', recipient);
 
     const response = await fetch('/api/recordings', {
       method: 'POST',
@@ -22,12 +22,12 @@ export async function sendAudioToTelegram(blob: Blob, targetUsername: string): P
     console.log('Recording uploaded successfully:', recording);
     
     // In a real Telegram Mini App, we'd use the Telegram WebApp API to send data
-    if (window.Telegram?.WebApp) {
+    if (window.Telegram?.WebApp && !recipient.includes('@')) {
       // You would normally send a command to the bot to deliver the audio
       window.Telegram.WebApp.sendData(JSON.stringify({
         action: 'send_recording',
         recordingId: recording.id,
-        targetUsername
+        recipient
       }));
     }
 
@@ -37,18 +37,23 @@ export async function sendAudioToTelegram(blob: Blob, targetUsername: string): P
     });
     
     if (!sendResponse.ok) {
-      console.error('Error sending to Telegram:', await sendResponse.text());
+      console.error('Error sending recording:', await sendResponse.text());
       throw new Error(`Failed to send recording: ${sendResponse.statusText}`);
     }
     
     const sendData = await sendResponse.json();
-    console.log('Telegram send response:', sendData);
+    console.log('Send response:', sendData);
 
     return true;
   } catch (error) {
-    console.error('Error sending audio to Telegram:', error);
+    console.error('Error sending audio:', error);
     return false;
   }
+}
+
+// For backward compatibility
+export async function sendAudioToTelegram(blob: Blob, targetUsername: string): Promise<boolean> {
+  return sendAudioToRecipient(blob, targetUsername);
 }
 
 export function isTelegramWebApp(): boolean {
