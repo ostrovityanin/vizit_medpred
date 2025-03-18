@@ -8,6 +8,12 @@ import path from "path";
 import fs from "fs";
 import { resolveTelegramUsername, sendAudioToTelegram } from './telegram';
 import { log } from './vite';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+// ESM equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Setup multer storage for audio files
 const storageConfig = multer.diskStorage({

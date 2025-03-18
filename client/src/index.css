@@ -11,3 +11,28 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+:root {
+  --tg-theme-bg-color: #ffffff;
+  --tg-theme-text-color: #000000;
+  --tg-theme-hint-color: #999999;
+  --tg-theme-link-color: #2678b6;
+  --tg-theme-button-color: #2678b6;
+  --tg-theme-button-text-color: #ffffff;
+}
+
+.bg-tgblue {
+  background-color: var(--tg-theme-button-color, #2678b6);
+}
+
+.hover\:bg-tgbluedark:hover {
+  background-color: #1f5d8c;
+}
+
+.text-tgblue {
+  color: var(--tg-theme-button-color, #2678b6);
+}
+
+.bg-recording {
+  background-color: #e53935;
+}
