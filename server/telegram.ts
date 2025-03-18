@@ -15,7 +15,7 @@ export interface TelegramUser {
 /**
  * Resolves a username to a chat_id using Telegram's getChat API
  */
-export async function resolveTelegramUsername(username: string): Promise<number | null> {
+export async function resolveTelegramUsername(username: string): Promise<number | string | null> {
   if (!BOT_TOKEN) {
     log('No Telegram Bot Token provided', 'telegram');
     return null;
@@ -25,7 +25,13 @@ export async function resolveTelegramUsername(username: string): Promise<number 
     // Remove @ symbol if present
     const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
     
-    // Call the Telegram API to get chat information
+    // For our app, we'll just return the username, as we can send directly to @username
+    // This bypasses the need for getChat and allows sending even if the bot hasn't
+    // started a conversation with the user yet
+    log(`Using direct username @${cleanUsername} instead of resolving chat_id`, 'telegram');
+    return `@${cleanUsername}`;
+    
+    /* Use this approach if you need the actual chat_id
     const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChat`, {
       params: {
         chat_id: `@${cleanUsername}`
@@ -38,6 +44,7 @@ export async function resolveTelegramUsername(username: string): Promise<number 
       log(`Failed to resolve username ${username}: ${JSON.stringify(response.data)}`, 'telegram');
       return null;
     }
+    */
   } catch (error) {
     log(`Error resolving username ${username}: ${error}`, 'telegram');
     return null;
@@ -49,7 +56,7 @@ export async function resolveTelegramUsername(username: string): Promise<number 
  */
 export async function sendAudioToTelegram(
   filePath: string, 
-  chatId: number, 
+  chatId: number | string, 
   caption: string = 'Запись с таймера визита'
 ): Promise<boolean> {
   if (!BOT_TOKEN) {
@@ -64,6 +71,8 @@ export async function sendAudioToTelegram(
     form.append('caption', caption);
     form.append('audio', fs.createReadStream(filePath));
 
+    log(`Sending audio to chat_id: ${chatId}`, 'telegram');
+
     // Send the request to the Telegram API
     const response = await axios.post(
       `https://api.telegram.org/bot${BOT_TOKEN}/sendAudio`,
@@ -76,7 +85,7 @@ export async function sendAudioToTelegram(
     );
 
     if (response.status === 200 && response.data.ok) {
-      log(`Successfully sent audio to chat ID ${chatId}`, 'telegram');
+      log(`Successfully sent audio to ${chatId}`, 'telegram');
       return true;
     } else {
       log(`Failed to send audio: ${JSON.stringify(response.data)}`, 'telegram');

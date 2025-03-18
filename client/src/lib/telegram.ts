@@ -1,5 +1,7 @@
 export async function sendAudioToTelegram(blob: Blob, targetUsername: string): Promise<boolean> {
   try {
+    console.log(`Sending audio to Telegram user: @${targetUsername}`);
+    
     const formData = new FormData();
     formData.append('audio', blob, 'recording.wav');
     formData.append('duration', String(Math.floor(Date.now() / 1000)));
@@ -12,10 +14,12 @@ export async function sendAudioToTelegram(blob: Blob, targetUsername: string): P
     });
 
     if (!response.ok) {
+      console.error('Error uploading recording:', await response.text());
       throw new Error('Failed to upload recording');
     }
 
     const recording = await response.json();
+    console.log('Recording uploaded successfully:', recording);
     
     // In a real Telegram Mini App, we'd use the Telegram WebApp API to send data
     if (window.Telegram?.WebApp) {
@@ -28,9 +32,17 @@ export async function sendAudioToTelegram(blob: Blob, targetUsername: string): P
     }
 
     // For this implementation, we're also calling our API to mark as sent
-    await fetch(`/api/recordings/${recording.id}/send`, {
+    const sendResponse = await fetch(`/api/recordings/${recording.id}/send`, {
       method: 'POST',
     });
+    
+    if (!sendResponse.ok) {
+      console.error('Error sending to Telegram:', await sendResponse.text());
+      throw new Error(`Failed to send recording: ${sendResponse.statusText}`);
+    }
+    
+    const sendData = await sendResponse.json();
+    console.log('Telegram send response:', sendData);
 
     return true;
   } catch (error) {

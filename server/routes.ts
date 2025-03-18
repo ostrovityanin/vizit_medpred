@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       log(`Attempting to send recording to user: ${username}`, 'telegram');
       
-      // Get Telegram user chat ID
+      // Get Telegram username with @ prefix for direct sending
       const chatId = await resolveTelegramUsername(username);
       
       if (!chatId) {
@@ -126,6 +126,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
+      
+      log(`Sending audio file: ${filePath} to ${chatId}`, 'telegram');
       
       // Send audio to Telegram
       const success = await sendAudioToTelegram(
