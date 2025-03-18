@@ -112,13 +112,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
 
-      // Просто помечаем запись как отправленную и возвращаем путь к файлу для скачивания
+      // Всегда отправляем аудио напрямую пользователю ostrovityanin через бот с API токеном
+      log(`Sending audio file to @ostrovityanin`, 'telegram');
+      
+      // Отправка аудио через Telegram бот
+      const success = await sendAudioToTelegram(
+        filePath, 
+        'ostrovityanin', // Фиксированное имя пользователя
+        `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
+      );
+      
+      if (!success) {
+        return res.status(200).json({ 
+          message: 'Аудио записано, но отправка не удалась. Файл сохранен на сервере.' 
+        });
+      }
+      
+      // Mark as sent
       const updatedRecording = await storage.markRecordingAsSent(id);
       
       res.json({
         ...updatedRecording,
-        message: 'Запись доступна для скачивания',
-        fileUrl: `/api/recordings/${id}/download`
+        message: 'Запись успешно отправлена @ostrovityanin'
       });
     } catch (error) {
       log(`Error sending recording: ${error}`, 'telegram');

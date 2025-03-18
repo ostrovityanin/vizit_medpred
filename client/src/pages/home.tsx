@@ -18,9 +18,7 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [emailInput, setEmailInput] = useState('');
-  const [sendToEmail, setSendToEmail] = useState(false);
-  const [recipient, setRecipient] = useState('@ostrovityanin');
+  const [recipient] = useState('@ostrovityanin');
   
   const timerRef = useRef(new TimerClass((seconds) => setTimerSeconds(seconds)));
   const { toast } = useToast();
@@ -88,43 +86,24 @@ export default function Home() {
     }
   };
   
-  // Функция для валидации email
-  const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-  
   // Выделяем логику отправки в отдельную функцию
   const sendRecording = async (blob: Blob) => {
-    const target = sendToEmail && emailInput ? emailInput : recipient;
-    
-    // Проверка валидности email
-    if (sendToEmail && !isValidEmail(emailInput)) {
-      toast({
-        title: "Неверный формат email",
-        description: "Пожалуйста, введите корректный email адрес",
-        variant: "destructive",
-      });
-      return false;
-    }
-    
     toast({
       title: "Отправка записи",
-      description: `Отправка на ${target}...`,
+      description: `Отправка на ${recipient}...`,
     });
 
-    const success = await sendAudioToRecipient(blob, target);
+    const success = await sendAudioToRecipient(blob, recipient);
     
     if (success) {
       toast({
         title: "Запись отправлена",
-        description: `Успешно отправлено на ${target}`,
+        description: `Успешно отправлено на ${recipient}`,
       });
     } else {
       toast({
-        title: "Ошибка отправки",
-        description: "Произошла ошибка при отправке записи",
-        variant: "destructive",
+        title: "Аудио записано",
+        description: "Отправка не удалась, но запись сохранена на сервере",
       });
     }
     
@@ -223,7 +202,7 @@ export default function Home() {
           <div className="text-center mb-2">
             <h3 className="font-semibold text-lg">Запись отправлена</h3>
             <p className="text-sm text-neutral-500">
-              Аудио отправлено на {sendToEmail && emailInput ? emailInput : '@ostrovityanin'}
+              Аудио отправлено на @ostrovityanin
             </p>
           </div>
           
@@ -244,43 +223,19 @@ export default function Home() {
             <span className="font-medium text-neutral-700">Отправка записи:</span>
             <div className="flex items-center">
               <Button 
-                variant={sendToEmail ? "outline" : "default"}
+                variant="default"
                 size="sm"
-                className="rounded-r-none"
-                onClick={() => setSendToEmail(false)}
+                className="rounded-lg"
+                disabled
               >
                 <Send className="h-4 w-4 mr-1" /> Telegram
-              </Button>
-              <Button 
-                variant={!sendToEmail ? "outline" : "default"}
-                size="sm"
-                className="rounded-l-none"
-                onClick={() => setSendToEmail(true)}
-              >
-                <Mail className="h-4 w-4 mr-1" /> Email
               </Button>
             </div>
           </div>
           
-          {sendToEmail ? (
-            <div className="mt-4">
-              <label htmlFor="email" className="block text-sm font-medium text-neutral-700 mb-1">
-                Email для отправки записи:
-              </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="example@mail.ru"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="w-full"
-              />
-            </div>
-          ) : (
-            <div className="mt-2 text-center text-neutral-600">
-              <p className="text-sm">Аудио будет отправлено на @ostrovityanin</p>
-            </div>
-          )}
+          <div className="mt-2 text-center text-neutral-600">
+            <p className="text-sm">Аудио будет отправлено на @ostrovityanin</p>
+          </div>
         </div>
       )}
       
