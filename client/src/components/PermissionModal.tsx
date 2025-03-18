@@ -16,9 +16,9 @@ export default function PermissionModal({ isOpen, onAllow, onCancel }: Permissio
           <div className="w-16 h-16 bg-tgblue bg-opacity-10 rounded-full flex items-center justify-center mx-auto mb-4">
             <Bell className="h-8 w-8 text-tgblue" />
           </div>
-          <DialogTitle className="text-center">Microphone Access</DialogTitle>
+          <DialogTitle className="text-center">Доступ к микрофону</DialogTitle>
           <DialogDescription className="text-center">
-            This app needs access to your microphone to record audio while the timer is running.
+            Приложению нужен доступ к микрофону для записи аудио во время работы таймера.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-3 sm:justify-center">
@@ -27,13 +27,13 @@ export default function PermissionModal({ isOpen, onAllow, onCancel }: Permissio
             onClick={onCancel}
             className="flex-1"
           >
-            Cancel
+            Отмена
           </Button>
           <Button 
             onClick={onAllow}
             className="flex-1 bg-tgblue hover:bg-tgbluedark"
           >
-            Allow
+            Разрешить
           </Button>
         </DialogFooter>
       </DialogContent>
