@@ -154,8 +154,7 @@ export default function Home() {
   return (
     <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen">
       <header className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-tgblue">Voice Timer</h1>
-        <p className="text-neutral-700 text-sm mt-1">Record audio while timing your activity</p>
+        <h1 className="text-2xl font-bold text-tgblue">Таймер визита</h1>
       </header>
 
       <Timer
@@ -170,7 +169,7 @@ export default function Home() {
             onClick={handleStartTimer}
           >
             <PlayCircle className="h-5 w-5" />
-            <span>Start Timer</span>
+            <span>Старт</span>
           </Button>
         ) : (
           <Button 
@@ -178,7 +177,7 @@ export default function Home() {
             onClick={handleStopTimer}
           >
             <StopCircle className="h-5 w-5" />
-            <span>Stop</span>
+            <span>Стоп</span>
           </Button>
         )}
       </div>
@@ -186,8 +185,7 @@ export default function Home() {
       {recordingCompleted && audioUrl && (
         <div className="bg-white rounded-2xl shadow-md p-6 mb-6 flex flex-col items-center">
           <div className="text-center mb-4">
-            <h3 className="font-semibold text-lg">Recording Completed</h3>
-            <p className="text-neutral-700 text-sm">Your audio has been processed</p>
+            <h3 className="font-semibold text-lg">Запись завершена</h3>
           </div>
           
           <AudioPlayer audioUrl={audioUrl} />
@@ -199,14 +197,14 @@ export default function Home() {
               onClick={handleDiscardAudio}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Discard
+              Удалить
             </Button>
             <Button 
               className="flex-1 bg-tgblue hover:bg-tgbluedark text-white font-medium"
               onClick={handleSendAudio}
             >
               <Send className="h-4 w-4 mr-2" />
-              Send to @ostrovityanin
+              Отправить
             </Button>
           </div>
         </div>
