@@ -97,11 +97,11 @@ export class AudioRecorder {
   /**
    * Запускает фрагментированную запись с сохранением фрагментов по таймеру
    * @param onFragmentSaved Callback, который вызывается при сохранении каждого фрагмента
-   * @param fragmentDurationMs Длительность одного фрагмента в мс (по умолчанию 60000мс = 1 минута)
+   * @param fragmentDurationMs Длительность одного фрагмента в мс (по умолчанию 900000мс = 15 минут)
    */
   startFragmentedRecording(
     onFragmentSaved?: (fragment: AudioFragment) => void, 
-    fragmentDurationMs: number = 60000
+    fragmentDurationMs: number = 900000 // 15 минут по умолчанию
   ): boolean {
     // Настраиваем параметры фрагментированной записи
     this.isFragmentedRecording = true;
@@ -109,6 +109,11 @@ export class AudioRecorder {
     this.audioFragments = [];
     this.currentFragmentIndex = 0;
     this.onFragmentSaved = onFragmentSaved || null;
+    
+    // Создаем новый ID сессии для каждой новой записи
+    const sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    localStorage.setItem('recordingSessionId', sessionId);
+    console.log(`Создана новая сессия записи с ID: ${sessionId}`);
     
     // Инициализируем запись
     const started = this._initRecording();

@@ -121,22 +121,25 @@ export default function Home() {
       return;
     }
     
-    // Используем фрагментированную запись вместо обычной
+    // Используем фрагментированную запись с 15-минутными фрагментами
     const started = audioRecorder.startFragmentedRecording(
       // Callback для сохранения фрагментов
       (fragment) => {
         console.log(`Сохранен фрагмент #${fragment.index}, размер: ${fragment.blob.size} байт`);
         
-        // Можно добавить индикатор о сохранении фрагмента, если нужно
-        if (fragment.index > 0 && fragment.index % 5 === 0) { // каждые 5 фрагментов
+        // Уведомление при сохранении каждого 15-минутного фрагмента
+        if (fragment.index > 0) {
+          const minutesRecorded = Math.round(fragment.index * 15);
           toast({
-            title: "Данные сохраняются",
-            description: `Записано ${Math.round(fragment.index * 60)} секунд`,
-            duration: 2000,
+            title: "Автоматическое сохранение",
+            description: `Фрагмент ${fragment.index}: сохранено ${minutesRecorded} минут записи`,
+            duration: 3000,
           });
+          
+          console.log(`Запись продолжается: сохранен фрагмент #${fragment.index} (${minutesRecorded} минут)`);
         }
       },
-      60000 // 1 минута - размер фрагмента
+      900000 // 15 минут (900 секунд) - размер фрагмента
     );
     
     if (started) {

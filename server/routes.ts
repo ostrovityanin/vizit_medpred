@@ -1110,13 +1110,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'Событие начала записи зарегистрировано',
           recordingId: recording.id 
         });
-      } catch (dbError) {
+      } catch (dbError: any) {
         console.error(`[recording] Ошибка при создании записи: ${dbError}`);
         // Даже если не удалось создать запись, продолжаем работу
         res.json({ 
           success: true, 
           message: 'Событие начала записи зарегистрировано, но не сохранено в БД',
-          error: dbError.message
+          error: dbError.message || 'Неизвестная ошибка БД'
         });
       }
     } catch (error) {
