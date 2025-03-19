@@ -33,7 +33,7 @@ export default function Home() {
       }
     }
   }, []);
-  const MAX_RECORDING_TIME = 60; // Максимальное время записи в секундах (1 минута)
+  const MAX_RECORDING_TIME = 300; // Максимальное время записи в секундах (5 минут)
   const { toast } = useToast();
   
   // Функция для остановки записи, которую можно безопасно вызывать из useRef колбэка
@@ -50,9 +50,9 @@ export default function Home() {
     
     // Только когда запись активна, устанавливаем таймер автоостановки
     if (isRecording) {
-      console.log('Установлен таймер автоостановки на 60 секунд');
+      console.log('Установлен таймер автоостановки на 5 минут');
       
-      // Устанавливаем таймер на автоматическую остановку через 60 секунд
+      // Устанавливаем таймер на автоматическую остановку через 5 минут
       autoStopTimerId = window.setTimeout(async () => {
         console.log('Сработал таймер автоостановки');
         
@@ -70,7 +70,7 @@ export default function Home() {
             
             toast({
               title: "Автоматическая остановка",
-              description: `Достигнута максимальная длительность записи (1 минута)`,
+              description: `Достигнута максимальная длительность записи (5 минут)`,
             });
             
             // Сохраняем данные
@@ -250,12 +250,12 @@ export default function Home() {
   // Отправка только через Telegram
 
   return (
-    <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen">
-      <header className="flex flex-col items-center mb-8">
-        <h1 className="text-2xl font-bold text-tgblue mb-2">Таймер визита</h1>
+    <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen bg-gray-800">
+      <header className="flex flex-col items-center mb-6">
+        <h1 className="text-3xl font-bold text-white mb-3">ТАЙМЕР ВИЗИТА</h1>
         <div className="flex gap-2 flex-wrap justify-center">
           <Link href={`/user-recordings${senderUsername ? `?username=${encodeURIComponent(senderUsername)}` : ''}`}>
-            <Button variant="outline" size="sm" className="text-xs">
+            <Button variant="outline" size="sm" className="text-xs bg-gray-700 text-white border-gray-600 hover:bg-gray-600">
               Мои визиты
             </Button>
           </Link>
@@ -270,32 +270,32 @@ export default function Home() {
       <div className="flex justify-center gap-4 mb-8">
         {!isRecording ? (
           <Button 
-            className="bg-tgblue hover:bg-tgbluedark text-white font-medium py-3 px-8 rounded-lg flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-10 rounded-lg flex items-center gap-2"
             onClick={handleStartTimer}
           >
-            <PlayCircle className="h-5 w-5" />
-            <span>Старт</span>
+            <PlayCircle className="h-6 w-6" />
+            <span className="text-lg">СТАРТ</span>
           </Button>
         ) : (
           <Button 
-            className="bg-recording hover:bg-red-600 text-white font-medium py-3 px-8 rounded-lg flex items-center gap-2"
+            className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-10 rounded-lg flex items-center gap-2"
             onClick={handleStopTimer}
           >
-            <StopCircle className="h-5 w-5" />
-            <span>Стоп</span>
+            <StopCircle className="h-6 w-6" />
+            <span className="text-lg">СТОП</span>
           </Button>
         )}
       </div>
 
       {recordingCompleted && audioUrl && (
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-4 flex flex-col items-center">
+        <div className="bg-gray-900 rounded-2xl shadow-lg p-6 mb-4 flex flex-col items-center border border-gray-700">
           <div className="text-center mb-2">
-            <h3 className="font-semibold text-lg">Визит зафиксирован</h3>
+            <h3 className="font-semibold text-lg text-white">Визит зафиксирован</h3>
           </div>
           
           <Button 
             variant="outline"
-            className="mt-3 border-neutral-300 text-neutral-700 font-medium"
+            className="mt-3 border-gray-600 text-gray-300 font-medium hover:bg-gray-700"
             onClick={handleDiscardAudio}
           >
             <Trash2 className="h-4 w-4 mr-2" />
