@@ -1180,6 +1180,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Продолжаем выполнение даже при ошибке логирования
       }
       
+      // Если задан recordingId, выполняем транскрипцию аудио и обновляем запись
+      if (recordingIdNum) {
+        try {
+          log(`Начинаем транскрипцию WAV файла: ${wavFilename} для записи ID: ${recordingIdNum}`, 'openai');
+          
+          const wavPath = path.join(__dirname, 'uploads', wavFilename);
+          if (fs.existsSync(wavPath)) {
+            const transcriptionResult = await transcribeAudio(wavPath);
+            
+            if (transcriptionResult) {
+              log(`Транскрипция успешно получена для записи ID: ${recordingIdNum}`, 'openai');
+              
+              // Обновляем запись с результатами транскрипции
+              const recording = await storage.getRecordingById(recordingIdNum);
+              if (recording) {
+                recording.transcription = transcriptionResult.text;
+                recording.transcriptionCost = transcriptionResult.cost;
+                recording.tokensProcessed = transcriptionResult.tokensProcessed;
+                
+                // Обновляем статус записи
+                await storage.updateRecordingStatus(recordingIdNum, 'completed');
+                log(`Обновлена запись ID: ${recordingIdNum} с результатами транскрипции`, 'openai');
+              }
+            } else {
+              log(`Не удалось получить транскрипцию для записи ID: ${recordingIdNum}`, 'openai');
+            }
+          } else {
+            log(`WAV файл не найден для транскрипции: ${wavPath}`, 'openai');
+          }
+        } catch (transcriptionError) {
+          log(`Ошибка при транскрипции WAV файла: ${transcriptionError}`, 'openai');
+          // Продолжаем выполнение даже при ошибке транскрипции
+        }
+      }
+      
       // Формируем ответ с информацией о созданном WAV файле
       res.json({
         success: true,
