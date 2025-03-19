@@ -981,19 +981,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Если передан ID записи, обновляем информацию о записи
       if (recordingId && recordingIdNum && !isNaN(recordingIdNum)) {
         try {
-            // Получаем текущую запись
-            const existingRecording = await storage.getRecordingById(recordingIdNum);
-            
-            if (existingRecording) {
-              // Запись найдена, обновляем статус, если требуется
-              if (existingRecording.status !== 'started') {
-                await storage.updateRecordingStatus(recordingIdNum, 'started');
-                log(`Обновлен статус записи с ID: ${recordingIdNum} на 'started' (фрагмент #${fragmentIndex})`, 'recording');
-              }
-              log(`Добавлен фрагмент #${fragmentIndex} к записи ${recordingIdNum}`, 'fragments');
-            } else {
-              log(`Предупреждение: Передан ID записи ${recordingIdNum}, но запись не найдена`, 'fragments');
+          // Получаем текущую запись
+          const existingRecording = await storage.getRecordingById(recordingIdNum);
+          
+          if (existingRecording) {
+            // Запись найдена, обновляем статус, если требуется
+            if (existingRecording.status !== 'started') {
+              await storage.updateRecordingStatus(recordingIdNum, 'started');
+              log(`Обновлен статус записи с ID: ${recordingIdNum} на 'started' (фрагмент #${fragmentIndex})`, 'recording');
             }
+            log(`Добавлен фрагмент #${fragmentIndex} к записи ${recordingIdNum}`, 'fragments');
+          } else {
+            log(`Предупреждение: Передан ID записи ${recordingIdNum}, но запись не найдена`, 'fragments');
           }
         } catch (error) {
           log(`Ошибка при обновлении информации о записи ${recordingId}: ${error}`, 'fragments');
@@ -1004,7 +1003,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       eventLogger.logEvent(
         'system', 
         'FRAGMENT_RECEIVED', 
-        { sessionId, index: fragment.index, size: fragment.size, recordingId: recordingId || undefined }
+        { 
+          sessionId, 
+          index: index, 
+          size: fragment ? fragment.size : fileBuffer.length, 
+          recordingId: recordingIdNum || undefined 
+        }
       );
       
       // Удаляем временный файл, так как мы уже сохранили его в fragmentManager
@@ -1013,7 +1017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({ 
         success: true, 
         message: 'Фрагмент успешно сохранен',
-        fragment
+        fragment: fragment || { index, sessionId, timestamp: parsedTimestamp }
       });
     } catch (error) {
       log(`Ошибка при приеме фрагмента: ${error}`, 'fragments');
