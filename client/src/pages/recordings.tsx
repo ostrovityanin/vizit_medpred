@@ -47,7 +47,7 @@ export default function Recordings() {
       console.error('Error fetching recordings:', error);
       toast({
         title: 'Ошибка',
-        description: 'Не удалось загрузить список записей',
+        description: 'Не удалось загрузить список визитов',
         variant: 'destructive',
       });
     } finally {
@@ -108,7 +108,7 @@ export default function Recordings() {
       if (success) {
         toast({
           title: 'Успешно',
-          description: `Аудиозапись отправлена пользователю @${username} через клиентский бот`,
+          description: `Аудио визита отправлено пользователю @${username} через клиентский бот`,
           variant: 'default',
         });
         
@@ -117,7 +117,7 @@ export default function Recordings() {
       } else {
         toast({
           title: 'Ошибка',
-          description: 'Не удалось отправить аудиозапись через клиентский бот',
+          description: 'Не удалось отправить аудио визита через клиентский бот',
           variant: 'destructive',
         });
       }
@@ -346,7 +346,7 @@ export default function Recordings() {
                           variant="outline" 
                           size="sm"
                           className="text-neutral-700"
-                          title="Скачать запись"
+                          title="Скачать данные визита"
                         >
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
@@ -520,7 +520,7 @@ export default function Recordings() {
                 }}
               >
                 <Play className="h-4 w-4 mr-1" />
-                <span>Слушать запись</span>
+                <span>Слушать аудио визита</span>
               </Button>
             </div>
           </div>
