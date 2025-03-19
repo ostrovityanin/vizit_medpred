@@ -48,6 +48,11 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
+  // Функция для безопасного обращения с timestamp
+  const safeTimestamp = (timestamp: string | null | undefined): string => {
+    return timestamp || new Date().toISOString();
+  };
+  
   app.post('/api/recordings', upload.single('audio'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
@@ -55,6 +60,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const recordingData = req.body;
+      const recordingId = recordingData.recordingId ? parseInt(recordingData.recordingId, 10) : null;
       
       try {
         // Получить размер файла
@@ -81,21 +87,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
           log(`Результат распознавания: ${transcriptionText}`, 'openai');
           log(`Стоимость распознавания: $${transcriptionCost} (${tokensProcessed} токенов)`, 'openai');
         }
-        
-        const validData = insertRecordingSchema.parse({
-          filename: req.file.filename,
-          duration: parseInt(recordingData.duration, 10),
-          timestamp: recordingData.timestamp,
-          targetUsername: recordingData.targetUsername,
-          senderUsername: recordingData.senderUsername || "Пользователь", // Добавляем имя отправителя
-          fileSize: fileSize, // Добавляем размер файла
-          transcription: transcriptionText, // Добавляем распознанный текст
-          transcriptionCost: transcriptionCost, // Добавляем стоимость распознавания
-          tokensProcessed: tokensProcessed // Добавляем количество обработанных токенов
-        });
 
-        // Создаем запись для админской базы
-        const recording = await storage.createRecording(validData);
+        // Проверяем существует ли начатая запись, которую нужно обновить
+        let recording;
+        if (recordingId) {
+          try {
+            const existingRecording = await storage.getRecordingById(recordingId);
+            
+            if (existingRecording && existingRecording.status === 'started') {
+              log(`Найдена запись со статусом 'started' (ID: ${recordingId}), обновляем...`, 'recording');
+              
+              // Сначала обновляем статус на 'completed'
+              await storage.updateRecordingStatus(recordingId, 'completed');
+              
+              // Затем обновляем другие данные (для этого нужно создать специальный метод)
+              // Пока просто создаем новую запись с отметкой, что она является продолжением предыдущей
+              const validData = insertRecordingSchema.parse({
+                filename: req.file.filename,
+                duration: parseInt(recordingData.duration, 10),
+                timestamp: recordingData.timestamp || new Date().toISOString(),
+                targetUsername: recordingData.targetUsername || existingRecording.targetUsername,
+                senderUsername: recordingData.senderUsername || existingRecording.senderUsername || "Пользователь",
+                fileSize: fileSize,
+                transcription: transcriptionText,
+                transcriptionCost: transcriptionCost,
+                tokensProcessed: tokensProcessed,
+                status: 'completed'
+              });
+
+              recording = await storage.createRecording(validData);
+              
+              log(`Создана новая запись (ID: ${recording.id}) со статусом 'completed' на основе записи ${recordingId}`, 'recording');
+              
+              // Если есть информация о пользователе, логируем завершение записи
+              if (recordingData.senderUsername) {
+                eventLogger.logRecordingEnd(recordingData.senderUsername, parseInt(recordingData.duration, 10), fileSize);
+              }
+            } else {
+              // Запись не найдена или уже имеет статус, отличный от 'started'
+              log(`Запись с ID: ${recordingId} не найдена или уже не имеет статус 'started'`, 'recording');
+              
+              // Создаем новую запись
+              const validData = insertRecordingSchema.parse({
+                filename: req.file.filename,
+                duration: parseInt(recordingData.duration, 10),
+                timestamp: recordingData.timestamp || new Date().toISOString(),
+                targetUsername: recordingData.targetUsername,
+                senderUsername: recordingData.senderUsername || "Пользователь",
+                fileSize: fileSize,
+                transcription: transcriptionText,
+                transcriptionCost: transcriptionCost,
+                tokensProcessed: tokensProcessed,
+                status: 'completed'
+              });
+
+              recording = await storage.createRecording(validData);
+            }
+          } catch (updateError) {
+            log(`Ошибка при обновлении существующей записи: ${updateError}`, 'recording');
+            // Создаем новую запись если не удалось обновить существующую
+            const validData = insertRecordingSchema.parse({
+              filename: req.file.filename,
+              duration: parseInt(recordingData.duration, 10),
+              timestamp: recordingData.timestamp || new Date().toISOString(),
+              targetUsername: recordingData.targetUsername,
+              senderUsername: recordingData.senderUsername || "Пользователь",
+              fileSize: fileSize,
+              transcription: transcriptionText,
+              transcriptionCost: transcriptionCost,
+              tokensProcessed: tokensProcessed,
+              status: 'completed'
+            });
+
+            recording = await storage.createRecording(validData);
+          }
+        } else {
+          // Создаем новую запись, так как ID не предоставлен
+          const validData = insertRecordingSchema.parse({
+            filename: req.file.filename,
+            duration: parseInt(recordingData.duration, 10),
+            timestamp: recordingData.timestamp || new Date().toISOString(),
+            targetUsername: recordingData.targetUsername,
+            senderUsername: recordingData.senderUsername || "Пользователь",
+            fileSize: fileSize,
+            transcription: transcriptionText,
+            transcriptionCost: transcriptionCost,
+            tokensProcessed: tokensProcessed,
+            status: 'completed'
+          });
+
+          recording = await storage.createRecording(validData);
+        }
         
         // Также создаем запись в пользовательской базе, если указан целевой пользователь
         if (recordingData.targetUsername) {
@@ -104,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               adminRecordingId: recording.id,
               username: recordingData.targetUsername,
               duration: parseInt(recordingData.duration, 10),
-              timestamp: recordingData.timestamp,
+              timestamp: recordingData.timestamp || new Date().toISOString(),
             });
             log(`Создана пользовательская запись для @${recordingData.targetUsername}`, 'storage');
           } catch (createUserError) {
@@ -120,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               adminRecordingId: recording.id,
               username: recordingData.senderUsername,
               duration: parseInt(recordingData.duration, 10),
-              timestamp: recordingData.timestamp,
+              timestamp: recordingData.timestamp || new Date().toISOString(),
             });
             log(`Создана пользовательская запись для отправителя @${recordingData.senderUsername}`, 'storage');
           } catch (createSenderError) {
