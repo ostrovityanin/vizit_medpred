@@ -70,6 +70,19 @@ export default function Recordings() {
   const downloadRecording = (id: number) => {
     window.location.href = `/api/recordings/${id}/download`;
   };
+  
+  const playRecording = (id: number) => {
+    const recording = recordings.find(r => r.id === id);
+    if (recording) {
+      setSelectedRecording(recording);
+      setAudioPlayerVisible(true);
+    }
+  };
+  
+  const closeAudioPlayer = () => {
+    setAudioPlayerVisible(false);
+    setSelectedRecording(null);
+  };
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
@@ -161,6 +174,32 @@ export default function Recordings() {
           должен отправить команду /start боту.
         </p>
       </div>
+      
+      {/* Модальное окно для аудиоплеера */}
+      {audioPlayerVisible && selectedRecording && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-md mx-4 p-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Прослушивание записи</h3>
+              <Button variant="ghost" size="sm" onClick={closeAudioPlayer}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <FileAudioPlayer 
+              audioUrl={`/api/recordings/${selectedRecording.id}/download`} 
+              filename={selectedRecording.filename}
+            />
+            
+            <div className="mt-4 text-sm text-neutral-500">
+              Записано: {formatDate(selectedRecording.timestamp)}
+              {selectedRecording.senderUsername && (
+                <span className="block">Отправитель: {selectedRecording.senderUsername}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
