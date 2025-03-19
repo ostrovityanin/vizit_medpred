@@ -13,13 +13,9 @@ export default function Timer({ time, isRecording }: TimerProps) {
       </div>
       
       {isRecording && (
-        <div className="flex items-center justify-center text-red-500 font-medium gap-2 mt-2">
+        <div className="flex items-center justify-center text-gray-500 font-medium gap-2 mt-2">
           <span className="flex items-center">
-            <span className="relative flex h-3 w-3 mr-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
-            </span>
-            <span className="text-white text-lg">ЗАПИСЬ</span>
+            <span className="text-gray-400 text-lg">ВИЗИТ ИДЕТ</span>
           </span>
         </div>
       )}
