@@ -18,6 +18,7 @@ function Router() {
       <Route path="/recordings" component={Recordings} />
       <Route path="/client-bot-test" component={ClientBotTest} />
       <Route path="/admin" component={Admin} />
+      <Route path="/admin-panel" component={Admin} />
       <Route path="/user-recordings" component={UserRecordings} />
       <Route component={NotFound} />
     </Switch>
