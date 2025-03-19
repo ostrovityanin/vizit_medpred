@@ -2,8 +2,14 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import crypto from 'crypto';
 import { log } from './vite';
 import { eventLogger } from './event-logger';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { storage } from './storage';
+
+const execAsync = promisify(exec);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -166,6 +172,88 @@ class FragmentManager {
     return await this.combineFragments(sessionId);
   }
   
+  /**
+   * Конвертирует WebM файл в WAV формат, поддерживаемый OpenAI API
+   */
+  public async convertToWav(input: string, output: string): Promise<boolean> {
+    try {
+      log(`Конвертация файла ${input} в формат WAV`, 'fragments');
+      
+      // Используем FFmpeg для конвертации
+      const command = `ffmpeg -i "${input}" -ar 44100 -ac 1 "${output}" -y`;
+      await execAsync(command);
+      
+      const stats = await fs.promises.stat(output);
+      log(`Конвертация успешна, размер файла: ${stats.size} байт`, 'fragments');
+      
+      return true;
+    } catch (error) {
+      log(`Ошибка при конвертации аудио: ${error}`, 'fragments');
+      return false;
+    }
+  }
+
+  /**
+   * Конвертирует объединенный файл WebM в формат WAV и копирует в директорию uploads
+   */
+  public async convertCombinedToWav(sessionId: string, recordingId?: string | number): Promise<string | null> {
+    try {
+      const combinedFilename = `combined-${sessionId}.webm`;
+      const combinedPath = path.join(this.fragmentsDir, combinedFilename);
+      
+      if (!fs.existsSync(combinedPath)) {
+        log(`Ошибка: Объединенный файл ${combinedFilename} не найден`, 'fragments');
+        return null;
+      }
+      
+      // Генерируем уникальное имя файла для WAV версии
+      const uuid = crypto.randomUUID();
+      const wavFilename = `${uuid}.wav`;
+      const uploadsDir = path.join(__dirname, 'uploads');
+      
+      // Создаем директорию uploads, если она не существует
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      const wavPath = path.join(uploadsDir, wavFilename);
+      
+      // Конвертируем файл
+      const success = await this.convertToWav(combinedPath, wavPath);
+      
+      if (!success) {
+        log(`Ошибка при конвертации файла ${combinedFilename} в WAV`, 'fragments');
+        return null;
+      }
+      
+      log(`Файл ${combinedFilename} успешно конвертирован в ${wavFilename}`, 'fragments');
+      
+      // Если указан ID записи, обновляем имя файла в базе данных
+      if (recordingId) {
+        try {
+          const id = typeof recordingId === 'string' ? parseInt(recordingId, 10) : recordingId;
+          const recording = await storage.getRecordingById(id);
+          
+          if (recording) {
+            // Обновляем имя файла в записи
+            recording.filename = wavFilename;
+            
+            // Обновляем статус записи
+            await storage.updateRecordingStatus(id, 'completed');
+            log(`Обновлен статус записи с ID: ${id} на 'completed' при объединении фрагментов`, 'recording');
+          }
+        } catch (error) {
+          log(`Ошибка при обновлении записи: ${error}`, 'fragments');
+        }
+      }
+      
+      return wavFilename;
+    } catch (error) {
+      log(`Ошибка при конвертации аудио: ${error}`, 'fragments');
+      return null;
+    }
+  }
+
   /**
    * Очищает временные файлы фрагментов для указанной сессии
    */
