@@ -228,7 +228,20 @@
       "tokensProcessed": 37,
       "id": 19,
       "sent": false
+    },
+    {
+      "filename": "73beebb8-7b17-4b6d-ba0b-fb432abb824c.wav",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:28:29.404Z",
+      "targetUsername": "archive",
+      "senderUsername": "Юрий",
+      "fileSize": 45509,
+      "transcription": "Человек 1: \"Тест-тест.\"",
+      "transcriptionCost": "0.0003",
+      "tokensProcessed": 43,
+      "id": 20,
+      "sent": false
     }
   ],
-  "currentId": 20
+  "currentId": 21
 }

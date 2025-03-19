@@ -55,7 +55,23 @@
       "timestamp": "2024-03-19T12:00:00Z",
       "id": 7,
       "sent": false
+    },
+    {
+      "adminRecordingId": 20,
+      "username": "archive",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:28:29.404Z",
+      "id": 8,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 20,
+      "username": "Юрий",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:28:29.404Z",
+      "id": 9,
+      "sent": false
     }
   ],
-  "currentId": 8
+  "currentId": 10
 }

@@ -27,14 +27,24 @@ export default function UserRecordings() {
     // Проверяем, запущено ли приложение в Telegram WebApp
     if (isTelegramWebApp() && window.Telegram?.WebApp?.initDataUnsafe?.user?.username) {
       // Получаем имя пользователя из Telegram WebApp
-      setUsername(window.Telegram.WebApp.initDataUnsafe.user.username);
-      fetchUserRecordings(window.Telegram.WebApp.initDataUnsafe.user.username);
+      const telegramUsername = window.Telegram.WebApp.initDataUnsafe.user.username;
+      console.log('Получено имя пользователя из Telegram WebApp:', telegramUsername);
+      setUsername(telegramUsername);
+      fetchUserRecordings(telegramUsername);
     } else {
-      // Если не в Telegram WebApp, запрашиваем имя пользователя вручную
-      const userInput = prompt('Введите ваше имя пользователя (без @):');
-      if (userInput) {
-        setUsername(userInput);
-        fetchUserRecordings(userInput);
+      // Получаем имя пользователя из URL, если оно там есть
+      const urlParams = new URLSearchParams(window.location.search);
+      const usernameFromUrl = urlParams.get('username');
+      
+      if (usernameFromUrl) {
+        console.log('Получено имя пользователя из URL:', usernameFromUrl);
+        setUsername(usernameFromUrl);
+        fetchUserRecordings(usernameFromUrl);
+      } else {
+        // Если не в Telegram WebApp и нет имени в URL, показываем форму ввода
+        // Форма отображается в JSX, когда username пустой
+        console.log('Имя пользователя не найдено, ожидание ввода в форму');
+        setLoading(false);
       }
     }
   }, []);
@@ -84,6 +94,20 @@ export default function UserRecordings() {
 
 
 
+  const handleUsernameChange = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formUsername = (document.getElementById('username-input') as HTMLInputElement)?.value;
+    if (formUsername) {
+      setUsername(formUsername);
+      fetchUserRecordings(formUsername);
+      
+      // Обновляем URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set('username', formUsername);
+      window.history.replaceState({}, '', newUrl.toString());
+    }
+  };
+
   return (
     <div className="w-full mx-auto px-4 py-6">
       <header className="flex items-center justify-between mb-6">
@@ -101,15 +125,31 @@ export default function UserRecordings() {
         </div>
       </header>
       
+      {!username && !loading && (
+        <div className="bg-white rounded-xl shadow-md p-6 mb-6">
+          <h2 className="text-lg font-medium mb-4">Введите имя пользователя</h2>
+          <form onSubmit={handleUsernameChange} className="flex flex-col gap-3">
+            <input
+              id="username-input"
+              type="text"
+              placeholder="Имя пользователя (без @)"
+              className="p-2 border border-gray-300 rounded-md"
+              required
+            />
+            <Button type="submit">Показать мои визиты</Button>
+          </form>
+        </div>
+      )}
+      
       {loading ? (
         <div className="text-center py-8">
           <p className="text-neutral-500">Загрузка...</p>
         </div>
-      ) : recordings.length === 0 ? (
+      ) : username && recordings.length === 0 ? (
         <div className="text-center py-8 bg-white rounded-xl shadow-sm">
-          <p className="text-neutral-500">Записей нет</p>
+          <p className="text-neutral-500">Визитов нет</p>
         </div>
-      ) : (
+      ) : username && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="grid grid-cols-1 divide-y divide-neutral-100">
             {recordings.map((recording) => (
@@ -123,8 +163,6 @@ export default function UserRecordings() {
           </div>
         </div>
       )}
-
-
     </div>
   );
 }
