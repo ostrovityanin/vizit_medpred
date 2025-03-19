@@ -13,7 +13,7 @@ export default function Instructions() {
         <h4 className="font-medium text-blue-800 mb-1">Важно!</h4>
         <p className="text-xs text-blue-700">
           Для получения сообщений от бота, пользователь @ostrovityanin должен сначала 
-          найти бот "@your_bot_name" и отправить ему команду /start
+          найти бот "@KashMenBot" и отправить ему команду /start
         </p>
       </div>
       
