@@ -6,6 +6,8 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Recordings from "@/pages/recordings";
 import ClientBotTest from "@/pages/client-bot-test";
+import Admin from "@/pages/admin";
+import UserRecordings from "@/pages/user-recordings";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -15,6 +17,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/recordings" component={Recordings} />
       <Route path="/client-bot-test" component={ClientBotTest} />
+      <Route path="/admin" component={Admin} />
+      <Route path="/user-recordings" component={UserRecordings} />
       <Route component={NotFound} />
     </Switch>
   );

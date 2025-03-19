@@ -1,0 +1,143 @@
+{
+  "recordings": [
+    {
+      "filename": "1823eaf0-37f2-4210-82be-a6630f5dbb6b.wav",
+      "duration": 1742346515,
+      "timestamp": "2025-03-19T01:08:35.131Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 23099,
+      "id": 1,
+      "sent": false
+    },
+    {
+      "filename": "7f8a501f-004c-4bc8-a070-f0e194fbab06.wav",
+      "duration": 1742346527,
+      "timestamp": "2025-03-19T01:08:47.429Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 22102,
+      "id": 2,
+      "sent": false
+    },
+    {
+      "filename": "0cb3f5c7-7087-4e56-adac-ae80b5a4f401.wav",
+      "duration": 1742347202,
+      "timestamp": "2025-03-19T01:20:02.042Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 54334,
+      "transcription": "Мококопра! Мококопра! Мококопра!",
+      "id": 3,
+      "sent": false
+    },
+    {
+      "filename": "970f7143-de06-4cdd-9ceb-c7bccd4ccb1e.wav",
+      "duration": 1742347305,
+      "timestamp": "2025-03-19T01:21:45.432Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 847950,
+      "transcription": "Как давно ты играл в Апекс в последний раз? Пойдём лучше на кухню Ну ты говори Не шуми Ну я хочу просто уйти, чтобы не мешать Ну давай говори ещё что-нибудь Давно играл в Апекс в последний раз? Нет Да, давно Короче ещё могу сказать, там появились новые делики На 20 кейсов Я правда не понял, почему на 20 Куда делись темы на 40? Те уже прошли Кто выполнил, тот выполнил А нам не дали ничего Те, короче, они Такой полоскан Это сколько будет кейсов В задачах, которые люди сами",
+      "id": 4,
+      "sent": false
+    },
+    {
+      "filename": "5f0dfbbd-bde8-4535-822b-d391dc114dff.wav",
+      "duration": 1742347512,
+      "timestamp": "2025-03-19T01:25:12.559Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 2258005,
+      "transcription": "Так чё, там с Антоном еще что-нибудь говорили интересное? С Антоном еще что-нибудь интересное говорили? Нет, ну мы с ним играли в прикольную игрушку, которую, я думаю, тебе тоже нужно взять и, я думаю, понравится Какого плана? Плана... Короче, вы с корешами собираете по всяким домам артефакты и там обитают всякие твари И задача в том, чтобы вынести оттуда как можно больше всякой прикольной штуки Она прикольная, она очень смешные ситуации генерирует Ну надо играть с одним человеком или с кем угодно? С кем угодно Но она клевая Ешь, вон там все твое, то что она пропитана Я думаю, это не страшно Все его ешь Фиг обманешь Я даже не знаю, как тебе показать, как это выглядит Это что показать? Что было за речь? Можно показать, что это такое? Надо попросить инструкцию на деление по диалогу",
+      "id": 5,
+      "sent": false
+    },
+    {
+      "filename": "fa5834e2-1f1c-431b-a40e-ce29955c6f0f.wav",
+      "duration": 1742347884,
+      "timestamp": "2025-03-19T01:31:24.352Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 674574,
+      "transcription": "Человек 1: Бл είναι жутко.\nЧеловек 2: Тест говорящего.\nЧеловек 1: Очень интересно.",
+      "id": 6,
+      "sent": false
+    },
+    {
+      "filename": "5f3b759f-0826-41b1-ace9-3fd818c9a238.wav",
+      "duration": 1742348180,
+      "timestamp": "2025-03-19T01:36:20.524Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 371614,
+      "transcription": "Человек 1: Пожалуйста, распознавайте только русские слова на русском языке.\nЧеловек 2: Какой ты негодяй.",
+      "id": 7,
+      "sent": false
+    },
+    {
+      "filename": "22a5320f-671f-4291-a77d-670a95c60403.wav",
+      "duration": 1742348355,
+      "timestamp": "2025-03-19T01:39:15.389Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 544000,
+      "transcription": "Человек 1: Подмога будет через пять минут. Людей так и нет.\nЧеловек 2: Значит, можно домой? А то Ваня начнет смотреть кино без меня.\nЧеловек 1: Ну да, отчет за тебя составят эльфы.\nЧеловек 2: Вот бы здорово было, если бы...\nЧеловек 1: Какая ты жопа.",
+      "id": 8,
+      "sent": false
+    },
+    {
+      "filename": "6a852fb4-e83d-4b59-833f-458e79d16437.wav",
+      "duration": 1742348848,
+      "timestamp": "2025-03-19T01:47:28.514Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 62186,
+      "transcription": "Человек 1: Тест записи. Запись теста.",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 58,
+      "id": 9,
+      "sent": false
+    },
+    {
+      "filename": "61524538-b61d-4d40-a538-89f196aeee35.wav",
+      "duration": 8,
+      "timestamp": "2025-03-19T13:37:35.738Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 127139,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, невозможно определить и разметить говорящих. Текст остается без изменений:\n\"Продолжение следует...\"",
+      "transcriptionCost": "0.0008",
+      "tokensProcessed": 119,
+      "id": 10,
+      "sent": false
+    },
+    {
+      "filename": "3c6dde37-409f-4717-adf4-0703cec9b05c.wav",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:42:04.895Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 60210,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на различных говорящих, невозможно определить и разметить разных говорящих. Вероятно, это фраза от одного говорящего.\nГоворящий 1: \"Продолжение следует...\"",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 56,
+      "id": 11,
+      "sent": false
+    },
+    {
+      "filename": "55fc13fd-7325-4d8c-b0c0-8d980a7e4a4b.wav",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:47:41.523Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 67788,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, невозможно определить и отформатировать его как диалог. Текст \"\"Продолжение следует...\"\" может быть произнесен любым говорящим или даже быть частью нарратива.",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 64,
+      "id": 12,
+      "sent": false
+    }
+  ],
+  "currentId": 13
+}

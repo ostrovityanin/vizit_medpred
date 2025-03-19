@@ -352,7 +352,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // API для работы с клиентскими записями (пользовательская часть)
+  // ======= API для работы с админкой ======= 
+  
+  // Получение всех записей для админки
+  app.get('/api/admin/recordings', async (req: Request, res: Response) => {
+    try {
+      const recordings = await storage.getAdminRecordings();
+      res.json(recordings);
+    } catch (error) {
+      log(`Error fetching admin recordings: ${error}`, 'admin');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении записей админки',
+        error
+      });
+    }
+  });
+  
+  // Получение записи по ID для админки
+  app.get('/api/admin/recordings/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid ID' });
+      }
+      
+      const recording = await storage.getAdminRecordingById(id);
+      if (!recording) {
+        return res.status(404).json({ message: 'Recording not found' });
+      }
+      
+      res.json(recording);
+    } catch (error) {
+      log(`Error fetching admin recording: ${error}`, 'admin');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении записи админки',
+        error
+      });
+    }
+  });
+  
+  // Отметка записи как отправленной для админки
+  app.post('/api/admin/recordings/:id/mark-sent', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        return res.status(400).json({ message: 'Invalid ID' });
+      }
+      
+      const recording = await storage.markAdminRecordingAsSent(id);
+      if (!recording) {
+        return res.status(404).json({ message: 'Recording not found' });
+      }
+      
+      res.json(recording);
+    } catch (error) {
+      log(`Error marking admin recording as sent: ${error}`, 'admin');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при отметке записи как отправленной',
+        error
+      });
+    }
+  });
+  
+  // ======= API для работы с клиентскими записями (пользовательская часть) =======
   
   // Получение записей для конкретного пользователя (по его username)
   app.get('/api/client/recordings/:username', async (req: Request, res: Response) => {
@@ -369,44 +434,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Подробное логирование
       log(`Запрошены записи для пользователя: @${username}`, 'client-bot');
       
-      // Получаем все записи
-      const allRecordings = await storage.getRecordings();
-      log(`Всего записей в базе: ${allRecordings.length}`, 'client-bot');
+      // Получаем записи пользователя
+      const userRecordings = await storage.getUserRecordings(username);
+      log(`Найдено ${userRecordings.length} записей для пользователя @${username}`, 'client-bot');
       
-      // Показываем, что у нас есть в базе
-      allRecordings.forEach((rec, index) => {
-        log(`Запись #${index + 1}: filename=${rec.filename}, sender=${rec.senderUsername || 'не указан'}, target=${rec.targetUsername}`, 'client-bot');
-      });
-      
-      // Проверяем и очищаем username (убираем возможный @ в начале)
-      const cleanUsername = username.replace(/^@/, '');
-      log(`Очищенное имя пользователя: ${cleanUsername}`, 'client-bot');
-      
-      // Фильтруем записи, в которых пользователь является ТОЛЬКО отправителем
-      // Это гарантирует, что пользователь видит только свои записи
-      const userRecordings = allRecordings.filter(recording => {
-        // Если senderUsername не существует, результат всегда false
-        if (!recording.senderUsername) {
-          log(`Запись ${recording.filename}: sender=null, match=false`, 'client-bot');
-          return false;
+      // Если записей пользователя нет, но мы должны искать в основной базе
+      if (userRecordings.length === 0) {
+        log(`Записи пользователя не найдены, ищем в основной базе (для обратной совместимости)`, 'client-bot');
+        
+        // Получаем все записи из админской базы
+        const allRecordings = await storage.getAdminRecordings();
+        
+        // Очищаем имя пользователя от @ и переводим в нижний регистр
+        const cleanUsername = username.replace(/^@/, '').toLowerCase();
+        
+        // Фильтруем записи, где пользователь является отправителем или получателем
+        const matchingRecordings = allRecordings.filter(recording => {
+          const senderMatch = recording.senderUsername && 
+                            recording.senderUsername.replace(/^@/, '').toLowerCase() === cleanUsername;
+                            
+          const targetMatch = recording.targetUsername && 
+                            recording.targetUsername.replace(/^@/, '').toLowerCase() === cleanUsername;
+                            
+          // Для бота пользователь должен видеть только свои записи (где он отправитель)
+          return senderMatch;
+        });
+        
+        // Для каждой найденной записи создаем запись в пользовательской базе
+        for (const recording of matchingRecordings) {
+          await storage.createUserRecording({
+            adminRecordingId: recording.id,
+            username: username,
+            duration: recording.duration,
+            timestamp: recording.timestamp,
+          });
         }
         
-        // Очищаем senderUsername от возможного @ в начале
-        const cleanSender = recording.senderUsername.replace(/^@/, '');
+        // Получаем обновленный список записей пользователя
+        const updatedUserRecordings = await storage.getUserRecordings(username);
+        log(`Создано ${updatedUserRecordings.length} записей пользователя из основной базы`, 'client-bot');
         
-        // Сравниваем в нижнем регистре
-        const isSender = cleanSender.toLowerCase() === cleanUsername.toLowerCase();
-        
-        log(`Запись ${recording.filename}: sender=${recording.senderUsername} (clean=${cleanSender}), match=${isSender}`, 'client-bot');
-        return isSender;
-      });
-      
-      log(`Отфильтровано записей для @${username}: ${userRecordings.length}`, 'client-bot');
-      
-      res.json({
-        success: true,
-        recordings: userRecordings
-      });
+        res.json({
+          success: true,
+          recordings: updatedUserRecordings
+        });
+      } else {
+        res.json({
+          success: true,
+          recordings: userRecordings
+        });
+      }
     } catch (error) {
       log(`Error fetching client recordings: ${error}`, 'client-bot');
       res.status(500).json({ 

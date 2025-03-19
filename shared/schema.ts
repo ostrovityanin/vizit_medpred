@@ -20,7 +20,7 @@ export const adminRecordings = pgTable("admin_recordings", {
 // Таблица для хранения записей пользователей (для бота)
 export const userRecordings = pgTable("user_recordings", {
   id: serial("id").primaryKey(),
-  adminRecordingId: integer("admin_recording_id"), // Связь с основной записью
+  adminRecordingId: integer("admin_recording_id"), // Связь с основной записью, может быть null при прямой записи
   username: text("username").notNull(),  // Имя пользователя, которому принадлежит запись
   duration: integer("duration").notNull(),
   timestamp: text("timestamp").notNull(),
