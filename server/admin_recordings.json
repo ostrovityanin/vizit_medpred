@@ -51,7 +51,33 @@
       "tokensProcessed": 3800,
       "id": 4,
       "sent": false
+    },
+    {
+      "filename": "44589e96-9859-4e7f-810f-475f79d88d31.wav",
+      "duration": 9,
+      "timestamp": "2025-03-19T16:46:37.170Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 151760,
+      "transcription": "Игорь Негода: \"С вами был Игорь Негода.\"",
+      "transcriptionCost": "0.0009",
+      "tokensProcessed": 142,
+      "id": 5,
+      "sent": false
+    },
+    {
+      "filename": "db452157-54a9-4b60-85e4-ca4bf1873962.wav",
+      "duration": 129,
+      "timestamp": "2025-03-19T16:48:58.667Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1914326,
+      "transcription": "Извините, но вы не предоставили текст для анализа. Пожалуйста, предоставьте текст, и я с удовольствием помогу вам его отформатировать.",
+      "transcriptionCost": "0.0120",
+      "tokensProcessed": 1795,
+      "id": 6,
+      "sent": false
     }
   ],
-  "currentId": 5
+  "currentId": 7
 }
