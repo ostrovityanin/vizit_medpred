@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
 import { sendAudioViaClientBot, notifyUserAboutRecording, sendMessageViaClientBot } from '@/lib/telegram';
@@ -18,6 +18,7 @@ interface AdminRecording {
   transcriptionCost?: string | null;
   tokensProcessed?: number | null;
   sent: boolean;
+  status?: 'started' | 'completed' | 'error' | null;
 }
 
 export default function AdminPanel() {
@@ -239,6 +240,56 @@ export default function AdminPanel() {
       setSelectedRecording(null);
     }
   };
+  
+  // Обновить статус записи
+  const updateRecordingStatus = async (id: number, newStatus: 'started' | 'completed' | 'error') => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) {
+        throw new Error('Запись не найдена');
+      }
+      
+      // Для статуса "error" запрашиваем сообщение об ошибке
+      let errorMessage = '';
+      if (newStatus === 'error') {
+        errorMessage = prompt('Введите описание ошибки:', '') || 'Неизвестная ошибка';
+      }
+      
+      const response = await fetch(`/api/recordings/${id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          status: newStatus,
+          errorMessage: newStatus === 'error' ? errorMessage : undefined
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Ошибка при обновлении статуса');
+      }
+      
+      const data = await response.json();
+      
+      toast({
+        title: 'Статус обновлен',
+        description: `Запись ${id} теперь имеет статус "${newStatus}"`,
+        variant: 'default',
+      });
+      
+      // Обновляем список записей
+      fetchRecordings();
+      
+    } catch (error) {
+      console.error('Error updating recording status:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось обновить статус записи',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <div className="w-full mx-auto px-2 py-4">
@@ -294,15 +345,36 @@ export default function AdminPanel() {
                     <td className="p-2 text-neutral-800 whitespace-nowrap">{formatDuration(recording.duration)}</td>
                     <td className="p-2 text-neutral-800 whitespace-nowrap">{recording.fileSize ? `${Math.round(recording.fileSize / 1024)} KB` : "-"}</td>
                     <td className="p-2">
-                      {recording.sent ? (
-                        <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
-                          Отправлено
-                        </span>
-                      ) : (
-                        <span className="inline-block px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
-                          Не отправлено
-                        </span>
-                      )}
+                      <div className="flex flex-col gap-1">
+                        {/* Статус отправки */}
+                        {recording.sent ? (
+                          <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                            Отправлено
+                          </span>
+                        ) : (
+                          <span className="inline-block px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
+                            Не отправлено
+                          </span>
+                        )}
+                        
+                        {/* Статус записи */}
+                        {recording.status && (
+                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                            recording.status === 'started' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : recording.status === 'completed' 
+                                ? 'bg-green-100 text-green-800' 
+                                : recording.status === 'error' 
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {recording.status === 'started' && 'В процессе'}
+                            {recording.status === 'completed' && 'Завершено'}
+                            {recording.status === 'error' && 'Ошибка'}
+                            {!['started', 'completed', 'error'].includes(recording.status) && recording.status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="p-2 text-neutral-600">
                       {recording.transcriptionCost ? (
@@ -353,6 +425,35 @@ export default function AdminPanel() {
                           title="Скачать данные визита"
                         >
                           <DownloadCloud className="h-4 w-4" />
+                        </Button>
+                        
+                        {/* Кнопки управления статусом */}
+                        <Button 
+                          onClick={() => updateRecordingStatus(recording.id, 'started')}
+                          variant="outline" 
+                          size="sm"
+                          className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                          title="Отметить как 'В процессе'"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          onClick={() => updateRecordingStatus(recording.id, 'completed')}
+                          variant="outline" 
+                          size="sm"
+                          className="text-green-700 border-green-200 hover:bg-green-50"
+                          title="Отметить как 'Завершено'"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          onClick={() => updateRecordingStatus(recording.id, 'error')}
+                          variant="outline" 
+                          size="sm"
+                          className="text-red-700 border-red-200 hover:bg-red-50"
+                          title="Отметить как 'Ошибка'"
+                        >
+                          <AlertCircle className="h-4 w-4" />
                         </Button>
                         
                         {/* Кнопки для клиентского бота */}

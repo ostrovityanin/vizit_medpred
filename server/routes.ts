@@ -53,6 +53,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return timestamp || new Date().toISOString();
   };
   
+  // Эндпоинт для начала записи (создает запись со статусом "started")
+  app.post('/api/recordings/start', async (req: Request, res: Response) => {
+    try {
+      const { targetUsername, senderUsername = "Пользователь" } = req.body;
+      
+      if (!targetUsername) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Не указано имя пользователя получателя' 
+        });
+      }
+      
+      // Создаем запись со статусом "started"
+      try {
+        const timestamp = new Date().toISOString();
+        
+        const validData = insertRecordingSchema.parse({
+          filename: '',  // Будет заполнено после записи
+          duration: 0,   // Будет обновлено после записи
+          timestamp,
+          targetUsername,
+          senderUsername,
+          status: 'started'
+        });
+        
+        const recording = await storage.createRecording(validData);
+        
+        // Логируем начало записи
+        if (senderUsername && senderUsername !== "Пользователь") {
+          eventLogger.logRecordingStart(senderUsername);
+        }
+        
+        log(`Создана новая запись (ID: ${recording.id}) со статусом 'started'`, 'recording');
+        
+        res.status(201).json({
+          success: true,
+          recordingId: recording.id,
+          message: 'Запись начата',
+          recording
+        });
+      } catch (error) {
+        log(`Ошибка при создании записи со статусом 'started': ${error}`, 'recording');
+        res.status(400).json({ 
+          success: false, 
+          message: 'Не удалось создать запись со статусом "started"', 
+          error 
+        });
+      }
+    } catch (error) {
+      log(`Ошибка при обработке запроса на начало записи: ${error}`, 'recording');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при обработке запроса', 
+        error 
+      });
+    }
+  });
+  
+  // Эндпоинт для загрузки готовой записи
   app.post('/api/recordings', upload.single('audio'), async (req: Request, res: Response) => {
     try {
       if (!req.file) {
@@ -226,6 +285,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(recordings);
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch recordings', error });
+    }
+  });
+
+  // Эндпоинт для обновления статуса записи
+  app.post('/api/recordings/:id/status', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { status } = req.body;
+      
+      if (!status || !['started', 'completed', 'error'].includes(status)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Некорректный статус. Допустимые значения: started, completed, error' 
+        });
+      }
+      
+      const recording = await storage.getRecordingById(id);
+      
+      if (!recording) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Запись не найдена' 
+        });
+      }
+      
+      const updatedRecording = await storage.updateRecordingStatus(id, status);
+      
+      if (status === 'error' && req.body.errorMessage) {
+        log(`Запись ${id} помечена как ошибочная: ${req.body.errorMessage}`, 'recording');
+        
+        // Если запись в состоянии ошибки и есть информация о пользователе, логируем ошибку
+        if (recording.senderUsername && recording.senderUsername !== "Пользователь") {
+          eventLogger.logRecordingError(recording.senderUsername, req.body.errorMessage);
+        }
+      }
+      
+      log(`Обновлен статус записи ${id}: ${status}`, 'recording');
+      
+      res.json({
+        success: true,
+        message: `Статус записи обновлен на "${status}"`,
+        recording: updatedRecording
+      });
+    } catch (error) {
+      log(`Ошибка при обновлении статуса записи: ${error}`, 'recording');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при обновлении статуса', 
+        error 
+      });
     }
   });
 
