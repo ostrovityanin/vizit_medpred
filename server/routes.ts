@@ -951,7 +951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Не загружен аудиофайл фрагмента' });
       }
       
-      const { fragmentIndex, timestamp, sessionId } = req.body;
+      const { fragmentIndex, timestamp, sessionId, recordingId } = req.body;
       
       if (!fragmentIndex || !timestamp || !sessionId) {
         return res.status(400).json({ 
@@ -971,11 +971,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId
       );
       
+      // Если передан ID записи, обновляем информацию о записи
+      if (recordingId) {
+        try {
+          const recordingIdNum = parseInt(recordingId, 10);
+          if (!isNaN(recordingIdNum)) {
+            // Получаем текущую запись
+            const existingRecording = await storage.getRecordingById(recordingIdNum);
+            
+            if (existingRecording) {
+              // Запись найдена, обновляем статус, если требуется
+              if (existingRecording.status !== 'started') {
+                await storage.updateRecordingStatus(recordingIdNum, 'started');
+                log(`Обновлен статус записи с ID: ${recordingIdNum} на 'started' (фрагмент #${fragmentIndex})`, 'recording');
+              }
+              log(`Добавлен фрагмент #${fragmentIndex} к записи ${recordingIdNum}`, 'fragments');
+            } else {
+              log(`Предупреждение: Передан ID записи ${recordingIdNum}, но запись не найдена`, 'fragments');
+            }
+          }
+        } catch (error) {
+          log(`Ошибка при обновлении информации о записи ${recordingId}: ${error}`, 'fragments');
+        }
+      }
+      
       // Логирование события
       eventLogger.logEvent(
         'system', 
         'FRAGMENT_RECEIVED', 
-        { sessionId, index: fragment.index, size: fragment.size }
+        { sessionId, index: fragment.index, size: fragment.size, recordingId: recordingId || undefined }
       );
       
       // Удаляем временный файл, так как мы уже сохранили его в fragmentManager
@@ -999,7 +1023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Объединение фрагментов записи
   app.get('/api/recording-fragments/combine', async (req: Request, res: Response) => {
     try {
-      const { sessionId } = req.query;
+      const { sessionId, recordingId } = req.query;
       
       if (!sessionId) {
         return res.status(400).json({ 
@@ -1016,11 +1040,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Если передан ID записи, обновляем информацию о записи
+      if (recordingId) {
+        try {
+          const recordingIdNum = parseInt(recordingId as string, 10);
+          if (!isNaN(recordingIdNum)) {
+            // Получаем текущую запись
+            const existingRecording = await storage.getRecordingById(recordingIdNum);
+            
+            if (existingRecording) {
+              // Запись найдена, обновляем статус на 'completed'
+              await storage.updateRecordingStatus(recordingIdNum, 'completed');
+              log(`Обновлен статус записи с ID: ${recordingIdNum} на 'completed' при объединении фрагментов`, 'recording');
+            }
+          }
+        } catch (error) {
+          log(`Ошибка при обновлении статуса записи ${recordingId}: ${error}`, 'fragments');
+        }
+      }
+      
       // Логирование события
       eventLogger.logEvent(
         'system', 
         'FRAGMENTS_COMBINED_REQUESTED', 
-        { sessionId, size: combinedBuffer.length }
+        { sessionId, size: combinedBuffer.length, recordingId: recordingId || undefined }
       );
       
       // Отправляем файл
