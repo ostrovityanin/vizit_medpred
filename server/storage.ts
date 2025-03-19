@@ -22,7 +22,8 @@ export class MemStorage implements IStorage {
       ...insertRecording, 
       id, 
       sent: false,
-      senderUsername: insertRecording.senderUsername || null 
+      senderUsername: insertRecording.senderUsername || null,
+      fileSize: insertRecording.fileSize || null
     };
     this.recordings.set(id, recording);
     return recording;

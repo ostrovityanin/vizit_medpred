@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X } from 'lucide-react';
 import { Link } from 'wouter';
+import FileAudioPlayer from '@/components/FileAudioPlayer';
 
 interface Recording {
   id: number;
@@ -11,12 +12,15 @@ interface Recording {
   timestamp: string;
   targetUsername: string;
   senderUsername?: string | null;
+  fileSize?: number | null;
   sent: boolean;
 }
 
 export default function Recordings() {
   const [recordings, setRecordings] = useState<Recording[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
+  const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -96,8 +100,8 @@ export default function Recordings() {
               <tr className="bg-neutral-50">
                 <th className="p-4 text-left text-neutral-600 font-medium">Дата</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Отправитель</th>
-                <th className="p-4 text-left text-neutral-600 font-medium">Получатель</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Длительность</th>
+                <th className="p-4 text-left text-neutral-600 font-medium">Размер</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Статус</th>
                 <th className="p-4 text-right text-neutral-600 font-medium">Действия</th>
               </tr>
@@ -111,8 +115,8 @@ export default function Recordings() {
                       recording.senderUsername : 
                       <span className="text-neutral-400">Нет данных</span>}
                   </td>
-                  <td className="p-4 text-neutral-800">@{recording.targetUsername}</td>
                   <td className="p-4 text-neutral-800">{formatDuration(recording.duration)}</td>
+                  <td className="p-4 text-neutral-800">{recording.fileSize ? `${Math.round(recording.fileSize / 1024)} KB` : "-"}</td>
                   <td className="p-4">
                     {recording.sent ? (
                       <span className="inline-block px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
@@ -124,15 +128,22 @@ export default function Recordings() {
                       </span>
                     )}
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="p-4 text-right flex gap-2 justify-end">
+                    <Button 
+                      onClick={() => playRecording(recording.id)}
+                      variant="outline" 
+                      size="sm"
+                      className="text-neutral-700"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
                     <Button 
                       onClick={() => downloadRecording(recording.id)}
                       variant="outline" 
                       size="sm"
                       className="text-neutral-700"
                     >
-                      <DownloadCloud className="h-4 w-4 mr-1" />
-                      <span>Скачать</span>
+                      <DownloadCloud className="h-4 w-4" />
                     </Button>
                   </td>
                 </tr>

@@ -10,6 +10,7 @@ export const recordings = pgTable("recordings", {
   targetUsername: text("target_username").notNull(),
   sent: boolean("sent").notNull().default(false),
   senderUsername: text("sender_username"),  // Добавляем поле для имени отправителя
+  fileSize: integer("file_size"),  // Размер файла в байтах
 });
 
 export const insertRecordingSchema = createInsertSchema(recordings).pick({
@@ -18,6 +19,7 @@ export const insertRecordingSchema = createInsertSchema(recordings).pick({
   timestamp: true,
   targetUsername: true,
   senderUsername: true,
+  fileSize: true,
 });
 
 export type InsertRecording = z.infer<typeof insertRecordingSchema>;

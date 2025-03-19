@@ -53,12 +53,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recordingData = req.body;
       
       try {
+        // Получить размер файла
+        const filePath = path.join(__dirname, 'uploads', req.file.filename);
+        let fileSize = 0;
+        if (fs.existsSync(filePath)) {
+          const stats = fs.statSync(filePath);
+          fileSize = stats.size;
+        }
+        
         const validData = insertRecordingSchema.parse({
           filename: req.file.filename,
           duration: parseInt(recordingData.duration, 10),
           timestamp: recordingData.timestamp,
           targetUsername: recordingData.targetUsername,
-          senderUsername: recordingData.senderUsername || "Пользователь" // Добавляем имя отправителя
+          senderUsername: recordingData.senderUsername || "Пользователь", // Добавляем имя отправителя
+          fileSize: fileSize // Добавляем размер файла
         });
 
         const recording = await storage.createRecording(validData);
