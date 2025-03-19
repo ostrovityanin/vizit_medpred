@@ -296,6 +296,66 @@ export class AudioRecorder {
   }
 
   /**
+   * Обрабатывает ответ сервера после объединения фрагментов
+   * @private
+   */
+  private async _processCombinedResponse(
+    response: Response, 
+    url: string, 
+    recordingId: string | null, 
+    resolve: (blob: Blob | null) => void
+  ): Promise<void> {
+    if (response.ok) {
+      try {
+        // Получаем JSON-ответ с информацией о созданном WAV-файле
+        const result = await response.json();
+        console.log(`Получен ответ от сервера с информацией о конвертированном файле:`, result);
+        
+        if (result.success && result.filename) {
+          // Загружаем файл по указанному пути
+          const audioUrl = recordingId ? `/api/recordings/${recordingId}/download` : null;
+          
+          if (audioUrl) {
+            const audioResponse = await fetch(audioUrl);
+            if (audioResponse.ok) {
+              const finalBlob = await audioResponse.blob();
+              console.log(`Получен конвертированный аудиофайл WAV с сервера, размер: ${finalBlob.size} байт`);
+              resolve(finalBlob);
+              return;
+            } else {
+              console.warn(`Ошибка загрузки конвертированного WAV-файла: ${audioResponse.status}`);
+            }
+          } else {
+            console.warn('Нет URL для загрузки аудиофайла');
+          }
+        } else {
+          console.warn('Сервер не вернул информацию о файле или возникла ошибка:', result);
+        }
+      } catch (jsonError) {
+        console.error('Ошибка при обработке JSON-ответа:', jsonError);
+        // Если не удалось обработать JSON, пробуем получить как блоб (старый формат)
+        try {
+          // Повторно отправляем запрос для получения blob
+          const blobResponse = await fetch(url);
+          if (blobResponse.ok) {
+            const finalBlob = await blobResponse.blob();
+            console.log(`Получен аудиофайл как blob с сервера, размер: ${finalBlob.size} байт`);
+            resolve(finalBlob);
+            return;
+          }
+        } catch (blobError) {
+          console.error('Ошибка при получении файла как blob:', blobError);
+        }
+      }
+    } else {
+      console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
+      // Получаем текст ошибки для лучшей диагностики
+      const errorText = await response.text();
+      console.warn(`Детали ошибки: ${errorText}`);
+    }
+  }
+
+  /**
    * Останавливает запись и возвращает результирующий аудио-блоб
    * При фрагментированной записи - объединяет все фрагменты
    */
@@ -332,17 +392,8 @@ export class AudioRecorder {
               
               const response = await fetch(url);
               
-              if (response.ok) {
-                const finalBlob = await response.blob();
-                console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
-                resolve(finalBlob);
-                return;
-              } else {
-                console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
-                // Получаем текст ошибки для лучшей диагностики
-                const errorText = await response.text();
-                console.warn(`Детали ошибки: ${errorText}`);
-              }
+              // Обрабатываем ответ сервера
+              await this._processCombinedResponse(response, url, recordingId, resolve);
             } else {
               console.warn('Отсутствует ID сессии в localStorage');
             }
@@ -402,17 +453,8 @@ export class AudioRecorder {
               
               const response = await fetch(url);
               
-              if (response.ok) {
-                const finalBlob = await response.blob();
-                console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
-                resolve(finalBlob);
-                return;
-              } else {
-                console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
-                // Получаем текст ошибки для лучшей диагностики
-                const errorText = await response.text();
-                console.warn(`Детали ошибки: ${errorText}`);
-              }
+              // Обрабатываем ответ сервера
+              await this._processCombinedResponse(response, url, recordingId, resolve);
             } else {
               console.warn('Отсутствует ID сессии в localStorage');
             }
@@ -434,15 +476,25 @@ export class AudioRecorder {
           console.log(`Локально объединены фрагменты, итоговый размер: ${finalBlob.size} байт`);
           
           resolve(finalBlob);
-        } else {
-          // Стандартная запись - просто объединяем чанки
-          const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-          resolve(audioBlob);
+          return;
         }
+        
+        // Для обычной записи создаем блоб из всех накопленных аудио чанков
+        if (this.audioChunks.length === 0) {
+          console.warn('No audio chunks recorded');
+          resolve(null);
+          return;
+        }
+        
+        const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+        console.log(`Recording completed, total size: ${blob.size} bytes`);
+        resolve(blob);
       };
-
+      
       // Останавливаем запись
-      this.mediaRecorder.stop();
+      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+        this.mediaRecorder.stop();
+      }
     });
   }
 
@@ -456,51 +508,50 @@ export class AudioRecorder {
       this.fragmentInterval = null;
     }
     
-    // Сбрасываем данные фрагментированной записи
-    this.isFragmentedRecording = false;
-    this.audioFragments = [];
-    this.currentFragmentIndex = 0;
-    this.onFragmentSaved = null;
+    // Останавливаем запись
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
     
-    // Останавливаем все медиа треки
+    // Останавливаем и удаляем медиапотоки
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
     }
     
-    // Очищаем аудио контекст и его узлы
-    if (this.audioContext) {
-      if (this.sourceNode) {
-        this.sourceNode.disconnect();
-        this.sourceNode = null;
-      }
-      
-      if (this.gainNode) {
-        this.gainNode.disconnect();
-        this.gainNode = null;
-      }
-      
+    if (this.enhancedStream && this.enhancedStream !== this.stream) {
+      this.enhancedStream.getTracks().forEach(track => track.stop());
+      this.enhancedStream = null;
+    }
+    
+    // Отключаем и обнуляем аудиоузлы
+    if (this.sourceNode) {
+      this.sourceNode.disconnect();
+      this.sourceNode = null;
+    }
+    
+    if (this.gainNode) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
+    
+    if (this.destinationNode) {
       this.destinationNode = null;
-      
-      // Закрываем аудио контекст, если это возможно
-      if (this.audioContext.state !== 'closed') {
-        this.audioContext.close().catch(err => console.error('Error closing audio context:', err));
-      }
+    }
+    
+    // Закрываем аудиоконтекст
+    if (this.audioContext) {
+      this.audioContext.close().catch(err => console.error('Error closing AudioContext:', err));
       this.audioContext = null;
     }
     
-    this.enhancedStream = null;
-    this.mediaRecorder = null;
+    // Очищаем массивы с данными
     this.audioChunks = [];
+    this.audioFragments = [];
+    this.mediaRecorder = null;
     
-    // Удаляем ID сессии из локального хранилища
-    try {
-      localStorage.removeItem('recordingSessionId');
-    } catch (err) {
-      console.warn('Не удалось удалить recordingSessionId из localStorage');
-    }
+    console.log('Audio recorder resources released');
   }
 }
 
-// Singleton instance
 export const audioRecorder = new AudioRecorder();

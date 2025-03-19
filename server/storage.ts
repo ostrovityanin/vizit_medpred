@@ -96,6 +96,22 @@ export class MemStorage implements IStorage {
     }
   }
   
+  // Сохраняем данные фрагментов записей в файл
+  private saveFragmentsToFile(): void {
+    try {
+      // Преобразуем Map в массив для сохранения
+      const data = {
+        fragments: Array.from(this.recordingFragments.values()),
+        currentId: this.fragmentCurrentId
+      };
+      
+      fs.writeFileSync(this.fragmentsStorageFile, JSON.stringify(data, null, 2));
+      console.log('[storage] Данные фрагментов записей успешно сохранены в файл');
+    } catch (error) {
+      console.error('[storage] Ошибка при сохранении данных фрагментов записей:', error);
+    }
+  }
+  
   // Загружаем данные из файлов
   private loadFromFiles(): void {
     // Загружаем данные админки
@@ -170,6 +186,32 @@ export class MemStorage implements IStorage {
       }
     } catch (error) {
       console.error('[storage] Ошибка при загрузке данных пользователей:', error);
+    }
+    
+    // Загружаем данные фрагментов записей
+    try {
+      if (fs.existsSync(this.fragmentsStorageFile)) {
+        const data = JSON.parse(fs.readFileSync(this.fragmentsStorageFile, 'utf8'));
+        
+        // Восстанавливаем Map из массива
+        if (data.fragments && Array.isArray(data.fragments)) {
+          this.recordingFragments = new Map();
+          data.fragments.forEach((fragment: RecordingFragment) => {
+            this.recordingFragments.set(fragment.id, fragment);
+          });
+        }
+        
+        // Восстанавливаем текущий ID
+        if (data.currentId) {
+          this.fragmentCurrentId = data.currentId;
+        }
+        
+        console.log(`[storage] Загружено ${this.recordingFragments.size} фрагментов записей из файла`);
+      } else {
+        console.log('[storage] Файл хранилища фрагментов не найден, используем пустое хранилище');
+      }
+    } catch (error) {
+      console.error('[storage] Ошибка при загрузке данных фрагментов:', error);
     }
   }
 
@@ -256,6 +298,43 @@ export class MemStorage implements IStorage {
       this.userRecordings.set(id, updatedRecording);
       this.saveUserToFile();
       return updatedRecording;
+    }
+    return undefined;
+  }
+  
+  // === Методы для фрагментов записей ===
+  
+  async createRecordingFragment(insertFragment: InsertRecordingFragment): Promise<RecordingFragment> {
+    const id = this.fragmentCurrentId++;
+    const fragment: RecordingFragment = {
+      ...insertFragment,
+      id,
+      processed: insertFragment.processed || false
+    };
+    this.recordingFragments.set(id, fragment);
+    this.saveFragmentsToFile();
+    return fragment;
+  }
+  
+  async getRecordingFragments(recordingId: number): Promise<RecordingFragment[]> {
+    return Array.from(this.recordingFragments.values())
+      .filter(fragment => fragment.recordingId === recordingId)
+      .sort((a, b) => a.index - b.index); // Сортируем по порядковому номеру
+  }
+  
+  async getFragmentsBySessionId(sessionId: string): Promise<RecordingFragment[]> {
+    return Array.from(this.recordingFragments.values())
+      .filter(fragment => fragment.sessionId === sessionId)
+      .sort((a, b) => a.index - b.index); // Сортируем по порядковому номеру
+  }
+  
+  async markFragmentAsProcessed(id: number): Promise<RecordingFragment | undefined> {
+    const fragment = this.recordingFragments.get(id);
+    if (fragment) {
+      const updatedFragment = { ...fragment, processed: true };
+      this.recordingFragments.set(id, updatedFragment);
+      this.saveFragmentsToFile();
+      return updatedFragment;
     }
     return undefined;
   }
