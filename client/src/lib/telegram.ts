@@ -1,3 +1,6 @@
+/**
+ * Отправляет аудиозапись получателю через админский бот (старый способ)
+ */
 export async function sendAudioToRecipient(blob: Blob, recipient: string, senderUsername: string = "Пользователь"): Promise<boolean> {
   try {
     console.log(`Sending audio to recipient: ${recipient} from ${senderUsername}`);
@@ -49,6 +52,127 @@ export async function sendAudioToRecipient(blob: Blob, recipient: string, sender
   } catch (error) {
     console.error('Error sending audio:', error);
     return false;
+  }
+}
+
+/**
+ * Отправляет аудиозапись получателю через клиентский бот
+ */
+export async function sendAudioViaClientBot(recordingId: number, recipient: string): Promise<boolean> {
+  try {
+    console.log(`Sending audio via client bot to: ${recipient}, recording ID: ${recordingId}`);
+    
+    const response = await fetch(`/api/client/send-audio/${recordingId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: recipient
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error sending audio via client bot:', await response.text());
+      throw new Error('Failed to send audio via client bot');
+    }
+
+    const result = await response.json();
+    console.log('Client bot send result:', result);
+
+    return result.success;
+  } catch (error) {
+    console.error('Error sending audio via client bot:', error);
+    return false;
+  }
+}
+
+/**
+ * Отправляет текстовое сообщение через клиентский бот
+ */
+export async function sendMessageViaClientBot(recipient: string, message: string): Promise<boolean> {
+  try {
+    console.log(`Sending message via client bot to: ${recipient}`);
+    
+    const response = await fetch('/api/client/send-message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: recipient,
+        message: message
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error sending message via client bot:', await response.text());
+      throw new Error('Failed to send message via client bot');
+    }
+
+    const result = await response.json();
+    console.log('Client bot message result:', result);
+
+    return result.success;
+  } catch (error) {
+    console.error('Error sending message via client bot:', error);
+    return false;
+  }
+}
+
+/**
+ * Отправляет уведомление о новой записи пользователю через клиентский бот
+ */
+export async function notifyUserAboutRecording(recordingId: number, recipient: string): Promise<boolean> {
+  try {
+    console.log(`Sending notification about recording ${recordingId} to ${recipient}`);
+    
+    const response = await fetch(`/api/client/notify-user/${recordingId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: recipient
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error sending notification via client bot:', await response.text());
+      throw new Error('Failed to send notification via client bot');
+    }
+
+    const result = await response.json();
+    console.log('Client bot notification result:', result);
+
+    return result.success;
+  } catch (error) {
+    console.error('Error sending notification via client bot:', error);
+    return false;
+  }
+}
+
+/**
+ * Получает записи пользователя через клиентский бот
+ */
+export async function getUserRecordings(username: string): Promise<any[]> {
+  try {
+    console.log(`Getting recordings for user: ${username}`);
+    
+    const response = await fetch(`/api/client/recordings/${username}`);
+
+    if (!response.ok) {
+      console.error('Error fetching user recordings:', await response.text());
+      throw new Error('Failed to fetch user recordings');
+    }
+
+    const result = await response.json();
+    console.log('User recordings result:', result);
+
+    return result.recordings || [];
+  } catch (error) {
+    console.error('Error fetching user recordings:', error);
+    return [];
   }
 }
 

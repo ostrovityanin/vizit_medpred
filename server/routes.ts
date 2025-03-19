@@ -7,6 +7,7 @@ import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
 import { sendAudioToTelegram, sendTextToTelegram, resolveTelegramUsername, getBotInfo, getBotUpdates } from './telegram';
+import { getClientBotInfo, getClientBotUpdates, resolveClientUsername, sendClientAudio, sendClientTextMessage, notifyUserAboutRecording } from './client-bot';
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -256,8 +257,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Эндпоинт для получения информации о боте
-  app.get('/api/telegram/bot-info', async (req: Request, res: Response) => {
+  // Эндпоинт для получения информации об админском боте
+  app.get('/api/telegram/admin-bot-info', async (req: Request, res: Response) => {
     try {
       const botInfo = await getBotInfo();
       if (!botInfo) {
@@ -269,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         botInfo
       });
     } catch (error) {
-      log(`Error getting bot info: ${error}`, 'telegram');
+      log(`Error getting admin bot info: ${error}`, 'telegram');
       res.status(500).json({ 
         success: false, 
         message: 'Ошибка при получении информации о боте',
@@ -278,8 +279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Эндпоинт для получения обновлений бота
-  app.get('/api/telegram/updates', async (req: Request, res: Response) => {
+  // Эндпоинт для получения обновлений админского бота
+  app.get('/api/telegram/admin-bot-updates', async (req: Request, res: Response) => {
     try {
       const updates = await getBotUpdates();
       if (!updates) {
@@ -291,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updates
       });
     } catch (error) {
-      log(`Error getting bot updates: ${error}`, 'telegram');
+      log(`Error getting admin bot updates: ${error}`, 'telegram');
       res.status(500).json({ 
         success: false, 
         message: 'Ошибка при получении обновлений для бота',
@@ -299,7 +300,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  
+  // Эндпоинт для получения информации о клиентском боте
+  app.get('/api/telegram/client-bot-info', async (req: Request, res: Response) => {
+    try {
+      const botInfo = await getClientBotInfo();
+      if (!botInfo) {
+        return res.status(500).json({ success: false, message: 'Не удалось получить информацию о клиентском боте' });
+      }
+      
+      res.json({
+        success: true,
+        botInfo
+      });
+    } catch (error) {
+      log(`Error getting client bot info: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении информации о клиентском боте',
+        error
+      });
+    }
+  });
+  
+  // Эндпоинт для получения обновлений клиентского бота
+  app.get('/api/telegram/client-bot-updates', async (req: Request, res: Response) => {
+    try {
+      const updates = await getClientBotUpdates();
+      if (!updates) {
+        return res.status(500).json({ success: false, message: 'Не удалось получить обновления для клиентского бота' });
+      }
+      
+      res.json({
+        success: true,
+        updates
+      });
+    } catch (error) {
+      log(`Error getting client bot updates: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении обновлений для клиентского бота',
+        error
+      });
+    }
+  });
 
+  // API для работы с клиентскими записями (пользовательская часть)
+  
+  // Получение записей для конкретного пользователя (по его username)
+  app.get('/api/client/recordings/:username', async (req: Request, res: Response) => {
+    try {
+      const username = req.params.username;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Не указано имя пользователя' 
+        });
+      }
+      
+      // Получаем все записи
+      const allRecordings = await storage.getRecordings();
+      
+      // Фильтруем записи, в которых пользователь является отправителем или получателем
+      const userRecordings = allRecordings.filter(recording => 
+        (recording.senderUsername && recording.senderUsername.toLowerCase() === username.toLowerCase()) ||
+        (recording.targetUsername && recording.targetUsername.toLowerCase() === username.toLowerCase())
+      );
+      
+      res.json({
+        success: true,
+        recordings: userRecordings
+      });
+    } catch (error) {
+      log(`Error fetching client recordings: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении записей пользователя',
+        error
+      });
+    }
+  });
+  
+  // Отправка сообщения пользователю через клиентский бот
+  app.post('/api/client/send-message', async (req: Request, res: Response) => {
+    try {
+      const { username, message } = req.body;
+      
+      if (!username || !message) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Не указано имя пользователя или текст сообщения' 
+        });
+      }
+      
+      log(`Attempting to send client message to @${username}`, 'client-bot');
+      
+      // Попытка найти chat_id по имени пользователя
+      const targetChatId = await resolveClientUsername(username);
+      
+      if (!targetChatId) {
+        log(`Failed to resolve username @${username} for client bot`, 'client-bot');
+        return res.status(200).json({ 
+          success: false,
+          message: 'Не удалось найти получателя в клиентском боте'
+        });
+      }
+      
+      log(`Sending text message to resolved client recipient: ${targetChatId}`, 'client-bot');
+      
+      // Отправка текстового сообщения через клиентский бот
+      const success = await sendClientTextMessage(
+        targetChatId,
+        message
+      );
+      
+      if (!success) {
+        return res.status(200).json({ 
+          success: false,
+          message: 'Отправка сообщения через клиентский бот не удалась'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: `Сообщение успешно отправлено @${username} через клиентский бот`
+      });
+    } catch (error) {
+      log(`Error sending client message: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при отправке сообщения через клиентский бот',
+        error
+      });
+    }
+  });
+  
+  // Отправка аудиозаписи пользователю через клиентский бот
+  app.post('/api/client/send-audio/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Не указано имя пользователя-получателя' 
+        });
+      }
+      
+      const recording = await storage.getRecordingById(id);
+      
+      if (!recording) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Запись не найдена' 
+        });
+      }
+      
+      // Полный путь к аудиофайлу
+      const filePath = path.join(__dirname, 'uploads', recording.filename);
+      
+      // Проверка существования файла
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Аудиофайл не найден на сервере' 
+        });
+      }
+      
+      log(`Attempting to send client audio to @${username}`, 'client-bot');
+      
+      // Попытка найти chat_id по имени пользователя
+      const targetChatId = await resolveClientUsername(username);
+      
+      if (!targetChatId) {
+        log(`Failed to resolve username @${username} for client bot`, 'client-bot');
+        return res.status(200).json({ 
+          success: false,
+          message: 'Не удалось найти получателя в клиентском боте'
+        });
+      }
+      
+      // Форматируем подпись к аудио
+      let caption = `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`;
+      if (recording.senderUsername) {
+        caption += `\nОтправитель: ${recording.senderUsername}`;
+      }
+      
+      // Отправка аудио через клиентский бот
+      const success = await sendClientAudio(
+        filePath,
+        targetChatId,
+        caption
+      );
+      
+      if (!success) {
+        return res.status(200).json({ 
+          success: false,
+          message: 'Отправка аудио через клиентский бот не удалась'
+        });
+      }
+      
+      // Если запись предназначена для этого пользователя, помечаем как отправленную
+      if (recording.targetUsername.toLowerCase() === username.toLowerCase()) {
+        await storage.markRecordingAsSent(id);
+      }
+      
+      res.json({
+        success: true,
+        message: `Аудиозапись успешно отправлена @${username} через клиентский бот`
+      });
+    } catch (error) {
+      log(`Error sending client audio: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при отправке аудио через клиентский бот',
+        error
+      });
+    }
+  });
+  
+  // Уведомление пользователя о новой записи
+  app.post('/api/client/notify-user/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { username } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Не указано имя пользователя-получателя' 
+        });
+      }
+      
+      const recording = await storage.getRecordingById(id);
+      
+      if (!recording) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Запись не найдена' 
+        });
+      }
+      
+      log(`Attempting to notify user @${username} about recording`, 'client-bot');
+      
+      // Попытка найти chat_id по имени пользователя
+      const targetChatId = await resolveClientUsername(username);
+      
+      if (!targetChatId) {
+        log(`Failed to resolve username @${username} for client notification`, 'client-bot');
+        return res.status(200).json({ 
+          success: false,
+          message: 'Не удалось найти получателя в клиентском боте'
+        });
+      }
+      
+      // Отправляем уведомление о новой записи
+      const success = await notifyUserAboutRecording(recording, targetChatId);
+      
+      if (!success) {
+        return res.status(200).json({ 
+          success: false,
+          message: 'Отправка уведомления через клиентский бот не удалась'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: `Уведомление успешно отправлено @${username} через клиентский бот`
+      });
+    } catch (error) {
+      log(`Error sending client notification: ${error}`, 'client-bot');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при отправке уведомления через клиентский бот',
+        error
+      });
+    }
+  });
+  
   // Эндпоинт для получения информации о файлах на сервере
   app.get('/api/files', async (req: Request, res: Response) => {
     try {

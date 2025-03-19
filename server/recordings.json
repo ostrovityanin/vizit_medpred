@@ -85,7 +85,20 @@
       "transcription": "Человек 1: Подмога будет через пять минут. Людей так и нет.\nЧеловек 2: Значит, можно домой? А то Ваня начнет смотреть кино без меня.\nЧеловек 1: Ну да, отчет за тебя составят эльфы.\nЧеловек 2: Вот бы здорово было, если бы...\nЧеловек 1: Какая ты жопа.",
       "id": 8,
       "sent": false
+    },
+    {
+      "filename": "6a852fb4-e83d-4b59-833f-458e79d16437.wav",
+      "duration": 1742348848,
+      "timestamp": "2025-03-19T01:47:28.514Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 62186,
+      "transcription": "Человек 1: Тест записи. Запись теста.",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 58,
+      "id": 9,
+      "sent": false
     }
   ],
-  "currentId": 9
+  "currentId": 10
 }
