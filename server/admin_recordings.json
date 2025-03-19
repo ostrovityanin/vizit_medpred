@@ -176,7 +176,46 @@
       "tokensProcessed": 53,
       "id": 15,
       "sent": false
+    },
+    {
+      "filename": "2746c265-8d10-47b3-bb18-fbb2077e46c3.wav",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:20:50.985Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 46525,
+      "transcription": "Человек 1: Тест, тест, тест, запись, тест.",
+      "transcriptionCost": "0.0003",
+      "tokensProcessed": 44,
+      "id": 16,
+      "sent": false
+    },
+    {
+      "filename": "1c329c5b-0159-4b74-b76a-2c8e8501e41d.wav",
+      "duration": 2,
+      "timestamp": "2025-03-19T14:21:44.269Z",
+      "targetUsername": "archive",
+      "senderUsername": "Юрий",
+      "fileSize": 39348,
+      "transcription": "Так как в представленном тексте нет диалога и не указаны говорящие, отформатировать его как полноценный диалог не представляется возможным. Текст \"\"Продолжение следует...\"\" может быть частью нарратива или комментария одного говорящего, но без дополнительного контекста определить это сложно.",
+      "transcriptionCost": "0.0002",
+      "tokensProcessed": 37,
+      "id": 17,
+      "sent": false
+    },
+    {
+      "filename": "7491315f-4628-48bd-a8d0-b44ad9b3be22.wav",
+      "duration": 2,
+      "timestamp": "2025-03-19T14:21:58.665Z",
+      "targetUsername": "archive",
+      "senderUsername": "Юрий",
+      "fileSize": 28673,
+      "transcription": "Так как в представленном тексте нет диалога или указания на разных говорящих, невозможно определить и разметить говорящих. Текст остается без изменений:\n\"Продолжение следует...\"",
+      "transcriptionCost": "0.0002",
+      "tokensProcessed": 27,
+      "id": 18,
+      "sent": false
     }
   ],
-  "currentId": 16
+  "currentId": 19
 }

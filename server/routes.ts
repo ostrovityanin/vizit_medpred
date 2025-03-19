@@ -36,11 +36,13 @@ const upload = multer({
   storage: storageConfig,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('audio/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Not an audio file'));
-    }
+    // Принимаем любые типы файлов для тестирования
+    // if (file.mimetype.startsWith('audio/')) {
+    //   cb(null, true);
+    // } else {
+    //   cb(new Error('Not an audio file'));
+    // }
+    cb(null, true);
   }
 });
 
@@ -92,7 +94,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           tokensProcessed: tokensProcessed // Добавляем количество обработанных токенов
         });
 
+        // Создаем запись для админской базы
         const recording = await storage.createRecording(validData);
+        
+        // Также создаем запись в пользовательской базе, если указан целевой пользователь
+        if (recordingData.targetUsername) {
+          try {
+            await storage.createUserRecording({
+              adminRecordingId: recording.id,
+              username: recordingData.targetUsername,
+              duration: parseInt(recordingData.duration, 10),
+              timestamp: recordingData.timestamp,
+            });
+            log(`Создана пользовательская запись для @${recordingData.targetUsername}`, 'storage');
+          } catch (createUserError) {
+            log(`Ошибка при создании пользовательской записи: ${createUserError}`, 'storage');
+            // Продолжаем выполнение, не прерываем основной процесс
+          }
+        }
+        
+        // Если указан отправитель, то создаем запись и для него
+        if (recordingData.senderUsername && recordingData.senderUsername !== "Пользователь") {
+          try {
+            await storage.createUserRecording({
+              adminRecordingId: recording.id,
+              username: recordingData.senderUsername,
+              duration: parseInt(recordingData.duration, 10),
+              timestamp: recordingData.timestamp,
+            });
+            log(`Создана пользовательская запись для отправителя @${recordingData.senderUsername}`, 'storage');
+          } catch (createSenderError) {
+            log(`Ошибка при создании пользовательской записи для отправителя: ${createSenderError}`, 'storage');
+            // Продолжаем выполнение, не прерываем основной процесс
+          }
+        }
+        
         res.status(201).json(recording);
       } catch (error) {
         res.status(400).json({ message: 'Invalid recording data', error });
