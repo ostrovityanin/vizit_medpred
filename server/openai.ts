@@ -2,9 +2,14 @@ import OpenAI from 'openai';
 import fs from 'fs';
 import { log } from './vite';
 
-// Создаем экземпляр клиента OpenAI
+// Проверяем наличие API ключа для OpenAI
+function isOpenAIConfigured(): boolean {
+  return !!process.env.OPENAI_API_KEY;
+}
+
+// Создаем экземпляр клиента OpenAI с обработкой пустого ключа
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
 });
 
 // Функция для очистки текста от нерусских символов и прочего мусора
@@ -69,6 +74,16 @@ function calculateTranscriptionCost(durationSeconds: number): string {
 
 export async function transcribeAudio(filePath: string): Promise<{text: string | null, cost: string, tokensProcessed: number} | null> {
   try {
+    // Проверяем наличие API ключа
+    if (!isOpenAIConfigured()) {
+      log('OPENAI_API_KEY не настроен, пропускаем распознавание речи', 'openai');
+      return { 
+        text: 'API ключ не настроен. Добавьте OPENAI_API_KEY для активации распознавания.', 
+        cost: '0.0000', 
+        tokensProcessed: 0 
+      };
+    }
+    
     log(`Отправляем аудиофайл на распознавание: ${filePath}`, 'openai');
     
     // Шаг 1: Базовое распознавание с помощью Whisper
