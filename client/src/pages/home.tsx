@@ -8,6 +8,7 @@ import { audioRecorder } from '@/lib/audioRecorder';
 import { sendAudioToRecipient } from '@/lib/telegram';
 import { useToast } from '@/hooks/use-toast';
 import { PlayCircle, StopCircle, Send, Trash2 } from 'lucide-react';
+import { Link } from 'wouter';
 
 export default function Home() {
   const [isRecording, setIsRecording] = useState(false);
@@ -165,8 +166,13 @@ export default function Home() {
 
   return (
     <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen">
-      <header className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-tgblue">Таймер визита</h1>
+      <header className="flex flex-col items-center mb-8">
+        <h1 className="text-2xl font-bold text-tgblue mb-2">Таймер визита</h1>
+        <Link href="/recordings">
+          <Button variant="outline" size="sm" className="text-xs">
+            Архив записей
+          </Button>
+        </Link>
       </header>
 
       <Timer
