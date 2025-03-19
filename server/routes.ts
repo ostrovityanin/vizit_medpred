@@ -1075,7 +1075,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Эндпоинт для регистрации событий клиента
   app.post('/api/events/recording-start', async (req: Request, res: Response) => {
     try {
-      const { username, timestamp } = req.body;
+      const { username, timestamp, recordingId } = req.body;
       
       if (!username) {
         return res.status(400).json({ 
@@ -1086,10 +1086,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Логируем начало записи
       eventLogger.logRecordingStart(username);
       
-      // Создаем запись в БД со статусом 'started'
+      // Если передан ID существующей записи, обновляем ее вместо создания новой
+      if (recordingId) {
+        try {
+          // Получаем текущую запись
+          const existingRecording = await storage.getRecordingById(recordingId);
+          
+          if (existingRecording) {
+            // Запись найдена, просто обновляем статус если нужно
+            if (existingRecording.status !== 'started') {
+              await storage.updateRecordingStatus(recordingId, 'started');
+              log(`Обновлен статус записи с ID: ${recordingId} на 'started'`, 'recording');
+            }
+            
+            return res.json({ 
+              success: true, 
+              message: 'Событие начала записи зарегистрировано для существующей записи',
+              recordingId: existingRecording.id 
+            });
+          }
+        } catch (error) {
+          log(`Ошибка при поиске существующей записи ${recordingId}: ${error}`, 'recording');
+          // Продолжаем выполнение, если не удалось найти запись
+        }
+      }
+      
+      // Если записи нет или ID не передан, проверяем незавершенные записи этого пользователя
       try {
+        // Получаем все записи
+        const allRecordings = await storage.getRecordings();
+        
+        // Ищем записи со статусом 'started' от этого пользователя
+        const existingStartedRecordings = allRecordings.filter(rec => 
+          rec.senderUsername === username && 
+          rec.status === 'started' &&
+          new Date(rec.timestamp).getTime() > Date.now() - 1000 * 60 * 60 // записи за последний час
+        );
+        
+        if (existingStartedRecordings.length > 0) {
+          // Есть уже начатая запись, используем ее
+          const latestRecording = existingStartedRecordings.sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          )[0];
+          
+          log(`Найдена существующая запись со статусом 'started' для ${username}, ID: ${latestRecording.id}`, 'recording');
+          
+          return res.json({ 
+            success: true, 
+            message: 'Событие начала записи зарегистрировано для существующей записи',
+            recordingId: latestRecording.id 
+          });
+        }
+        
+        // Если мы дошли до сюда, то создаем новую запись
         const recordingData = {
-          // Обязательные поля
+          filename: '', // Будет заполнено позже
           duration: 0, // Начальная длительность
           timestamp: timestamp || new Date().toISOString(),
           targetUsername: 'archive', // По умолчанию
@@ -1103,15 +1154,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Создаем запись для админской базы
         const recording = await storage.createRecording(validData);
         
-        console.log(`[recording] Создана запись со статусом "started" для ${username}, ID: ${recording.id}`);
+        log(`Создана новая запись со статусом 'started' для ${username}, ID: ${recording.id}`, 'recording');
         
         res.json({ 
           success: true, 
-          message: 'Событие начала записи зарегистрировано',
+          message: 'Событие начала записи зарегистрировано с созданием новой записи',
           recordingId: recording.id 
         });
       } catch (dbError: any) {
-        console.error(`[recording] Ошибка при создании записи: ${dbError}`);
+        console.error(`[recording] Ошибка при работе с записями: ${dbError}`);
         // Даже если не удалось создать запись, продолжаем работу
         res.json({ 
           success: true, 

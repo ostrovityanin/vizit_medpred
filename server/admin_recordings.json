@@ -266,7 +266,35 @@
       "status": "completed",
       "id": 20,
       "sent": false
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-03-19T19:01:38.929Z",
+      "targetUsername": "archive",
+      "senderUsername": "iq1_1iq",
+      "status": "started",
+      "id": 21,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "duration": 0,
+      "timestamp": "2025-03-19T19:01:38.442Z",
+      "targetUsername": "archive",
+      "senderUsername": "iq1_1iq",
+      "status": "started",
+      "id": 22,
+      "sent": false,
+      "filename": null,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 21
+  "currentId": 23
 }
