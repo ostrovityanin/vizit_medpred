@@ -1,20 +1,6 @@
-export async function sendAudioToRecipient(blob: Blob, recipient: string): Promise<boolean> {
+export async function sendAudioToRecipient(blob: Blob, recipient: string, senderUsername: string = "Пользователь"): Promise<boolean> {
   try {
-    console.log(`Sending audio to recipient: ${recipient}`);
-    
-    // Get sender info from Telegram WebApp if available
-    let senderUsername = "Пользователь";
-    if (window.Telegram?.WebApp) {
-      const webAppUser = window.Telegram.WebApp.initDataUnsafe?.user;
-      if (webAppUser) {
-        senderUsername = webAppUser.username || 
-                         (webAppUser.first_name ? 
-                          `${webAppUser.first_name}${webAppUser.last_name ? ' ' + webAppUser.last_name : ''}` : 
-                          "Пользователь");
-      }
-    }
-    
-    console.log(`Sender username: ${senderUsername}`);
+    console.log(`Sending audio to recipient: ${recipient} from ${senderUsername}`);
     
     const formData = new FormData();
     formData.append('audio', blob, 'recording.wav');
@@ -67,8 +53,8 @@ export async function sendAudioToRecipient(blob: Blob, recipient: string): Promi
 }
 
 // For backward compatibility
-export async function sendAudioToTelegram(blob: Blob, targetUsername: string): Promise<boolean> {
-  return sendAudioToRecipient(blob, targetUsername);
+export async function sendAudioToTelegram(blob: Blob, targetUsername: string, senderUsername: string = "Пользователь"): Promise<boolean> {
+  return sendAudioToRecipient(blob, targetUsername, senderUsername);
 }
 
 export function isTelegramWebApp(): boolean {

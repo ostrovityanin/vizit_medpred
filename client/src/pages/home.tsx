@@ -106,7 +106,7 @@ export default function Home() {
       description: `Отправка на ${recipient}...`,
     });
 
-    const success = await sendAudioToRecipient(blob, recipient);
+    const success = await sendAudioToRecipient(blob, recipient, senderUsername);
     
     if (success) {
       toast({
