@@ -1196,6 +1196,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Получение фрагментов записи по ID записи
+  app.get('/api/recording-fragments/:recordingId([0-9]+)', async (req: Request, res: Response) => {
+    try {
+      const recordingId = parseInt(req.params.recordingId);
+      
+      if (isNaN(recordingId)) {
+        log(`Ошибка: некорректный ID записи для получения фрагментов: ${req.params.recordingId}`, 'fragments');
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Некорректный ID записи' 
+        });
+      }
+      
+      log(`Запрос фрагментов для записи ID: ${recordingId}`, 'fragments');
+      const fragments = await storage.getRecordingFragments(recordingId);
+      
+      log(`Найдено ${fragments.length} фрагментов для записи ID: ${recordingId}`, 'fragments');
+      res.json(fragments);
+    } catch (error: any) {
+      log(`Ошибка получения фрагментов для записи: ${error.message}`, 'fragments');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении фрагментов записи' 
+      });
+    }
+  });
+  
   // Очистка фрагментов сессии
   app.delete('/api/recording-fragments/:sessionId', async (req: Request, res: Response) => {
     try {

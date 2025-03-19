@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
+import RecordingFragments from '@/components/RecordingFragments';
 import { sendAudioViaClientBot, notifyUserAboutRecording, sendMessageViaClientBot } from '@/lib/telegram';
 
 interface AdminRecording {
