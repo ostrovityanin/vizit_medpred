@@ -326,7 +326,11 @@ export class AudioRecorder {
               // Добавляем небольшую задержку для завершения всех загрузок фрагментов
               await new Promise(resolve => setTimeout(resolve, 1000));
               
-              const response = await fetch(`/api/recording-fragments/combine?sessionId=${sessionId}`);
+              const recordingId = localStorage.getItem("currentRecordingId");
+              const url = `/api/recording-fragments/combine?sessionId=${sessionId}${recordingId ? `&recordingId=${recordingId}` : ""}`;
+              console.log(`Запрашиваем объединенный файл: ${url}`);
+              
+              const response = await fetch(url);
               
               if (response.ok) {
                 const finalBlob = await response.blob();
