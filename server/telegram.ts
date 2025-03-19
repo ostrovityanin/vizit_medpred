@@ -25,26 +25,31 @@ export async function resolveTelegramUsername(username: string): Promise<number 
     // Remove @ symbol if present
     const cleanUsername = username.startsWith('@') ? username.substring(1) : username;
     
-    // For our app, we'll just return the username, as we can send directly to @username
-    // This bypasses the need for getChat and allows sending even if the bot hasn't
-    // started a conversation with the user yet
-    log(`Using direct username @${cleanUsername} instead of resolving chat_id`, 'telegram');
-    return `@${cleanUsername}`;
-    
-    /* Use this approach if you need the actual chat_id
-    const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChat`, {
-      params: {
-        chat_id: `@${cleanUsername}`
-      }
-    });
+    // Try to get actual chat_id first
+    log(`Attempting to resolve username @${cleanUsername} to chat_id`, 'telegram');
+    try {
+      const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChat`, {
+        params: {
+          chat_id: `@${cleanUsername}`
+        }
+      });
 
-    if (response.status === 200 && response.data.ok) {
-      return response.data.result.id;
-    } else {
-      log(`Failed to resolve username ${username}: ${JSON.stringify(response.data)}`, 'telegram');
-      return null;
+      if (response.status === 200 && response.data.ok) {
+        log(`Successfully resolved @${cleanUsername} to chat_id: ${response.data.result.id}`, 'telegram');
+        return response.data.result.id;
+      } else {
+        log(`Failed to resolve username @${cleanUsername}: ${JSON.stringify(response.data)}`, 'telegram');
+      }
+    } catch (error: any) {
+      log(`Error resolving chat_id: ${error.message}`, 'telegram');
+      if (error.response) {
+        log(`Response data: ${JSON.stringify(error.response.data)}`, 'telegram');
+      }
     }
-    */
+    
+    // Fallback to direct username if chat_id resolution fails
+    log(`Falling back to direct username @${cleanUsername}`, 'telegram');
+    return `@${cleanUsername}`;
   } catch (error) {
     log(`Error resolving username ${username}: ${error}`, 'telegram');
     return null;
@@ -65,10 +70,23 @@ export async function sendAudioToTelegram(
   }
 
   try {
-    // Ensure chatId starts with @
-    const formattedChatId = (typeof chatId === 'string' && !chatId.startsWith('@')) 
-      ? `@${chatId}` 
-      : chatId.toString();
+    // For username, ensure it starts with @, but for actual chat_id number, leave as is
+    let formattedChatId: string;
+    
+    if (typeof chatId === 'string') {
+      // If it's a username (not a numeric chat_id)
+      if (isNaN(Number(chatId))) {
+        // Make sure the username starts with @
+        formattedChatId = chatId.startsWith('@') ? chatId : `@${chatId}`;
+        log(`Formatting username to: ${formattedChatId}`, 'telegram');
+      } else {
+        // It's a numeric chat_id as string, don't add @
+        formattedChatId = chatId;
+      }
+    } else {
+      // It's already a number
+      formattedChatId = chatId.toString();
+    }
       
     // Prepare form data with the audio file
     const form = new FormData();

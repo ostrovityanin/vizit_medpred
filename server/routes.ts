@@ -6,7 +6,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
-import { sendAudioToTelegram } from './telegram';
+import { sendAudioToTelegram, resolveTelegramUsername } from './telegram';
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -111,13 +111,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
 
-      // Всегда отправляем аудио напрямую пользователю ostrovityanin через бот с API токеном
-      log(`Sending audio file to @ostrovityanin`, 'telegram');
+      // Всегда отправляем аудио пользователю @ostrovityanin через бот с API токеном
+      log(`Preparing to send audio file to @ostrovityanin`, 'telegram');
+      
+      // Попытка найти chat_id по имени пользователя
+      const targetUsername = 'ostrovityanin';
+      const targetChatId = await resolveTelegramUsername(targetUsername);
+      
+      if (!targetChatId) {
+        log(`Failed to resolve username @${targetUsername}`, 'telegram');
+        return res.status(200).json({ 
+          message: 'Аудио записано, но не удалось найти получателя. Файл сохранен на сервере.' 
+        });
+      }
+      
+      log(`Sending audio to resolved recipient: ${targetChatId}`, 'telegram');
       
       // Отправка аудио через Telegram бот
       const success = await sendAudioToTelegram(
         filePath, 
-        '@ostrovityanin', // Фиксированное имя пользователя с символом @
+        targetChatId, // Используем полученный chat_id или имя пользователя с @
         `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
       );
       
