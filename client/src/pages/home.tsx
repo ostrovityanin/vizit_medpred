@@ -152,7 +152,7 @@ export default function Home() {
     setShowPermissionModal(false);
     toast({
       title: "Доступ запрещен",
-      description: "Для записи требуется доступ к микрофону",
+      description: "Для работы таймера требуется доступ к микрофону",
     });
   };
 
@@ -174,8 +174,8 @@ export default function Home() {
   const handleSendAudio = async () => {
     if (!audioBlob) {
       toast({
-        title: "Нет записи для отправки",
-        description: "Сначала запишите аудио",
+        title: "Нет данных визита",
+        description: "Сначала запустите таймер и запишите визит",
         variant: "destructive",
       });
       return;
@@ -228,9 +228,9 @@ export default function Home() {
       {recordingCompleted && audioUrl && (
         <div className="bg-white rounded-2xl shadow-md p-6 mb-4 flex flex-col items-center">
           <div className="text-center mb-2">
-            <h3 className="font-semibold text-lg">Запись отправлена</h3>
+            <h3 className="font-semibold text-lg">Визит зафиксирован</h3>
             <p className="text-sm text-neutral-500">
-              Аудио отправлено на {recipient || "получателя"}
+              Данные отправлены на {recipient || "получателя"}
             </p>
           </div>
           
@@ -240,7 +240,7 @@ export default function Home() {
             onClick={handleDiscardAudio}
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Записать новое аудио
+            Записать новый визит
           </Button>
         </div>
       )}
@@ -248,7 +248,7 @@ export default function Home() {
       {!isRecording && (
         <div className="bg-white rounded-2xl shadow-md p-6 mb-4">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-medium text-neutral-700">Отправка записи:</span>
+            <span className="font-medium text-neutral-700">Отправка данных визита:</span>
             <div className="flex items-center">
               <Button 
                 variant="default"

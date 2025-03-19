@@ -18,7 +18,7 @@ export default function PermissionModal({ isOpen, onAllow, onCancel }: Permissio
           </div>
           <DialogTitle className="text-center">Доступ к микрофону</DialogTitle>
           <DialogDescription className="text-center">
-            Приложению нужен доступ к микрофону для записи аудио во время работы таймера.
+            Приложению нужен доступ к микрофону для фиксации данных визита во время работы таймера.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex gap-3 sm:justify-center">
