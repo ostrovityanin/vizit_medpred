@@ -5,12 +5,12 @@ import { log } from './vite';
 import { Recording } from '@shared/schema';
 
 /**
- * Клиентский бот (@rsrobot) для пользовательской части приложения
+ * Клиентский бот (@MedPredRuBot) для пользовательской части приложения
  * Отвечает за взаимодействие с пользователями, отправку им их записей
  */
 
 // API ключ бота (берется из переменных окружения)
-const TELEGRAM_CLIENT_BOT_TOKEN = process.env.RSROBOT_API_KEY;
+const TELEGRAM_CLIENT_BOT_TOKEN = process.env.MEDPRED_BOT_TOKEN;
 const BASE_URL = `https://api.telegram.org/bot${TELEGRAM_CLIENT_BOT_TOKEN}`;
 
 /**
