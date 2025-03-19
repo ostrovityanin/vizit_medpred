@@ -174,12 +174,18 @@ export default function AdminPanel() {
   // Обновление статуса записи
   const updateRecordingStatus = async (id: number, status: 'started' | 'completed' | 'error') => {
     try {
+      // Получаем ID сессии из localStorage, если он есть
+      const sessionId = localStorage.getItem('recordingSessionId');
+      
       const response = await fetch(`/api/recordings/${id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ 
+          status,
+          sessionId // Добавляем ID сессии для автоматического объединения фрагментов
+        }),
       });
       
       if (!response.ok) {
