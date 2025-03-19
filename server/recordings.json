@@ -63,7 +63,18 @@
       "transcription": "Человек 1: Бл είναι жутко.\nЧеловек 2: Тест говорящего.\nЧеловек 1: Очень интересно.",
       "id": 6,
       "sent": false
+    },
+    {
+      "filename": "5f3b759f-0826-41b1-ace9-3fd818c9a238.wav",
+      "duration": 1742348180,
+      "timestamp": "2025-03-19T01:36:20.524Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 371614,
+      "transcription": "Человек 1: Пожалуйста, распознавайте только русские слова на русском языке.\nЧеловек 2: Какой ты негодяй.",
+      "id": 7,
+      "sent": false
     }
   ],
-  "currentId": 7
+  "currentId": 8
 }
