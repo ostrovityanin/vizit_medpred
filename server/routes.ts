@@ -168,17 +168,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: 'Audio file not found on server' });
       }
 
-      // Всегда отправляем аудио пользователю @ostrovityanin через бот с API токеном
-      log(`Preparing to send audio file to @ostrovityanin`, 'telegram');
+      // Отправляем аудио целевому пользователю через бот с API токеном
+      const targetUsername = recording.targetUsername.replace('@', '');
+      log(`Preparing to send audio file to @${targetUsername}`, 'telegram');
       
       // Попытка найти chat_id по имени пользователя
-      const targetUsername = 'ostrovityanin';
       const targetChatId = await resolveTelegramUsername(targetUsername);
       
       if (!targetChatId) {
         log(`Failed to resolve username @${targetUsername}`, 'telegram');
         return res.status(200).json({ 
-          message: 'Аудио записано, но не удалось найти получателя. Файл сохранен на сервере.' 
+          message: `Аудио записано, но не удалось найти получателя @${targetUsername}. Файл сохранен на сервере.` 
         });
       }
       
@@ -202,7 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       res.json({
         ...updatedRecording,
-        message: 'Запись успешно отправлена @ostrovityanin'
+        message: `Запись успешно отправлена @${targetUsername}`
       });
     } catch (error) {
       log(`Error sending recording: ${error}`, 'telegram');
@@ -213,7 +213,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Маршрут для тестирования отправки текстового сообщения в Telegram
   app.post('/api/send-telegram-message', async (req: Request, res: Response) => {
     try {
-      const { username = 'ostrovityanin', message = 'Тестовое сообщение из таймера визита' } = req.body;
+      const { username, message = 'Тестовое сообщение из таймера визита' } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({
+          success: false,
+          message: 'Не указано имя пользователя-получателя'
+        });
+      }
       
       log(`Attempting to send test message to @${username}`, 'telegram');
       

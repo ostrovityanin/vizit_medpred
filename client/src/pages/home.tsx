@@ -101,6 +101,15 @@ export default function Home() {
   
   // Выделяем логику отправки в отдельную функцию
   const sendRecording = async (blob: Blob) => {
+    if (!recipient || recipient.trim() === '') {
+      toast({
+        title: "Имя получателя не указано",
+        description: "Пожалуйста, введите имя получателя перед отправкой",
+        variant: "destructive"
+      });
+      return false;
+    }
+
     toast({
       title: "Отправка записи",
       description: `Отправка на ${recipient}...`,
