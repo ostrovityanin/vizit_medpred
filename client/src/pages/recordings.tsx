@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
+import { sendAudioViaClientBot, notifyUserAboutRecording, sendMessageViaClientBot } from '@/lib/telegram';
 
 interface Recording {
   id: number;
@@ -87,6 +88,132 @@ export default function Recordings() {
     setAudioPlayerVisible(false);
     if (!transcriptionModalVisible) {
       setSelectedRecording(null);
+    }
+  };
+  
+  // Отправить аудиозапись через клиентский бот
+  const sendViaClientBot = async (id: number) => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) {
+        throw new Error('Запись не найдена');
+      }
+      
+      // Запрашиваем у пользователя имя получателя
+      const username = prompt('Введите имя пользователя получателя (без @):', recording.targetUsername);
+      if (!username) return;
+      
+      const success = await sendAudioViaClientBot(id, username);
+      
+      if (success) {
+        toast({
+          title: 'Успешно',
+          description: `Аудиозапись отправлена пользователю @${username} через клиентский бот`,
+          variant: 'default',
+        });
+        
+        // Обновляем список записей
+        fetchRecordings();
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось отправить аудиозапись через клиентский бот',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending via client bot:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось отправить аудиозапись через клиентский бот',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Отправить уведомление о записи через клиентский бот
+  const sendNotificationViaClientBot = async (id: number) => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) {
+        throw new Error('Запись не найдена');
+      }
+      
+      // Запрашиваем у пользователя имя получателя
+      const username = prompt('Введите имя пользователя получателя (без @):', recording.targetUsername);
+      if (!username) return;
+      
+      const success = await notifyUserAboutRecording(id, username);
+      
+      if (success) {
+        toast({
+          title: 'Успешно',
+          description: `Уведомление о записи отправлено пользователю @${username}`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось отправить уведомление через клиентский бот',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending notification via client bot:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось отправить уведомление через клиентский бот',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Отправить сообщение с выдержкой из транскрипции
+  const sendTranscriptViaClientBot = async (id: number) => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) {
+        throw new Error('Запись не найдена');
+      }
+      
+      if (!recording.transcription) {
+        toast({
+          title: 'Ошибка',
+          description: 'У этой записи отсутствует распознанный текст',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Запрашиваем у пользователя имя получателя
+      const username = prompt('Введите имя пользователя получателя (без @):', recording.targetUsername);
+      if (!username) return;
+      
+      // Формируем сообщение с выдержкой из транскрипции
+      const messageText = `📝 <b>Текст аудиозаписи от ${formatDate(recording.timestamp)}</b>\n\n${recording.transcription.substring(0, 1000)}${recording.transcription.length > 1000 ? '...' : ''}`;
+      
+      const success = await sendMessageViaClientBot(username, messageText);
+      
+      if (success) {
+        toast({
+          title: 'Успешно',
+          description: `Текст записи отправлен пользователю @${username}`,
+          variant: 'default',
+        });
+      } else {
+        toast({
+          title: 'Ошибка',
+          description: 'Не удалось отправить текст через клиентский бот',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error sending transcript via client bot:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось отправить текст через клиентский бот',
+        variant: 'destructive',
+      });
     }
   };
   
@@ -193,6 +320,7 @@ export default function Recordings() {
                     </td>
                     <td className="p-2 text-right whitespace-nowrap">
                       <div className="flex gap-1 justify-end">
+                        {/* Базовые действия */}
                         <Button 
                           onClick={() => playRecording(recording.id)}
                           variant="outline" 
@@ -222,6 +350,37 @@ export default function Recordings() {
                         >
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
+                        
+                        {/* Кнопки для клиентского бота */}
+                        <Button 
+                          onClick={() => sendViaClientBot(recording.id)}
+                          variant="outline" 
+                          size="sm"
+                          className="text-blue-700 border-blue-200 hover:bg-blue-50"
+                          title="Отправить через клиентский бот"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          onClick={() => sendNotificationViaClientBot(recording.id)}
+                          variant="outline" 
+                          size="sm"
+                          className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                          title="Отправить уведомление через клиентский бот"
+                        >
+                          <Bell className="h-4 w-4" />
+                        </Button>
+                        {recording.transcription && (
+                          <Button 
+                            onClick={() => sendTranscriptViaClientBot(recording.id)}
+                            variant="outline" 
+                            size="sm"
+                            className="text-green-700 border-green-200 hover:bg-green-50"
+                            title="Отправить текст через клиентский бот"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -234,10 +393,27 @@ export default function Recordings() {
 
       <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-lg">
         <h3 className="text-blue-800 font-medium mb-2">Примечание</h3>
-        <p className="text-sm text-blue-700">
-          Если запись не была отправлена в Telegram, вы можете скачать её здесь.
-          Для получения записей через бот @KashMenBot, пользователь @ostrovityanin 
-          должен отправить команду /start боту.
+        <p className="text-sm text-blue-700 mb-2">
+          Система использует двух ботов для отправки записей:
+        </p>
+        <ul className="text-sm text-blue-700 list-disc pl-5 space-y-1">
+          <li>
+            <strong>@KashMenBot</strong> - основной бот для администратора, автоматически получает все записи
+          </li>
+          <li>
+            <strong>@rsrobot</strong> - клиентский бот для непосредственной отправки записей пользователям
+          </li>
+        </ul>
+        <div className="mt-3 text-sm text-blue-700">
+          <p className="mb-2"><strong>Новые возможности через кнопки:</strong></p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><span className="text-blue-700">📩</span> - отправить запись пользователю через клиентский бот</li>
+            <li><span className="text-amber-700">🔔</span> - отправить уведомление о новой записи</li>
+            <li><span className="text-green-700">💬</span> - отправить текст записи пользователю</li>
+          </ul>
+        </div>
+        <p className="text-sm text-blue-700 mt-3">
+          Для получения сообщений, пользователи должны отправить команду /start соответствующему боту.
         </p>
       </div>
       
