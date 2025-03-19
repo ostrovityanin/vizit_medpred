@@ -1,0 +1,35 @@
+{
+  "fragments": [
+    {
+      "recordingId": 30,
+      "filename": "fragment-session-1742421477808-467-00000.webm",
+      "index": 0,
+      "timestamp": 1742421507834,
+      "sessionId": "session-1742421477808-467",
+      "size": 470615,
+      "processed": true,
+      "id": 1
+    },
+    {
+      "recordingId": 30,
+      "filename": "fragment-session-1742421477808-467-00001.webm",
+      "index": 1,
+      "timestamp": 1742421537822,
+      "sessionId": "session-1742421477808-467",
+      "size": 481367,
+      "processed": true,
+      "id": 2
+    },
+    {
+      "recordingId": 30,
+      "filename": "fragment-session-1742421477808-467-00002.webm",
+      "index": 2,
+      "timestamp": 1742421551742,
+      "sessionId": "session-1742421477808-467",
+      "size": 237071,
+      "processed": true,
+      "id": 3
+    }
+  ],
+  "currentId": 4
+}
