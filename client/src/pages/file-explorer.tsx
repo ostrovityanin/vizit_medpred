@@ -252,11 +252,11 @@ export default function FileExplorer() {
                   {filesData.files.map((file: FileInfo, index: number) => (
                     <tr key={index} className="border-b border-neutral-100 hover:bg-neutral-50">
                       <td className="py-3 px-3">
-                        <div className="flex flex-col space-y-2">
-                          <div className="flex items-center space-x-2">
-                            {file.recording && (
+                        <div className="flex items-center space-x-2">
+                          {file.recording && (
+                            <div className="flex items-center space-x-2">
                               <div className="flex items-center">
-                                {selectedAudioFile?.id === file.recording.id ? (
+                                {audioElement?.src.includes(String(file.recording.id)) ? (
                                   <Button
                                     size="sm"
                                     variant="ghost"
@@ -265,6 +265,7 @@ export default function FileExplorer() {
                                       setSelectedAudioFile(null);
                                       setAudioElement(null);
                                     }}
+                                    className="hover:bg-neutral-100"
                                   >
                                     <Pause className="h-4 w-4" />
                                   </Button>
@@ -278,14 +279,15 @@ export default function FileExplorer() {
                                       setAudioElement(audio);
                                       setSelectedAudioFile({ id: file.recording.id, filename: file.filename });
                                     }}
+                                    className="hover:bg-neutral-100"
                                   >
                                     <Play className="h-4 w-4" />
                                   </Button>
                                 )}
                                 <span className="text-sm ml-2">{formatSeconds(file.recording.duration)}</span>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                           <span className="text-sm text-neutral-600">{file.filename}</span>
                         </div>
                       </td>
@@ -293,14 +295,14 @@ export default function FileExplorer() {
                       <td className="py-3 px-3 text-sm">{formatDate(file.created)}</td>
                       <td className="py-3 px-3">
                         <div className="flex flex-col">
-                          <span className="text-sm font-medium">@{file.recording?.targetUsername || '-'}</span>
+                          <span className="text-sm font-medium">@{file.recording?.targetUsername || 'Неизвестно'}</span>
                           <span className="text-xs text-neutral-500">
                             {!file.inDatabase ? (
-                              "Нет в базе данных"
+                              "Не добавлено в архив"
                             ) : file.recording?.sent ? (
-                              "Отправлено"
+                              "Отправлено пользователю"
                             ) : (
-                              "В ожидании"
+                              "В ожидании отправки"
                             )}
                           </span>
                         </div>
