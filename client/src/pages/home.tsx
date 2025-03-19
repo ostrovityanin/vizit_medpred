@@ -33,8 +33,55 @@ export default function Home() {
       }
     }
   }, []);
-  const timerRef = useRef(new TimerClass((seconds) => setTimerSeconds(seconds)));
+  const MAX_RECORDING_TIME = 60; // Максимальное время записи в секундах (1 минута)
   const { toast } = useToast();
+  
+  // Функция для остановки записи, которую можно безопасно вызывать из useRef колбэка
+  const stopRecordingRef = useRef<() => Promise<void>>();
+  
+  const timerRef = useRef(new TimerClass((seconds) => {
+    setTimerSeconds(seconds);
+    
+    // Автоматически останавливаем запись через 1 минуту
+    if (seconds >= MAX_RECORDING_TIME && isRecording) {
+      if (stopRecordingRef.current) {
+        stopRecordingRef.current();
+      }
+    }
+  }));
+
+  // Обновляем ссылку на функцию остановки при каждом изменении состояния записи
+  useEffect(() => {
+    // Только когда запись активна, обновляем ссылку на функцию остановки
+    if (isRecording) {
+      stopRecordingRef.current = async () => {
+        // Проверяем, что запись все еще идет
+        if (isRecording) {
+          const duration = timerRef.current.stop();
+          setIsRecording(false);
+          
+          const blob = await audioRecorder.stopRecording();
+          if (blob) {
+            setAudioBlob(blob);
+            const url = URL.createObjectURL(blob);
+            setAudioUrl(url);
+            setRecordingCompleted(true);
+            
+            toast({
+              title: "Автоматическая остановка",
+              description: `Достигнута максимальная длительность записи (1 минута)`,
+            });
+            
+            // Сохраняем данные
+            await sendRecording(blob);
+          }
+        }
+      };
+    } else {
+      // Если запись не активна, очищаем ссылку
+      stopRecordingRef.current = undefined;
+    }
+  }, [isRecording]);
 
   useEffect(() => {
     // Cleanup on unmount
