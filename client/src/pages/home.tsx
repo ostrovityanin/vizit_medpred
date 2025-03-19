@@ -17,7 +17,7 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [recipient] = useState('@ostrovityanin');
+  const [recipient, setRecipient] = useState('');
   const [senderUsername, setSenderUsername] = useState<string>("Пользователь");
   
   // Получаем информацию о пользователе из Telegram WebApp
@@ -116,7 +116,7 @@ export default function Home() {
     } else {
       toast({
         title: "Аудио записано",
-        description: "Отправка не удалась. Для получения сообщений от бота, @ostrovityanin должен отправить боту команду /start. Запись сохранена на сервере.",
+        description: "Отправка не удалась. Для получения сообщений от бота, получатель должен отправить боту команду /start. Запись сохранена на сервере.",
         duration: 10000,
       });
     }
@@ -221,7 +221,7 @@ export default function Home() {
           <div className="text-center mb-2">
             <h3 className="font-semibold text-lg">Запись отправлена</h3>
             <p className="text-sm text-neutral-500">
-              Аудио отправлено на @ostrovityanin
+              Аудио отправлено на {recipient || "получателя"}
             </p>
           </div>
           
@@ -253,7 +253,14 @@ export default function Home() {
           </div>
           
           <div className="mt-2 text-center text-neutral-600">
-            <p className="text-sm">Аудио будет отправлено на @ostrovityanin</p>
+            <p className="text-sm">Введите имя получателя:</p>
+            <input 
+              type="text" 
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="Например, @username"
+              className="mt-2 p-2 w-full border rounded-md"
+            />
           </div>
         </div>
       )}
