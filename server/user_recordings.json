@@ -1,4 +1,21 @@
 {
-  "recordings": [],
-  "currentId": 1
+  "recordings": [
+    {
+      "adminRecordingId": 1,
+      "username": "archive",
+      "duration": 9,
+      "timestamp": "2025-03-19T15:02:02.797Z",
+      "id": 1,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 1,
+      "username": "ostrovityanin",
+      "duration": 9,
+      "timestamp": "2025-03-19T15:02:02.797Z",
+      "id": 2,
+      "sent": false
+    }
+  ],
+  "currentId": 3
 }

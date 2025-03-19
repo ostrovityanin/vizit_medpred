@@ -1,4 +1,18 @@
 {
-  "recordings": [],
-  "currentId": 1
+  "recordings": [
+    {
+      "filename": "22ca252c-f5de-4376-9a52-d788620e5fdc.wav",
+      "duration": 9,
+      "timestamp": "2025-03-19T15:02:02.797Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 153881,
+      "transcription": "Поскольку в представленной транскрипции есть только одна фраза, и нет контекста, который бы помог определить, кто говорит, я отформатирую ее следующим образом:\nЧеловек 1: \"Аппетитно. Спасибо.\"",
+      "transcriptionCost": "0.0010",
+      "tokensProcessed": 144,
+      "id": 1,
+      "sent": false
+    }
+  ],
+  "currentId": 2
 }

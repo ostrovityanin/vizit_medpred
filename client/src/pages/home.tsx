@@ -278,7 +278,7 @@ export default function Home() {
           </Button>
         ) : (
           <Button 
-            className="bg-red-600 hover:bg-red-700 text-white font-medium py-3 px-10 rounded-lg flex items-center gap-2"
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-10 rounded-lg flex items-center gap-2"
             onClick={handleStopTimer}
           >
             <StopCircle className="h-6 w-6" />
