@@ -14,6 +14,8 @@ interface Recording {
   senderUsername?: string | null;
   fileSize?: number | null;
   transcription?: string | null;
+  transcriptionCost?: string | null;
+  tokensProcessed?: number | null;
   sent: boolean;
 }
 
@@ -144,6 +146,7 @@ export default function Recordings() {
                   <th className="p-2 text-left text-neutral-600 font-medium">Длительность</th>
                   <th className="p-2 text-left text-neutral-600 font-medium">Размер</th>
                   <th className="p-2 text-left text-neutral-600 font-medium">Статус</th>
+                  <th className="p-2 text-left text-neutral-600 font-medium">Стоимость</th>
                   <th className="p-2 text-left text-neutral-600 font-medium">Распознанный текст</th>
                   <th className="p-2 text-right text-neutral-600 font-medium">Действия</th>
                 </tr>
@@ -168,6 +171,15 @@ export default function Recordings() {
                         <span className="inline-block px-2 py-1 text-xs font-medium bg-amber-100 text-amber-800 rounded-full">
                           Не отправлено
                         </span>
+                      )}
+                    </td>
+                    <td className="p-2 text-neutral-600">
+                      {recording.transcriptionCost ? (
+                        <div className="text-sm whitespace-nowrap text-green-600">
+                          ${recording.transcriptionCost}
+                        </div>
+                      ) : (
+                        <div className="text-neutral-400 text-sm">-</div>
                       )}
                     </td>
                     <td className="p-2 text-neutral-600">
@@ -250,6 +262,12 @@ export default function Recordings() {
               {selectedRecording.senderUsername && (
                 <div>Отправитель: {selectedRecording.senderUsername}</div>
               )}
+              {selectedRecording.transcriptionCost && (
+                <div className="text-green-600">
+                  Стоимость распознавания: ${selectedRecording.transcriptionCost}
+                  {selectedRecording.tokensProcessed && ` (${selectedRecording.tokensProcessed} токенов)`}
+                </div>
+              )}
               {selectedRecording.transcription && (
                 <div className="flex justify-between items-center mt-2">
                   <div className="text-sm line-clamp-2 italic overflow-hidden text-neutral-600">
@@ -308,8 +326,14 @@ export default function Recordings() {
             </div>
             
             <div className="mt-4 flex justify-between items-center">
-              <div className="text-xs text-neutral-500">
-                Записано: {formatDate(selectedRecording.timestamp)}
+              <div className="text-xs text-neutral-500 space-y-1">
+                <div>Записано: {formatDate(selectedRecording.timestamp)}</div>
+                {selectedRecording.transcriptionCost && (
+                  <div className="text-green-600">
+                    Стоимость распознавания: ${selectedRecording.transcriptionCost}
+                    {selectedRecording.tokensProcessed && ` (${selectedRecording.tokensProcessed} токенов)`}
+                  </div>
+                )}
               </div>
               <Button 
                 variant="ghost" 
