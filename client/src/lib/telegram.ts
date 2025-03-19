@@ -121,7 +121,7 @@ export async function sendMessageViaClientBot(recipient: string, message: string
 }
 
 /**
- * Отправляет уведомление о новой записи пользователю через клиентский бот
+ * Отправляет уведомление о новом визите пользователю через клиентский бот
  */
 export async function notifyUserAboutRecording(recordingId: number, recipient: string): Promise<boolean> {
   try {
@@ -153,7 +153,7 @@ export async function notifyUserAboutRecording(recordingId: number, recipient: s
 }
 
 /**
- * Получает записи пользователя через клиентский бот
+ * Получает данные визитов пользователя через клиентский бот
  */
 export async function getUserRecordings(username: string): Promise<any[]> {
   try {

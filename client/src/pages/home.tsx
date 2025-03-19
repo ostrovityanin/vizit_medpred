@@ -194,7 +194,7 @@ export default function Home() {
         <div className="flex gap-2 flex-wrap justify-center">
           <Link href="/recordings">
             <Button variant="outline" size="sm" className="text-xs">
-              Архив записей
+              Архив визитов
             </Button>
           </Link>
         </div>
