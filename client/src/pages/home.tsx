@@ -44,22 +44,53 @@ export default function Home() {
     setTimerSeconds(seconds);
   }));
 
-  // Автоматическая остановка записи через 1 минуту
+  // Автоматическая остановка записи по достижению лимита времени
   useEffect(() => {
     let autoStopTimerId: number | null = null;
     
     // Только когда запись активна, устанавливаем таймер автоостановки
     if (isRecording) {
-      console.log('Установлен таймер автоостановки на 10 минут');
+      console.log(`Установлен таймер автоостановки на ${MAX_RECORDING_TIME / 60} минут`);
       
-      // Устанавливаем таймер на автоматическую остановку через 10 минут
+      // Устанавливаем таймер на автоматическую остановку
       autoStopTimerId = window.setTimeout(async () => {
-        console.log('Сработал таймер автоостановки');
+        console.log('Сработал таймер автоостановки по достижению лимита времени');
         
         // Проверяем, что запись все еще идет
         if (isRecording) {
           const duration = timerRef.current.stop();
           setIsRecording(false);
+          
+          // Получаем ID текущей записи и сессию для обновления статуса
+          const recordingId = localStorage.getItem('currentRecordingId');
+          const sessionId = localStorage.getItem('recordingSessionId');
+          
+          // Явно устанавливаем статус "completed" для текущей записи
+          if (recordingId && sessionId) {
+            try {
+              console.log(`Автоматическое обновление статуса записи ${recordingId} на "completed" (достигнут лимит времени)`);
+              
+              const response = await fetch(`/api/recordings/${recordingId}/status`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                  status: 'completed',
+                  sessionId: sessionId,
+                  autoStop: true
+                }),
+              });
+              
+              if (response.ok) {
+                console.log(`Статус записи ${recordingId} успешно обновлен на "completed"`);
+              } else {
+                console.error(`Ошибка при обновлении статуса записи ${recordingId}:`, await response.text());
+              }
+            } catch (error) {
+              console.error('Ошибка при обновлении статуса записи:', error);
+            }
+          }
           
           const blob = await audioRecorder.stopRecording();
           if (blob) {
@@ -70,7 +101,7 @@ export default function Home() {
             
             toast({
               title: "Автоматическая остановка",
-              description: `Достигнут максимальный лимит времени (10 минут)`,
+              description: `Достигнут максимальный лимит времени (${MAX_RECORDING_TIME / 60} минут)`,
             });
             
             // Сохраняем данные
@@ -145,8 +176,7 @@ export default function Home() {
           console.log(`Запись продолжается: сохранен фрагмент #${fragment.index} (${minutesRecorded} минут)`);
         }
       },
-      30000, // 30 секунд - размер фрагмента
-      sessionId  // Передаем ID сессии для связывания фрагментов
+      30000 // 30 секунд - размер фрагмента
     );
     
     if (started) {
@@ -213,6 +243,37 @@ export default function Home() {
   const handleStopTimer = async () => {
     const duration = timerRef.current.stop();
     setIsRecording(false);
+    
+    // Получаем ID текущей записи и сессию для обновления статуса
+    const recordingId = localStorage.getItem('currentRecordingId');
+    const sessionId = localStorage.getItem('recordingSessionId');
+    
+    // Явно устанавливаем статус "completed" для текущей записи при ручной остановке
+    if (recordingId && sessionId) {
+      try {
+        console.log(`Обновление статуса записи ${recordingId} на "completed" (ручная остановка)`);
+        
+        const response = await fetch(`/api/recordings/${recordingId}/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            status: 'completed',
+            sessionId: sessionId,
+            manualStop: true
+          }),
+        });
+        
+        if (response.ok) {
+          console.log(`Статус записи ${recordingId} успешно обновлен на "completed"`);
+        } else {
+          console.error(`Ошибка при обновлении статуса записи ${recordingId}:`, await response.text());
+        }
+      } catch (error) {
+        console.error('Ошибка при обновлении статуса записи:', error);
+      }
+    }
     
     const blob = await audioRecorder.stopRecording();
     if (blob) {

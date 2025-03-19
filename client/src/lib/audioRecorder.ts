@@ -110,10 +110,14 @@ export class AudioRecorder {
     this.currentFragmentIndex = 0;
     this.onFragmentSaved = onFragmentSaved || null;
     
-    // Создаем новый ID сессии для каждой новой записи
-    const sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    localStorage.setItem('recordingSessionId', sessionId);
-    console.log(`Создана новая сессия записи с ID: ${sessionId}`);
+    // Создаем новый ID сессии для каждой новой записи, если он не был установлен извне
+    if (!localStorage.getItem('recordingSessionId')) {
+      const newSessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      localStorage.setItem('recordingSessionId', newSessionId);
+      console.log(`Создана новая сессия записи с ID: ${newSessionId}`);
+    } else {
+      console.log(`Используется существующая сессия с ID: ${localStorage.getItem('recordingSessionId')}`);
+    }
     
     // Инициализируем запись
     const started = this._initRecording();
