@@ -350,7 +350,35 @@
       "transcription": null,
       "transcriptionCost": null,
       "tokensProcessed": null
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-03-19T21:15:05.059Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "started",
+      "id": 27,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-03-19T21:15:55.640Z",
+      "targetUsername": "archive",
+      "senderUsername": "iq1_1iq",
+      "status": "started",
+      "id": 28,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 27
+  "currentId": 29
 }

@@ -52,63 +52,92 @@ class FragmentManager {
     timestamp: number, 
     sessionId: string,
     recordingId?: number
-  ): Promise<RecordingFragment> {
-    // Создаем имя файла для фрагмента
-    const filename = `fragment-${sessionId}-${index.toString().padStart(5, '0')}.webm`;
-    const fullPath = path.join(this.fragmentsDir, filename);
-    
-    // Сохраняем файл
-    await fs.promises.writeFile(fullPath, buffer);
-    
-    // Получаем размер файла
-    const stats = await fs.promises.stat(fullPath);
-    
-    // Создаем объект фрагмента
-    const fragment: RecordingFragment = {
-      filename,
-      index,
-      timestamp,
-      sessionId,
-      size: stats.size
-    };
-    
-    // Добавляем фрагмент в коллекцию по sessionId для обратной совместимости
-    if (!this.fragments.has(sessionId)) {
-      this.fragments.set(sessionId, []);
-    }
-    
-    this.fragments.get(sessionId)?.push(fragment);
-    
-    // Сохраняем фрагмент в базу данных, если указан ID записи
-    if (recordingId) {
-      try {
-        const fragmentData: InsertRecordingFragment = {
-          recordingId,
-          filename,
-          index,
-          timestamp,
-          sessionId,
-          size: stats.size,
-          processed: false
-        };
-        
-        await storage.createRecordingFragment(fragmentData);
-        log(`Фрагмент #${index} сессии ${sessionId} сохранен в базу данных`, 'fragments');
-      } catch (error) {
-        log(`Ошибка при сохранении фрагмента в базу данных: ${error}`, 'fragments');
+  ): Promise<RecordingFragment | null> {
+    try {
+      // Проверяем входные данные
+      if (!buffer || !sessionId) {
+        log(`Ошибка: некорректные входные параметры для сохранения фрагмента`, 'fragments');
+        return null;
       }
+      
+      // Проверяем существование директории
+      if (!fs.existsSync(this.fragmentsDir)) {
+        fs.mkdirSync(this.fragmentsDir, { recursive: true });
+        log(`Создана директория для фрагментов: ${this.fragmentsDir}`, 'fragments');
+      }
+      
+      // Создаем имя файла для фрагмента
+      const filename = `fragment-${sessionId}-${index.toString().padStart(5, '0')}.webm`;
+      const fullPath = path.join(this.fragmentsDir, filename);
+      
+      log(`Сохранение фрагмента #${index} сессии ${sessionId}`, 'fragments');
+      
+      // Сохраняем файл
+      await fs.promises.writeFile(fullPath, buffer);
+      
+      // Получаем размер файла
+      let fileSize = buffer.length; // Резервный размер
+      try {
+        const stats = await fs.promises.stat(fullPath);
+        fileSize = stats.size;
+      } catch (statError) {
+        log(`Предупреждение: не удалось получить размер файла ${filename}: ${statError}`, 'fragments');
+      }
+      
+      // Создаем объект фрагмента
+      const fragment: RecordingFragment = {
+        filename,
+        index,
+        timestamp,
+        sessionId,
+        size: fileSize
+      };
+      
+      // Добавляем фрагмент в коллекцию по sessionId для обратной совместимости
+      if (!this.fragments.has(sessionId)) {
+        this.fragments.set(sessionId, []);
+      }
+      
+      const fragments = this.fragments.get(sessionId);
+      if (fragments) {
+        fragments.push(fragment);
+      }
+      
+      // Сохраняем фрагмент в базу данных, если указан ID записи
+      if (recordingId) {
+        try {
+          const fragmentData: InsertRecordingFragment = {
+            recordingId,
+            filename,
+            index,
+            timestamp,
+            sessionId,
+            size: fileSize,
+            processed: false
+          };
+          
+          await storage.createRecordingFragment(fragmentData);
+          log(`Фрагмент #${index} сессии ${sessionId} сохранен в базу данных`, 'fragments');
+        } catch (error) {
+          log(`Ошибка при сохранении фрагмента в базу данных: ${error}`, 'fragments');
+          // Продолжаем работу даже если не удалось сохранить в БД
+        }
+      }
+      
+      // Логируем событие
+      log(`Сохранен фрагмент #${index} сессии ${sessionId}, размер: ${fileSize} байт`, 'fragments');
+      eventLogger.logEvent('system', 'FRAGMENT_SAVED', { 
+        sessionId, 
+        index, 
+        size: fileSize,
+        recordingId
+      });
+      
+      return fragment;
+    } catch (error) {
+      log(`Критическая ошибка при сохранении фрагмента #${index} сессии ${sessionId}: ${error}`, 'fragments');
+      return null;
     }
-    
-    // Логируем событие
-    log(`Сохранен фрагмент #${index} сессии ${sessionId}, размер: ${stats.size} байт`, 'fragments');
-    eventLogger.logEvent('system', 'FRAGMENT_SAVED', { 
-      sessionId, 
-      index, 
-      size: stats.size,
-      recordingId
-    });
-    
-    return fragment;
   }
   
   /**
