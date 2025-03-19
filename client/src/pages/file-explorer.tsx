@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, RefreshCcw, Send, PlayCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCcw, Send, PlayCircle, XCircle, Play, Pause } from 'lucide-react';
 import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { formatSeconds } from '@/lib/timer';
@@ -30,7 +30,8 @@ interface FileInfo {
 export default function FileExplorer() {
   const { toast } = useToast();
   const [selectedAudioFile, setSelectedAudioFile] = useState<{id: number, filename: string} | null>(null);
-  
+  const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
+
   // Запрос информации о файлах
   const { 
     data: filesData, 
@@ -40,7 +41,7 @@ export default function FileExplorer() {
     queryKey: ['/api/files'],
     queryFn: getQueryFn({ on401: 'throw' }),
   });
-  
+
   // Запрос информации о боте
   const { 
     data: botInfoData, 
@@ -50,7 +51,7 @@ export default function FileExplorer() {
     queryKey: ['/api/telegram/bot-info'],
     queryFn: getQueryFn({ on401: 'throw' }),
   });
-  
+
   // Запрос обновлений бота
   const { 
     data: updatesData, 
@@ -60,43 +61,43 @@ export default function FileExplorer() {
     queryKey: ['/api/telegram/updates'],
     queryFn: getQueryFn({ on401: 'throw' }),
   });
-  
+
   const handleRefreshAll = () => {
     refetchFiles();
     refetchBotInfo();
     refetchUpdates();
-    
+
     toast({
       title: "Обновление данных",
       description: "Данные успешно обновлены",
     });
   };
-  
+
   const handleDownloadFile = (fileId: number) => {
     window.open(`/api/recordings/${fileId}/download`, '_blank');
   };
-  
+
   const handlePlayFile = (fileId: number, filename: string) => {
     console.log("Playing file:", fileId, filename);
     setSelectedAudioFile({ id: fileId, filename });
-    
+
     // Попробуем воспроизвести напрямую через API
     const audio = new Audio(`/api/recordings/${fileId}/download`);
     audio.play().catch(err => console.error("Error playing audio:", err));
   };
-  
+
   const handleClosePlayer = () => {
     setSelectedAudioFile(null);
   };
-  
+
   const handleSendFile = async (fileId: number) => {
     try {
       const response = await fetch(`/api/recordings/${fileId}/send`, {
         method: 'POST',
       });
-      
+
       const data = await response.json();
-      
+
       if (response.ok) {
         toast({
           title: "Успех",
@@ -119,13 +120,13 @@ export default function FileExplorer() {
       });
     }
   };
-  
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
-  
+
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleString('ru-RU');
@@ -171,7 +172,7 @@ export default function FileExplorer() {
       {/* Информация о боте */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-medium mb-4">Информация о Telegram боте</h2>
-        
+
         {isLoadingBotInfo ? (
           <p className="text-neutral-500">Загрузка информации...</p>
         ) : botInfoData?.success ? (
@@ -197,11 +198,11 @@ export default function FileExplorer() {
           <p className="text-red-500">Не удалось получить информацию о боте</p>
         )}
       </div>
-      
+
       {/* Обновления бота */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h2 className="text-lg font-medium mb-4">Последние обновления бота</h2>
-        
+
         {isLoadingUpdates ? (
           <p className="text-neutral-500">Загрузка обновлений...</p>
         ) : updatesData?.success ? (
@@ -227,11 +228,11 @@ export default function FileExplorer() {
           <p className="text-red-500">Не удалось получить обновления бота</p>
         )}
       </div>
-      
+
       {/* Список файлов */}
       <div className="bg-white rounded-xl shadow-sm p-6">
         <h2 className="text-lg font-medium mb-4">Файлы на сервере</h2>
-        
+
         {isLoadingFiles ? (
           <p className="text-neutral-500">Загрузка файлов...</p>
         ) : filesData?.success ? (
@@ -240,35 +241,69 @@ export default function FileExplorer() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-neutral-200">
-                    <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Имя файла</th>
+                    <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Файл</th>
                     <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Размер</th>
                     <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Создан</th>
                     <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Пользователь</th>
-                    <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Длительность</th>
-                    <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Статус</th>
                     <th className="text-left py-2 px-3 text-sm font-medium text-neutral-500">Действия</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filesData.files.map((file: FileInfo, index: number) => (
                     <tr key={index} className="border-b border-neutral-100 hover:bg-neutral-50">
-                      <td className="py-3 px-3 text-sm">{file.filename}</td>
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col space-y-2">
+                          <div className="flex items-center space-x-2">
+                            {file.recording && (
+                              <div className="flex items-center">
+                                {selectedAudioFile?.id === file.recording.id ? (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      audioElement?.pause();
+                                      setSelectedAudioFile(null);
+                                      setAudioElement(null);
+                                    }}
+                                  >
+                                    <Pause className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      const audio = new Audio(`/api/recordings/${file.recording.id}/download`);
+                                      audio.play();
+                                      setAudioElement(audio);
+                                      setSelectedAudioFile({ id: file.recording.id, filename: file.filename });
+                                    }}
+                                  >
+                                    <Play className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <span className="text-sm ml-2">{formatSeconds(file.recording.duration)}</span>
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-sm text-neutral-600">{file.filename}</span>
+                        </div>
+                      </td>
                       <td className="py-3 px-3 text-sm">{formatFileSize(file.size)}</td>
                       <td className="py-3 px-3 text-sm">{formatDate(file.created)}</td>
-                      <td className="py-3 px-3 text-sm">
-                        {file.recording ? `@${file.recording.targetUsername}` : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-sm">
-                        {file.recording ? formatSeconds(file.recording.duration) : '-'}
-                      </td>
-                      <td className="py-3 px-3 text-sm">
-                        {!file.inDatabase ? (
-                          <span className="text-yellow-500">Нет в базе данных</span>
-                        ) : file.recording?.sent ? (
-                          <span className="text-green-500">Отправлено</span>
-                        ) : (
-                          <span className="text-blue-500">В ожидании</span>
-                        )}
+                      <td className="py-3 px-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">@{file.recording?.targetUsername || '-'}</span>
+                          <span className="text-xs text-neutral-500">
+                            {!file.inDatabase ? (
+                              "Нет в базе данных"
+                            ) : file.recording?.sent ? (
+                              "Отправлено"
+                            ) : (
+                              "В ожидании"
+                            )}
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3 px-3 text-sm">
                         <div className="flex space-x-2">
@@ -277,21 +312,12 @@ export default function FileExplorer() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
-                                onClick={() => handlePlayFile(file.recording!.id, file.filename)}
-                                title="Воспроизвести"
-                              >
-                                <PlayCircle className="h-3 w-3" />
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm"
                                 onClick={() => handleDownloadFile(file.recording!.id)}
                                 title="Скачать"
                               >
                                 <Download className="h-3 w-3" />
                               </Button>
-                              
+
                               {!file.recording.sent && (
                                 <Button 
                                   variant="outline" 
