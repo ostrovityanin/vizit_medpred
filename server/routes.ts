@@ -947,28 +947,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Прием фрагмента записи
   app.post('/api/recording-fragments', upload.single('fragmentAudio'), async (req: Request, res: Response) => {
     try {
+      log(`Получен запрос на сохранение фрагмента`, 'fragments');
+      
       if (!req.file) {
+        log(`Ошибка: файл фрагмента отсутствует в запросе`, 'fragments');
         return res.status(400).json({ message: 'Не загружен аудиофайл фрагмента' });
       }
       
       const { fragmentIndex, timestamp, sessionId, recordingId } = req.body;
       
+      log(`Параметры запроса: fragmentIndex=${fragmentIndex}, timestamp=${timestamp}, sessionId=${sessionId}, recordingId=${recordingId}`, 'fragments');
+      
       if (!fragmentIndex || !timestamp || !sessionId) {
+        log(`Ошибка: отсутствуют обязательные параметры в запросе`, 'fragments');
         return res.status(400).json({ 
           message: 'Отсутствуют необходимые параметры (fragmentIndex, timestamp, sessionId)' 
         });
       }
       
-      // Чтение содержимого файла
-      const filePath = path.join(__dirname, 'uploads', req.file.filename);
-      const fileBuffer = await fs.promises.readFile(filePath);
-      
-      // Сохраняем фрагмент через менеджер фрагментов
+      // Проверяем корректность числовых значений
       const index = parseInt(fragmentIndex, 10);
       const parsedTimestamp = parseInt(timestamp, 10);
       
+      if (isNaN(index) || isNaN(parsedTimestamp)) {
+        log(`Ошибка: некорректные числовые значения index=${index}, timestamp=${parsedTimestamp}`, 'fragments');
+        return res.status(400).json({ 
+          message: 'Некорректные числовые значения для индекса или временной метки' 
+        });
+      }
+      
+      // Проверяем путь к файлу и существование директории
+      const uploadDir = path.join(__dirname, 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        log(`Директория загрузок не существует, создаём: ${uploadDir}`, 'fragments');
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      // Чтение содержимого файла
+      const filePath = path.join(uploadDir, req.file.filename);
+      
+      if (!fs.existsSync(filePath)) {
+        log(`Ошибка: файл фрагмента не найден по пути ${filePath}`, 'fragments');
+        return res.status(500).json({ 
+          message: 'Внутренняя ошибка сервера: файл фрагмента не найден' 
+        });
+      }
+      
+      log(`Чтение файла фрагмента: ${filePath}`, 'fragments');
+      let fileBuffer;
+      try {
+        fileBuffer = await fs.promises.readFile(filePath);
+        log(`Файл успешно прочитан, размер: ${fileBuffer.length} байт`, 'fragments');
+      } catch (readError) {
+        log(`Ошибка при чтении файла: ${readError}`, 'fragments');
+        return res.status(500).json({ 
+          message: 'Внутренняя ошибка сервера при чтении файла фрагмента'
+        });
+      }
+      
       // Если передан ID записи, отправляем его менеджеру фрагментов для сохранения в БД
       const recordingIdNum = recordingId ? parseInt(recordingId, 10) : undefined;
+      
+      log(`Сохранение фрагмента через менеджер, index=${index}, sessionId=${sessionId}, recordingId=${recordingIdNum}`, 'fragments');
       
       const fragment = await fragmentManager.saveFragment(
         fileBuffer, 
@@ -977,6 +1017,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sessionId,
         recordingIdNum
       );
+      
+      if (!fragment) {
+        log(`Предупреждение: не удалось сохранить фрагмент через менеджер`, 'fragments');
+      } else {
+        log(`Фрагмент успешно сохранен, размер: ${fragment.size} байт`, 'fragments');
+      }
       
       // Если передан ID записи, обновляем информацию о записи
       if (recordingId && recordingIdNum && !isNaN(recordingIdNum)) {
@@ -988,31 +1034,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Запись найдена, обновляем статус, если требуется
             if (existingRecording.status !== 'started') {
               await storage.updateRecordingStatus(recordingIdNum, 'started');
-              log(`Обновлен статус записи с ID: ${recordingIdNum} на 'started' (фрагмент #${fragmentIndex})`, 'recording');
+              log(`Обновлен статус записи с ID: ${recordingIdNum} на 'started' (фрагмент #${index})`, 'recording');
             }
-            log(`Добавлен фрагмент #${fragmentIndex} к записи ${recordingIdNum}`, 'fragments');
+            log(`Добавлен фрагмент #${index} к записи ${recordingIdNum}`, 'fragments');
           } else {
             log(`Предупреждение: Передан ID записи ${recordingIdNum}, но запись не найдена`, 'fragments');
           }
-        } catch (error) {
-          log(`Ошибка при обновлении информации о записи ${recordingId}: ${error}`, 'fragments');
+        } catch (recordingError) {
+          log(`Ошибка при обновлении информации о записи ${recordingId}: ${recordingError}`, 'fragments');
+          // Продолжаем выполнение даже при ошибке обновления записи
         }
       }
       
       // Логирование события
-      eventLogger.logEvent(
-        'system', 
-        'FRAGMENT_RECEIVED', 
-        { 
-          sessionId, 
-          index: index, 
-          size: fragment ? fragment.size : fileBuffer.length, 
-          recordingId: recordingIdNum || undefined 
-        }
-      );
+      try {
+        eventLogger.logEvent(
+          'system', 
+          'FRAGMENT_RECEIVED', 
+          { 
+            sessionId, 
+            index: index, 
+            size: fragment ? fragment.size : fileBuffer.length, 
+            recordingId: recordingIdNum || undefined 
+          }
+        );
+      } catch (logError) {
+        log(`Ошибка при логировании события: ${logError}`, 'fragments');
+        // Продолжаем выполнение даже при ошибке логирования
+      }
       
       // Удаляем временный файл, так как мы уже сохранили его в fragmentManager
-      await fs.promises.unlink(filePath).catch(() => {});
+      try {
+        await fs.promises.unlink(filePath);
+        log(`Временный файл ${filePath} успешно удален`, 'fragments');
+      } catch (unlinkError) {
+        log(`Предупреждение: не удалось удалить временный файл: ${unlinkError}`, 'fragments');
+        // Продолжаем выполнение даже при ошибке удаления файла
+      }
       
       res.status(201).json({ 
         success: true, 
@@ -1020,11 +1078,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         fragment: fragment || { index, sessionId, timestamp: parsedTimestamp }
       });
     } catch (error) {
-      log(`Ошибка при приеме фрагмента: ${error}`, 'fragments');
+      log(`Критическая ошибка при приеме фрагмента: ${error}`, 'fragments');
       res.status(500).json({ 
         success: false, 
-        message: 'Ошибка при сохранении фрагмента записи',
-        error
+        message: 'Ошибка при сохранении фрагмента записи'
       });
     }
   });
@@ -1032,32 +1089,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Объединение фрагментов записи
   app.get('/api/recording-fragments/combine', async (req: Request, res: Response) => {
     try {
+      log(`Получен запрос на объединение фрагментов`, 'fragments');
+      
       const { sessionId, recordingId } = req.query;
       
+      log(`Параметры запроса: sessionId=${sessionId}, recordingId=${recordingId}`, 'fragments');
+      
       if (!sessionId) {
+        log(`Ошибка: не указан ID сессии записи`, 'fragments');
         return res.status(400).json({ 
           message: 'Не указан ID сессии записи' 
         });
       }
       
+      // Парсим recordingId как число, если он указан
+      let recordingIdNum: number | undefined;
+      if (recordingId) {
+        recordingIdNum = parseInt(recordingId as string, 10);
+        if (isNaN(recordingIdNum)) {
+          log(`Предупреждение: recordingId не является числом: ${recordingId}`, 'fragments');
+          recordingIdNum = undefined;
+        }
+      }
+      
+      log(`Получение объединенного файла для сессии ${sessionId}`, 'fragments');
+      
       // Сначала получаем объединенный файл из менеджера фрагментов (в формате WebM)
       const combinedBuffer = await fragmentManager.getCombinedFile(sessionId as string);
       
       if (!combinedBuffer) {
+        log(`Ошибка: не найдены фрагменты для сессии ${sessionId}`, 'fragments');
         return res.status(404).json({ 
           message: 'Не найдены фрагменты для указанной сессии' 
         });
       }
       
-      // Парсим recordingId как число, если он указан
-      const recordingIdNum = recordingId ? parseInt(recordingId as string, 10) : undefined;
+      log(`Получен объединенный файл, размер: ${combinedBuffer.length} байт`, 'fragments');
       
       // Логирование события
-      eventLogger.logEvent(
-        'system', 
-        'FRAGMENTS_COMBINED_REQUESTED', 
-        { sessionId, size: combinedBuffer.length, recordingId: recordingIdNum || undefined }
-      );
+      try {
+        eventLogger.logEvent(
+          'system', 
+          'FRAGMENTS_COMBINED_REQUESTED', 
+          { sessionId, size: combinedBuffer.length, recordingId: recordingIdNum }
+        );
+      } catch (logError) {
+        log(`Ошибка при логировании события: ${logError}`, 'fragments');
+        // Продолжаем выполнение даже при ошибке логирования
+      }
+      
+      log(`Конвертация WebM в WAV для сессии ${sessionId}`, 'fragments');
       
       // Конвертируем объединенный WebM в WAV и сохраняем в uploads
       const wavFilename = await fragmentManager.convertCombinedToWav(
@@ -1066,31 +1147,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       if (!wavFilename) {
+        log(`Ошибка при конвертации аудио в WAV формат для сессии ${sessionId}`, 'fragments');
         return res.status(500).json({ 
           message: 'Ошибка при конвертации аудио в WAV формат' 
         });
       }
       
+      log(`Файл успешно конвертирован в WAV: ${wavFilename}`, 'fragments');
+      
+      // Дополнительно проверяем существование wav файла
+      const wavPath = path.join(__dirname, 'uploads', wavFilename);
+      if (!fs.existsSync(wavPath)) {
+        log(`Предупреждение: созданный WAV файл не найден по пути ${wavPath}`, 'fragments');
+      } else {
+        try {
+          const stats = await fs.promises.stat(wavPath);
+          log(`Размер WAV файла: ${stats.size} байт`, 'fragments');
+        } catch (statError) {
+          log(`Ошибка при получении информации о WAV файле: ${statError}`, 'fragments');
+        }
+      }
+      
       // Логирование события
-      eventLogger.logEvent(
-        'system', 
-        'FRAGMENTS_COMBINED_AND_CONVERTED', 
-        { sessionId, wavFilename, recordingId: recordingId || undefined }
-      );
+      try {
+        eventLogger.logEvent(
+          'system', 
+          'FRAGMENTS_COMBINED_AND_CONVERTED', 
+          { sessionId, wavFilename, recordingId: recordingId || undefined }
+        );
+      } catch (logError) {
+        log(`Ошибка при логировании события конвертации: ${logError}`, 'fragments');
+        // Продолжаем выполнение даже при ошибке логирования
+      }
       
       // Формируем ответ с информацией о созданном WAV файле
       res.json({
         success: true,
         message: 'Фрагменты успешно объединены и конвертированы',
         filename: wavFilename,
-        path: `/api/recordings/${recordingId}/download`
+        path: `/api/recordings/${recordingId ? recordingId : 'latest'}/download`
       });
     } catch (error) {
-      log(`Ошибка при объединении и конвертации фрагментов: ${error}`, 'fragments');
+      log(`Критическая ошибка при объединении и конвертации фрагментов: ${error}`, 'fragments');
       res.status(500).json({ 
         success: false, 
-        message: 'Ошибка при объединении и конвертации фрагментов записи',
-        error
+        message: 'Ошибка при объединении и конвертации фрагментов записи'
       });
     }
   });
