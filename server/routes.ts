@@ -62,10 +62,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileSize = stats.size;
         }
         
-        // Распознаем текст из аудио
+        // Распознаем текст из аудио и получаем стоимость
         log('Начинаем распознавание речи...', 'openai');
-        const transcriptionText = await transcribeAudio(filePath);
-        log(`Результат распознавания: ${transcriptionText}`, 'openai');
+        const transcriptionResult = await transcribeAudio(filePath);
+        
+        // Извлекаем данные из результата
+        let transcriptionText = null;
+        let transcriptionCost = null;
+        let tokensProcessed = null;
+        
+        if (transcriptionResult) {
+          transcriptionText = transcriptionResult.text;
+          transcriptionCost = transcriptionResult.cost;
+          tokensProcessed = transcriptionResult.tokensProcessed;
+          log(`Результат распознавания: ${transcriptionText}`, 'openai');
+          log(`Стоимость распознавания: $${transcriptionCost} (${tokensProcessed} токенов)`, 'openai');
+        }
         
         const validData = insertRecordingSchema.parse({
           filename: req.file.filename,
@@ -74,7 +86,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           targetUsername: recordingData.targetUsername,
           senderUsername: recordingData.senderUsername || "Пользователь", // Добавляем имя отправителя
           fileSize: fileSize, // Добавляем размер файла
-          transcription: transcriptionText // Добавляем распознанный текст
+          transcription: transcriptionText, // Добавляем распознанный текст
+          transcriptionCost: transcriptionCost, // Добавляем стоимость распознавания
+          tokensProcessed: tokensProcessed // Добавляем количество обработанных токенов
         });
 
         const recording = await storage.createRecording(validData);
