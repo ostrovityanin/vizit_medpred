@@ -233,14 +233,20 @@ export class AudioRecorder {
       formData.append('fragmentIndex', String(fragment.index));
       formData.append('timestamp', String(fragment.timestamp));
       
-      // Добавим идентификатор сессии, если в будущем понадобится объединять фрагменты
-      const sessionId = localStorage.getItem('recordingSessionId') || 
-                       `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      // Получаем или создаем идентификатор сессии
+      let sessionId = localStorage.getItem('recordingSessionId');
       
-      // Сохраняем ID сессии, если это первый фрагмент
-      if (fragment.index === 0) {
-        localStorage.setItem('recordingSessionId', sessionId);
+      // Если сессии нет, создаем новую
+      if (!sessionId) {
+        sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        console.log(`Создан новый ID сессии: ${sessionId}`);
       }
+      
+      // Всегда сохраняем текущий ID сессии в localStorage
+      localStorage.setItem('recordingSessionId', sessionId);
+      
+      // Логируем информацию о фрагменте
+      console.log(`Отправляем фрагмент #${fragment.index} для сессии ${sessionId}, размер: ${fragment.blob.size} байт`);
       
       formData.append('sessionId', sessionId);
       
@@ -251,12 +257,15 @@ export class AudioRecorder {
       });
       
       if (!response.ok) {
-        throw new Error(`Ошибка отправки фрагмента: ${response.status} ${response.statusText}`);
+        // Получаем текст ошибки для лучшей диагностики
+        const errorText = await response.text();
+        throw new Error(`Ошибка отправки фрагмента: ${response.status} ${response.statusText} - ${errorText}`);
       }
       
-      console.log(`Фрагмент #${fragment.index} успешно отправлен на сервер`);
+      const result = await response.json();
+      console.log(`Фрагмент #${fragment.index} успешно отправлен на сервер. Ответ:`, result);
     } catch (error) {
-      console.error('Ошибка отправки фрагмента:', error);
+      console.error(`Ошибка отправки фрагмента #${fragment.index}:`, error);
       // Сохраняем фрагмент локально, если есть поддержка IndexedDB
       if ('indexedDB' in window) {
         this._saveFragmentLocally(fragment);
@@ -299,6 +308,11 @@ export class AudioRecorder {
             // Пытаемся получить объединенный файл с сервера
             const sessionId = localStorage.getItem('recordingSessionId');
             if (sessionId) {
+              console.log(`Запрашиваем объединенный файл для сессии ${sessionId}`);
+              
+              // Добавляем небольшую задержку для завершения всех загрузок фрагментов
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
               const response = await fetch(`/api/recording-fragments/combine?sessionId=${sessionId}`);
               
               if (response.ok) {
@@ -306,7 +320,14 @@ export class AudioRecorder {
                 console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
                 resolve(finalBlob);
                 return;
+              } else {
+                console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
+                // Получаем текст ошибки для лучшей диагностики
+                const errorText = await response.text();
+                console.warn(`Детали ошибки: ${errorText}`);
               }
+            } else {
+              console.warn('Отсутствует ID сессии в localStorage');
             }
           } catch (error) {
             console.error('Ошибка при получении объединенного файла с сервера:', error);
@@ -353,6 +374,11 @@ export class AudioRecorder {
           try {
             const sessionId = localStorage.getItem('recordingSessionId');
             if (sessionId) {
+              console.log(`Запрашиваем объединенный файл для сессии ${sessionId}`);
+              
+              // Добавляем небольшую задержку для завершения всех загрузок фрагментов
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
               const response = await fetch(`/api/recording-fragments/combine?sessionId=${sessionId}`);
               
               if (response.ok) {
@@ -360,7 +386,14 @@ export class AudioRecorder {
                 console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
                 resolve(finalBlob);
                 return;
+              } else {
+                console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
+                // Получаем текст ошибки для лучшей диагностики
+                const errorText = await response.text();
+                console.warn(`Детали ошибки: ${errorText}`);
               }
+            } else {
+              console.warn('Отсутствует ID сессии в localStorage');
             }
           } catch (error) {
             console.error('Ошибка при получении объединенного файла с сервера:', error);
