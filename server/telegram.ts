@@ -66,6 +66,60 @@ export async function resolveTelegramUsername(username: string): Promise<number 
  * отправив команду /start. Иначе бот не сможет отправить сообщение и будет ошибка
  * "Bad Request: chat not found"
  */
+/**
+ * Отправляет текстовое сообщение пользователю Telegram
+ */
+export async function sendTextToTelegram(
+  chatId: number | string,
+  text: string
+): Promise<boolean> {
+  if (!BOT_TOKEN) {
+    log('No Telegram Bot Token provided', 'telegram');
+    return false;
+  }
+
+  try {
+    // Форматируем chatId также как и в функции отправки аудио
+    let formattedChatId: string;
+    
+    if (typeof chatId === 'string') {
+      if (isNaN(Number(chatId))) {
+        formattedChatId = chatId.startsWith('@') ? chatId : `@${chatId}`;
+        log(`Formatting username to: ${formattedChatId}`, 'telegram');
+      } else {
+        formattedChatId = chatId;
+      }
+    } else {
+      formattedChatId = chatId.toString();
+    }
+    
+    log(`Sending text message to chat_id: ${formattedChatId}`, 'telegram');
+    log(`Using bot token: ${BOT_TOKEN.substring(0, 5)}...`, 'telegram');
+    
+    // Отправляем запрос к Telegram API
+    const apiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const response = await axios.post(apiUrl, {
+      chat_id: formattedChatId,
+      text: text
+    });
+    
+    if (response.status === 200 && response.data.ok) {
+      log(`Successfully sent text message to ${formattedChatId}`, 'telegram');
+      return true;
+    } else {
+      log(`Failed to send text message: ${JSON.stringify(response.data)}`, 'telegram');
+      return false;
+    }
+  } catch (error: any) {
+    log(`Error sending text message: ${error.message}`, 'telegram');
+    if (error.response) {
+      log(`Error response data: ${JSON.stringify(error.response.data)}`, 'telegram');
+      log(`Error response status: ${error.response.status}`, 'telegram');
+    }
+    return false;
+  }
+}
+
 export async function sendAudioToTelegram(
   filePath: string, 
   chatId: number | string, 

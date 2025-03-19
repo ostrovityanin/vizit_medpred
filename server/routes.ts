@@ -6,7 +6,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
-import { sendAudioToTelegram, resolveTelegramUsername } from './telegram';
+import { sendAudioToTelegram, sendTextToTelegram, resolveTelegramUsername } from './telegram';
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -175,6 +175,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       log(`Error sending recording: ${error}`, 'telegram');
       res.status(500).json({ message: 'Failed to send recording', error });
+    }
+  });
+
+  // Маршрут для тестирования отправки текстового сообщения в Telegram
+  app.post('/api/send-telegram-message', async (req: Request, res: Response) => {
+    try {
+      const { username = 'ostrovityanin', message = 'Тестовое сообщение из таймера визита' } = req.body;
+      
+      log(`Attempting to send test message to @${username}`, 'telegram');
+      
+      // Попытка найти chat_id по имени пользователя
+      const targetChatId = await resolveTelegramUsername(username);
+      
+      if (!targetChatId) {
+        log(`Failed to resolve username @${username}`, 'telegram');
+        return res.status(200).json({ 
+          success: false,
+          message: 'Не удалось найти получателя.'
+        });
+      }
+      
+      log(`Sending text message to resolved recipient: ${targetChatId}`, 'telegram');
+      
+      // Отправка текстового сообщения через Telegram бот
+      const success = await sendTextToTelegram(
+        targetChatId,
+        message
+      );
+      
+      if (!success) {
+        return res.status(200).json({ 
+          success: false,
+          message: 'Отправка сообщения не удалась.'
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: `Сообщение успешно отправлено @${username}`
+      });
+    } catch (error) {
+      log(`Error sending text message: ${error}`, 'telegram');
+      res.status(500).json({ 
+        success: false,
+        message: 'Ошибка при отправке сообщения',
+        error
+      });
     }
   });
 

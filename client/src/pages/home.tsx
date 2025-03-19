@@ -168,11 +168,18 @@ export default function Home() {
     <div className="max-w-md mx-auto px-4 py-8 flex flex-col min-h-screen">
       <header className="flex flex-col items-center mb-8">
         <h1 className="text-2xl font-bold text-tgblue mb-2">Таймер визита</h1>
-        <Link href="/recordings">
-          <Button variant="outline" size="sm" className="text-xs">
-            Архив записей
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/recordings">
+            <Button variant="outline" size="sm" className="text-xs">
+              Архив записей
+            </Button>
+          </Link>
+          <Link href="/test-telegram">
+            <Button variant="outline" size="sm" className="text-xs">
+              Тест Telegram
+            </Button>
+          </Link>
+        </div>
       </header>
 
       <Timer
