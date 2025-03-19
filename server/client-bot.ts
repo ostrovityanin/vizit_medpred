@@ -115,7 +115,7 @@ export async function sendClientTextMessage(
 }
 
 /**
- * Отправляет аудиофайл пользователю через клиентский бот
+ * Отправляет аудио визита пользователю через клиентский бот
  */
 export async function sendClientAudio(
   filePath: string,

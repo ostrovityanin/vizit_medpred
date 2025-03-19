@@ -113,10 +113,10 @@ export async function resolveTelegramUsername(username: string): Promise<number 
 }
 
 /**
- * Sends an audio file to a Telegram user
+ * Sends a visit audio to a Telegram user
  */
 /**
- * Отправляет аудиофайл пользователю Telegram
+ * Отправляет аудио визита пользователю Telegram
  * 
  * Важно: для отправки сообщений пользователь должен начать диалог с ботом,
  * отправив команду /start. Иначе бот не сможет отправить сообщение и будет ошибка
@@ -179,7 +179,7 @@ export async function sendTextToTelegram(
 export async function sendAudioToTelegram(
   filePath: string, 
   chatId: number | string, 
-  caption: string = 'Запись с таймера визита'
+  caption: string = 'Аудио визита'
 ): Promise<boolean> {
   if (!BOT_TOKEN) {
     log('No Telegram Bot Token provided', 'telegram');
