@@ -1,0 +1,45 @@
+{
+  "recordings": [
+    {
+      "adminRecordingId": 10,
+      "username": "ostrovityanin",
+      "duration": 8,
+      "timestamp": "2025-03-19T13:37:35.738Z",
+      "id": 1,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 11,
+      "username": "ostrovityanin",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:42:04.895Z",
+      "id": 2,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 12,
+      "username": "ostrovityanin",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:47:41.523Z",
+      "id": 3,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 13,
+      "username": "ostrovityanin",
+      "duration": 1,
+      "timestamp": "2025-03-19T14:03:22.422Z",
+      "id": 4,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 14,
+      "username": "ostrovityanin",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:03:43.537Z",
+      "id": 5,
+      "sent": false
+    }
+  ],
+  "currentId": 6
+}

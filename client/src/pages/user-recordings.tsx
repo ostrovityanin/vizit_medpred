@@ -88,7 +88,7 @@ export default function UserRecordings() {
   // Воспроизводим аудио
   const playRecording = (id: number) => {
     const recording = recordings.find(r => r.id === id);
-    if (recording && recording.adminRecordingId) {
+    if (recording) {
       setSelectedRecording(recording);
       setAudioPlayerVisible(true);
     } else {
@@ -116,19 +116,17 @@ export default function UserRecordings() {
               <span>Назад</span>
             </Button>
           </Link>
-          <h1 className="text-xl font-bold">Мои записи</h1>
+          <h1 className="text-xl font-bold">Записи визитов</h1>
         </div>
       </header>
       
-      {username && <p className="text-neutral-600 mb-4">Записи для пользователя: @{username}</p>}
-      
       {loading ? (
         <div className="text-center py-8">
-          <p className="text-neutral-500">Загрузка ваших записей...</p>
+          <p className="text-neutral-500">Загрузка...</p>
         </div>
       ) : recordings.length === 0 ? (
         <div className="text-center py-8 bg-white rounded-xl shadow-sm">
-          <p className="text-neutral-500">У вас пока нет записей визитов</p>
+          <p className="text-neutral-500">Записей нет</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -137,7 +135,7 @@ export default function UserRecordings() {
               <div key={recording.id} className="p-4 hover:bg-neutral-50">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="font-medium">Визит от {formatDate(recording.timestamp)}</p>
+                    <p className="font-medium">Время визита: {formatDate(recording.timestamp)}</p>
                     <p className="text-sm text-neutral-600">Длительность: {formatSeconds(recording.duration)}</p>
                   </div>
                   <Button 
@@ -157,7 +155,7 @@ export default function UserRecordings() {
       )}
 
       {/* Модальное окно для аудиоплеера */}
-      {audioPlayerVisible && selectedRecording && selectedRecording.adminRecordingId && (
+      {audioPlayerVisible && selectedRecording && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
             <div className="flex justify-between items-center mb-4">
@@ -170,7 +168,7 @@ export default function UserRecordings() {
               Дата визита: {formatDate(selectedRecording.timestamp)}
             </p>
             <FileAudioPlayer 
-              audioUrl={`/api/recordings/${selectedRecording.adminRecordingId}/download`}
+              audioUrl={`/api/recordings/${selectedRecording.adminRecordingId || selectedRecording.id}/download`}
               filename={`Запись визита от ${formatDate(selectedRecording.timestamp)}`}
             />
             <p className="text-center text-sm text-neutral-500 mt-4">

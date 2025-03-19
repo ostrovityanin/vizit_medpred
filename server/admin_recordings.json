@@ -137,7 +137,33 @@
       "tokensProcessed": 64,
       "id": 12,
       "sent": false
+    },
+    {
+      "filename": "11b43b0b-b68c-44b8-89ae-96326c15df4a.wav",
+      "duration": 1,
+      "timestamp": "2025-03-19T14:03:22.422Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 9289,
+      "transcription": "Редактор субтитров: А. Синецкая.\nКорректор: А. Егорова.",
+      "transcriptionCost": "0.0001",
+      "tokensProcessed": 9,
+      "id": 13,
+      "sent": false
+    },
+    {
+      "filename": "8a9f4897-c040-49a9-8d67-f3740c029ae5.wav",
+      "duration": 3,
+      "timestamp": "2025-03-19T14:03:43.537Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 46450,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, его невозможно отформатировать как диалог. Текст: \"Продолжение следует...\" представляет собой одну фразу, вероятно, произнесенную одним человеком.",
+      "transcriptionCost": "0.0003",
+      "tokensProcessed": 44,
+      "id": 14,
+      "sent": false
     }
   ],
-  "currentId": 13
+  "currentId": 15
 }

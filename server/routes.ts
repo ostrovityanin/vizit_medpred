@@ -462,12 +462,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Для каждой найденной записи создаем запись в пользовательской базе
         for (const recording of matchingRecordings) {
-          await storage.createUserRecording({
-            adminRecordingId: recording.id,
-            username: username,
-            duration: recording.duration,
-            timestamp: recording.timestamp,
-          });
+          try {
+            await storage.createUserRecording({
+              adminRecordingId: recording.id,
+              username: username,
+              duration: recording.duration,
+              timestamp: recording.timestamp,
+            });
+          } catch (error) {
+            log(`Ошибка при создании записи пользователя из основной базы: ${error}`, 'client-bot');
+          }
         }
         
         // Получаем обновленный список записей пользователя

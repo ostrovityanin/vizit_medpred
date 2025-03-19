@@ -187,14 +187,14 @@ export default function Home() {
       <header className="flex flex-col items-center mb-8">
         <h1 className="text-2xl font-bold text-tgblue mb-2">Таймер визита</h1>
         <div className="flex gap-2 flex-wrap justify-center">
-          <Link href="/recordings">
+          <Link href="/admin">
             <Button variant="outline" size="sm" className="text-xs">
-              Архив визитов
+              Панель администратора
             </Button>
           </Link>
-          <Link href="/client-bot-test">
+          <Link href="/user-recordings">
             <Button variant="outline" size="sm" className="text-xs">
-              Тест клиент-бота
+              Мои записи
             </Button>
           </Link>
         </div>
