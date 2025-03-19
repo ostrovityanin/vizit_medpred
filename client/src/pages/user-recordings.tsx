@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Play, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link } from 'wouter';
-import FileAudioPlayer from '@/components/FileAudioPlayer';
 import { isTelegramWebApp } from '@/lib/telegram';
 import { formatSeconds } from '@/lib/timer';
 
@@ -19,8 +18,6 @@ interface UserRecording {
 export default function UserRecordings() {
   const [recordings, setRecordings] = useState<UserRecording[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRecording, setSelectedRecording] = useState<UserRecording | null>(null);
-  const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
   const { toast } = useToast();
   
   // Получаем имя пользователя из Telegram WebApp или запрашиваем вручную
@@ -85,26 +82,7 @@ export default function UserRecordings() {
     });
   };
 
-  // Воспроизводим аудио
-  const playRecording = (id: number) => {
-    const recording = recordings.find(r => r.id === id);
-    if (recording) {
-      setSelectedRecording(recording);
-      setAudioPlayerVisible(true);
-    } else {
-      toast({
-        title: 'Ошибка',
-        description: 'Не удалось найти аудиозапись',
-        variant: 'destructive',
-      });
-    }
-  };
-  
-  // Закрыть модальное окно
-  const closeAudioPlayer = () => {
-    setAudioPlayerVisible(false);
-    setSelectedRecording(null);
-  };
+
 
   return (
     <div className="w-full mx-auto px-4 py-6">
@@ -116,7 +94,10 @@ export default function UserRecordings() {
               <span>Назад</span>
             </Button>
           </Link>
-          <h1 className="text-xl font-bold">Записи визитов</h1>
+          <div>
+            <h1 className="text-xl font-bold">Мои визиты</h1>
+            {username && <p className="text-sm text-neutral-500">Пользователь: {username}</p>}
+          </div>
         </div>
       </header>
       
@@ -133,20 +114,9 @@ export default function UserRecordings() {
           <div className="grid grid-cols-1 divide-y divide-neutral-100">
             {recordings.map((recording) => (
               <div key={recording.id} className="p-4 hover:bg-neutral-50">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">Время визита: {formatDate(recording.timestamp)}</p>
-                    <p className="text-sm text-neutral-600">Длительность: {formatSeconds(recording.duration)}</p>
-                  </div>
-                  <Button 
-                    onClick={() => playRecording(recording.id)}
-                    variant="outline" 
-                    size="sm"
-                    className="text-neutral-700"
-                  >
-                    <Play className="h-4 w-4 mr-1" />
-                    <span>Слушать</span>
-                  </Button>
+                <div>
+                  <p className="font-medium">Время визита: {formatDate(recording.timestamp)}</p>
+                  <p className="text-sm text-neutral-600">Длительность: {formatSeconds(recording.duration)}</p>
                 </div>
               </div>
             ))}
@@ -154,29 +124,7 @@ export default function UserRecordings() {
         </div>
       )}
 
-      {/* Модальное окно для аудиоплеера */}
-      {audioPlayerVisible && selectedRecording && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium">Запись визита</h2>
-              <Button variant="ghost" size="sm" onClick={closeAudioPlayer}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-sm text-neutral-600 mb-2">
-              Дата визита: {formatDate(selectedRecording.timestamp)}
-            </p>
-            <FileAudioPlayer 
-              audioUrl={`/api/recordings/${selectedRecording.adminRecordingId || selectedRecording.id}/download`}
-              filename={`Запись визита от ${formatDate(selectedRecording.timestamp)}`}
-            />
-            <p className="text-center text-sm text-neutral-500 mt-4">
-              Длительность: {formatSeconds(selectedRecording.duration)}
-            </p>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
