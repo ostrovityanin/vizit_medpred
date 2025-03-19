@@ -13,6 +13,7 @@ export interface IStorage {
   markAdminRecordingAsSent(id: number): Promise<AdminRecording | undefined>;
   getAdminRecordingById(id: number): Promise<AdminRecording | undefined>;
   updateAdminRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined>;
+  updateAdminRecording(recording: AdminRecording): Promise<AdminRecording | undefined>;
   
   // Методы для пользовательских записей
   createUserRecording(recording: InsertUserRecording): Promise<UserRecording>;
@@ -32,6 +33,7 @@ export interface IStorage {
   markRecordingAsSent(id: number): Promise<AdminRecording | undefined>;
   getRecordingById(id: number): Promise<AdminRecording | undefined>;
   updateRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined>;
+  updateRecording(recording: AdminRecording): Promise<AdminRecording | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -359,6 +361,19 @@ export class MemStorage implements IStorage {
   
   async updateRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined> {
     return this.updateAdminRecordingStatus(id, status);
+  }
+  
+  async updateAdminRecording(recording: AdminRecording): Promise<AdminRecording | undefined> {
+    if (recording && recording.id && this.adminRecordings.has(recording.id)) {
+      this.adminRecordings.set(recording.id, recording);
+      this.saveAdminToFile();
+      return recording;
+    }
+    return undefined;
+  }
+  
+  async updateRecording(recording: AdminRecording): Promise<AdminRecording | undefined> {
+    return this.updateAdminRecording(recording);
   }
 }
 

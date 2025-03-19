@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/recordings/:id/status', async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const { status } = req.body;
+      const { status, sessionId } = req.body;
       
       if (!status || !['started', 'completed', 'error'].includes(status)) {
         return res.status(400).json({ 
@@ -311,6 +311,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedRecording = await storage.updateRecordingStatus(id, status);
+      
+      // Если статус 'completed' или 'error' и передан ID сессии,
+      // автоматически объединяем фрагменты и выполняем транскрипцию
+      if ((status === 'completed' || status === 'error') && sessionId) {
+        log(`Статус записи изменен на ${status}. Автоматически инициируем объединение фрагментов для сессии ${sessionId}`, 'recording');
+        
+        try {
+          // Запускаем процесс объединения фрагментов асинхронно
+          (async () => {
+            try {
+              // Получаем объединенный файл
+              const combinedBuffer = await fragmentManager.getCombinedFile(sessionId);
+              
+              if (!combinedBuffer) {
+                log(`Предупреждение: не найдены фрагменты для сессии ${sessionId} при автоматическом объединении`, 'fragments');
+                return;
+              }
+              
+              log(`Получен объединенный файл при автоматическом объединении, размер: ${combinedBuffer.length} байт`, 'fragments');
+              
+              // Конвертируем в WAV для транскрипции
+              const wavFilename = await fragmentManager.convertCombinedToWav(sessionId, id);
+              
+              if (!wavFilename) {
+                log(`Ошибка при автоматической конвертации аудио в WAV формат для сессии ${sessionId}`, 'fragments');
+                return;
+              }
+              
+              log(`Файл успешно конвертирован в WAV при автоматическом объединении: ${wavFilename}`, 'fragments');
+              
+              // Выполняем транскрипцию
+              const wavPath = path.join(__dirname, 'uploads', wavFilename);
+              if (fs.existsSync(wavPath)) {
+                const transcriptionResult = await transcribeAudio(wavPath);
+                
+                if (transcriptionResult) {
+                  log(`Транскрипция успешно получена при автоматическом объединении для записи ID: ${id}`, 'openai');
+                  
+                  // Обновляем запись с результатами транскрипции
+                  const recordingToUpdate = await storage.getRecordingById(id);
+                  if (recordingToUpdate) {
+                    recordingToUpdate.transcription = transcriptionResult.text;
+                    recordingToUpdate.transcriptionCost = transcriptionResult.cost;
+                    recordingToUpdate.tokensProcessed = transcriptionResult.tokensProcessed;
+                    recordingToUpdate.status = status === 'error' ? 'error' : 'completed';
+                    
+                    // Сохраняем обновленную запись
+                    await storage.updateRecording(recordingToUpdate);
+                    log(`Обновлена запись ID: ${id} с результатами транскрипции`, 'openai');
+                  }
+                }
+              }
+            } catch (autoError) {
+              log(`Ошибка при автоматическом объединении фрагментов: ${autoError}`, 'fragments');
+            }
+          })();
+        } catch (autoInitError) {
+          log(`Не удалось инициировать автоматическое объединение фрагментов: ${autoInitError}`, 'fragments');
+        }
+      }
       
       if (status === 'error' && req.body.errorMessage) {
         log(`Запись ${id} помечена как ошибочная: ${req.body.errorMessage}`, 'recording');
