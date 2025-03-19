@@ -18,7 +18,7 @@ export class AudioRecorder {
   private audioFragments: AudioFragment[] = [];
   private fragmentInterval: number | null = null;
   private currentFragmentIndex: number = 0;
-  private fragmentDuration: number = 60000; // 60 секунд (1 минута) на фрагмент
+  private fragmentDuration: number = 30000; // 30 секунд на фрагмент
   private isFragmentedRecording: boolean = false;
   private onFragmentSaved: ((fragment: AudioFragment) => void) | null = null;
 
@@ -97,11 +97,11 @@ export class AudioRecorder {
   /**
    * Запускает фрагментированную запись с сохранением фрагментов по таймеру
    * @param onFragmentSaved Callback, который вызывается при сохранении каждого фрагмента
-   * @param fragmentDurationMs Длительность одного фрагмента в мс (по умолчанию 900000мс = 15 минут)
+   * @param fragmentDurationMs Длительность одного фрагмента в мс (по умолчанию 30000мс = 30 секунд)
    */
   startFragmentedRecording(
     onFragmentSaved?: (fragment: AudioFragment) => void, 
-    fragmentDurationMs: number = 900000 // 15 минут по умолчанию
+    fragmentDurationMs: number = 30000 // 30 секунд по умолчанию
   ): boolean {
     // Настраиваем параметры фрагментированной записи
     this.isFragmentedRecording = true;
