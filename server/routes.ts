@@ -369,10 +369,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Получаем все записи
       const allRecordings = await storage.getRecordings();
       
-      // Фильтруем записи, в которых пользователь является отправителем или получателем
+      // Фильтруем записи, в которых пользователь является ТОЛЬКО отправителем
+      // Это гарантирует, что пользователь видит только свои записи
       const userRecordings = allRecordings.filter(recording => 
-        (recording.senderUsername && recording.senderUsername.toLowerCase() === username.toLowerCase()) ||
-        (recording.targetUsername && recording.targetUsername.toLowerCase() === username.toLowerCase())
+        (recording.senderUsername && recording.senderUsername.toLowerCase() === username.toLowerCase())
       );
       
       res.json({

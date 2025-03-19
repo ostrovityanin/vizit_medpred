@@ -98,7 +98,20 @@
       "tokensProcessed": 58,
       "id": 9,
       "sent": false
+    },
+    {
+      "filename": "61524538-b61d-4d40-a538-89f196aeee35.wav",
+      "duration": 8,
+      "timestamp": "2025-03-19T13:37:35.738Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 127139,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, невозможно определить и разметить говорящих. Текст остается без изменений:\n\"Продолжение следует...\"",
+      "transcriptionCost": "0.0008",
+      "tokensProcessed": 119,
+      "id": 10,
+      "sent": false
     }
   ],
-  "currentId": 10
+  "currentId": 11
 }
