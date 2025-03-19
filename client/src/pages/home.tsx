@@ -33,7 +33,7 @@ export default function Home() {
       }
     }
   }, []);
-  const MAX_RECORDING_TIME = 600; // Максимальное время записи в секундах (10 минут)
+  const MAX_RECORDING_TIME = 900; // Максимальное время записи в секундах (15 минут)
   const { toast } = useToast();
   
   // Функция для остановки записи, которую можно безопасно вызывать из useRef колбэка
