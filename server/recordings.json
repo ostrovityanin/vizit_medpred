@@ -124,7 +124,20 @@
       "tokensProcessed": 56,
       "id": 11,
       "sent": false
+    },
+    {
+      "filename": "55fc13fd-7325-4d8c-b0c0-8d980a7e4a4b.wav",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:47:41.523Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 67788,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, невозможно определить и отформатировать его как диалог. Текст \"\"Продолжение следует...\"\" может быть произнесен любым говорящим или даже быть частью нарратива.",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 64,
+      "id": 12,
+      "sent": false
     }
   ],
-  "currentId": 12
+  "currentId": 13
 }
