@@ -2,21 +2,33 @@ import { pgTable, text, serial, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const recordings = pgTable("recordings", {
+// Основная таблица для хранения всех записей (для админки)
+export const adminRecordings = pgTable("admin_recordings", {
   id: serial("id").primaryKey(),
   filename: text("filename").notNull(),
   duration: integer("duration").notNull(),
   timestamp: text("timestamp").notNull(),
   targetUsername: text("target_username").notNull(),
   sent: boolean("sent").notNull().default(false),
-  senderUsername: text("sender_username"),  // Добавляем поле для имени отправителя
+  senderUsername: text("sender_username"),  // Имя отправителя
   fileSize: integer("file_size"),  // Размер файла в байтах
   transcription: text("transcription"),  // Распознанный текст из аудио
   transcriptionCost: text("transcription_cost"),  // Стоимость распознавания
   tokensProcessed: integer("tokens_processed"),  // Количество обработанных токенов
 });
 
-export const insertRecordingSchema = createInsertSchema(recordings).pick({
+// Таблица для хранения записей пользователей (для бота)
+export const userRecordings = pgTable("user_recordings", {
+  id: serial("id").primaryKey(),
+  adminRecordingId: integer("admin_recording_id"), // Связь с основной записью
+  username: text("username").notNull(),  // Имя пользователя, которому принадлежит запись
+  duration: integer("duration").notNull(),
+  timestamp: text("timestamp").notNull(),
+  sent: boolean("sent").notNull().default(false),
+});
+
+// Схемы для вставки записей
+export const insertAdminRecordingSchema = createInsertSchema(adminRecordings).pick({
   filename: true,
   duration: true,
   timestamp: true,
@@ -28,5 +40,22 @@ export const insertRecordingSchema = createInsertSchema(recordings).pick({
   tokensProcessed: true,
 });
 
-export type InsertRecording = z.infer<typeof insertRecordingSchema>;
-export type Recording = typeof recordings.$inferSelect;
+export const insertUserRecordingSchema = createInsertSchema(userRecordings).pick({
+  adminRecordingId: true,
+  username: true,
+  duration: true,
+  timestamp: true,
+});
+
+// Типы для использования в приложении
+export type InsertAdminRecording = z.infer<typeof insertAdminRecordingSchema>;
+export type AdminRecording = typeof adminRecordings.$inferSelect;
+
+export type InsertUserRecording = z.infer<typeof insertUserRecordingSchema>;
+export type UserRecording = typeof userRecordings.$inferSelect;
+
+// Для обратной совместимости
+export const recordings = adminRecordings;
+export const insertRecordingSchema = insertAdminRecordingSchema;
+export type InsertRecording = InsertAdminRecording;
+export type Recording = AdminRecording;
