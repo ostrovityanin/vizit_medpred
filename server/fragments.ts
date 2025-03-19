@@ -147,9 +147,10 @@ class FragmentManager {
    * Объединяет все фрагменты сессии в один файл
    */
   public async combineFragments(sessionId: string): Promise<Buffer | null> {
+    // Получаем фрагменты для сессии
     const fragments = await this.getSessionFragments(sessionId);
     
-    if (fragments.length === 0) {
+    if (!fragments || fragments.length === 0) {
       log(`Нет фрагментов для сессии ${sessionId}`, 'fragments');
       return null;
     }
@@ -314,16 +315,19 @@ class FragmentManager {
    * Очищает временные файлы фрагментов для указанной сессии
    */
   public async cleanupSession(sessionId: string): Promise<void> {
+    // Получаем фрагменты для сессии
     const fragments = await this.getSessionFragments(sessionId);
     
-    // Удаляем каждый файл фрагмента
-    for (const fragment of fragments) {
-      const filePath = path.join(this.fragmentsDir, fragment.filename);
-      
-      try {
-        await fs.promises.unlink(filePath);
-      } catch (error) {
-        log(`Ошибка при удалении фрагмента ${fragment.filename}: ${error}`, 'fragments');
+    if (fragments && fragments.length > 0) {
+      // Удаляем каждый файл фрагмента
+      for (const fragment of fragments) {
+        const filePath = path.join(this.fragmentsDir, fragment.filename);
+        
+        try {
+          await fs.promises.unlink(filePath);
+        } catch (error) {
+          log(`Ошибка при удалении фрагмента ${fragment.filename}: ${error}`, 'fragments');
+        }
       }
     }
     
