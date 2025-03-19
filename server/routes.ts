@@ -964,18 +964,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const fileBuffer = await fs.promises.readFile(filePath);
       
       // Сохраняем фрагмент через менеджер фрагментов
+      const index = parseInt(fragmentIndex, 10);
+      const parsedTimestamp = parseInt(timestamp, 10);
+      
+      // Если передан ID записи, отправляем его менеджеру фрагментов для сохранения в БД
+      const recordingIdNum = recordingId ? parseInt(recordingId, 10) : undefined;
+      
       const fragment = await fragmentManager.saveFragment(
         fileBuffer, 
-        parseInt(fragmentIndex, 10), 
-        parseInt(timestamp, 10),
-        sessionId
+        index, 
+        parsedTimestamp,
+        sessionId,
+        recordingIdNum
       );
       
       // Если передан ID записи, обновляем информацию о записи
-      if (recordingId) {
+      if (recordingId && recordingIdNum && !isNaN(recordingIdNum)) {
         try {
-          const recordingIdNum = parseInt(recordingId, 10);
-          if (!isNaN(recordingIdNum)) {
             // Получаем текущую запись
             const existingRecording = await storage.getRecordingById(recordingIdNum);
             
@@ -1040,17 +1045,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Парсим recordingId как число, если он указан
+      const recordingIdNum = recordingId ? parseInt(recordingId as string, 10) : undefined;
+      
       // Логирование события
       eventLogger.logEvent(
         'system', 
         'FRAGMENTS_COMBINED_REQUESTED', 
-        { sessionId, size: combinedBuffer.length, recordingId: recordingId || undefined }
+        { sessionId, size: combinedBuffer.length, recordingId: recordingIdNum || undefined }
       );
       
       // Конвертируем объединенный WebM в WAV и сохраняем в uploads
       const wavFilename = await fragmentManager.convertCombinedToWav(
         sessionId as string, 
-        recordingId as string
+        recordingIdNum
       );
       
       if (!wavFilename) {
