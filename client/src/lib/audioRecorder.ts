@@ -273,24 +273,141 @@ export class AudioRecorder {
     console.log(`Сохраняем фрагмент #${fragment.index} локально для последующей отправки`);
   }
 
+  /**
+   * Останавливает запись и возвращает результирующий аудио-блоб
+   * При фрагментированной записи - объединяет все фрагменты
+   */
   stopRecording(): Promise<Blob | null> {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
+      // Если медиарекордер не существует или уже остановлен
       if (!this.mediaRecorder || this.mediaRecorder.state === 'inactive') {
+        // Если у нас была фрагментированная запись, объединяем фрагменты
+        if (this.isFragmentedRecording && this.audioFragments.length > 0) {
+          // Сохраняем последний фрагмент, если есть данные
+          if (this.audioChunks.length > 0) {
+            await this._saveCurrentFragment();
+          }
+          
+          // Останавливаем таймер фрагментации
+          if (this.fragmentInterval !== null) {
+            clearInterval(this.fragmentInterval);
+            this.fragmentInterval = null;
+          }
+          
+          // Получаем данные с сервера или объединяем локальные фрагменты
+          try {
+            // Пытаемся получить объединенный файл с сервера
+            const sessionId = localStorage.getItem('recordingSessionId');
+            if (sessionId) {
+              const response = await fetch(`/api/recording-fragments/combine?sessionId=${sessionId}`);
+              
+              if (response.ok) {
+                const finalBlob = await response.blob();
+                console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
+                resolve(finalBlob);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Ошибка при получении объединенного файла с сервера:', error);
+          }
+          
+          // Если не удалось получить с сервера, объединяем локально
+          console.log(`Объединяем ${this.audioFragments.length} фрагментов локально`);
+          
+          // Сортируем фрагменты по индексу
+          this.audioFragments.sort((a, b) => a.index - b.index);
+          
+          // Получаем блобы из всех фрагментов
+          const blobs = this.audioFragments.map(fragment => fragment.blob);
+          
+          // Создаем итоговый блоб
+          const finalBlob = new Blob(blobs, { type: 'audio/webm' });
+          console.log(`Локально объединены фрагменты, итоговый размер: ${finalBlob.size} байт`);
+          
+          resolve(finalBlob);
+          return;
+        }
+        
+        // Для обычной записи, если нет данных
         resolve(null);
         return;
       }
 
-      this.mediaRecorder.onstop = () => {
-        // Создаем blob с максимальным качеством
-        const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-        resolve(audioBlob);
+      // Для обычной записи или если фрагменты еще не были сохранены
+      this.mediaRecorder.onstop = async () => {
+        // Если это фрагментированная запись
+        if (this.isFragmentedRecording) {
+          // Сохраняем последний фрагмент
+          if (this.audioChunks.length > 0) {
+            await this._saveCurrentFragment();
+          }
+          
+          // Останавливаем таймер фрагментации
+          if (this.fragmentInterval !== null) {
+            clearInterval(this.fragmentInterval);
+            this.fragmentInterval = null;
+          }
+          
+          // Пытаемся получить объединенный файл
+          try {
+            const sessionId = localStorage.getItem('recordingSessionId');
+            if (sessionId) {
+              const response = await fetch(`/api/recording-fragments/combine?sessionId=${sessionId}`);
+              
+              if (response.ok) {
+                const finalBlob = await response.blob();
+                console.log(`Получен объединенный аудиофайл с сервера, размер: ${finalBlob.size} байт`);
+                resolve(finalBlob);
+                return;
+              }
+            }
+          } catch (error) {
+            console.error('Ошибка при получении объединенного файла с сервера:', error);
+          }
+          
+          // Если не удалось получить с сервера, объединяем локально
+          console.log(`Объединяем ${this.audioFragments.length} фрагментов локально`);
+          
+          // Сортируем фрагменты по индексу
+          this.audioFragments.sort((a, b) => a.index - b.index);
+          
+          // Получаем блобы из всех фрагментов
+          const blobs = this.audioFragments.map(fragment => fragment.blob);
+          
+          // Создаем итоговый блоб
+          const finalBlob = new Blob(blobs, { type: 'audio/webm' });
+          console.log(`Локально объединены фрагменты, итоговый размер: ${finalBlob.size} байт`);
+          
+          resolve(finalBlob);
+        } else {
+          // Стандартная запись - просто объединяем чанки
+          const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+          resolve(audioBlob);
+        }
       };
 
+      // Останавливаем запись
       this.mediaRecorder.stop();
     });
   }
 
+  /**
+   * Очищает все ресурсы и освобождает память
+   */
   cleanup() {
+    // Останавливаем таймер фрагментации
+    if (this.fragmentInterval !== null) {
+      clearInterval(this.fragmentInterval);
+      this.fragmentInterval = null;
+    }
+    
+    // Сбрасываем данные фрагментированной записи
+    this.isFragmentedRecording = false;
+    this.audioFragments = [];
+    this.currentFragmentIndex = 0;
+    this.onFragmentSaved = null;
+    
     // Останавливаем все медиа треки
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
@@ -321,6 +438,13 @@ export class AudioRecorder {
     this.enhancedStream = null;
     this.mediaRecorder = null;
     this.audioChunks = [];
+    
+    // Удаляем ID сессии из локального хранилища
+    try {
+      localStorage.removeItem('recordingSessionId');
+    } catch (err) {
+      console.warn('Не удалось удалить recordingSessionId из localStorage');
+    }
   }
 }
 

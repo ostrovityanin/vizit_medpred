@@ -12,6 +12,8 @@ import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { transcribeAudio } from './openai';
+import { fragmentManager } from './fragments';
+import { eventLogger } from './event-logger';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -731,6 +733,208 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Эндпоинт для получения информации о файлах на сервере
+  // ======= API для работы с фрагментами записи =======
+  
+  // Прием фрагмента записи
+  app.post('/api/recording-fragments', upload.single('fragmentAudio'), async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'Не загружен аудиофайл фрагмента' });
+      }
+      
+      const { fragmentIndex, timestamp, sessionId } = req.body;
+      
+      if (!fragmentIndex || !timestamp || !sessionId) {
+        return res.status(400).json({ 
+          message: 'Отсутствуют необходимые параметры (fragmentIndex, timestamp, sessionId)' 
+        });
+      }
+      
+      // Чтение содержимого файла
+      const filePath = path.join(__dirname, 'uploads', req.file.filename);
+      const fileBuffer = await fs.promises.readFile(filePath);
+      
+      // Сохраняем фрагмент через менеджер фрагментов
+      const fragment = await fragmentManager.saveFragment(
+        fileBuffer, 
+        parseInt(fragmentIndex, 10), 
+        parseInt(timestamp, 10),
+        sessionId
+      );
+      
+      // Логирование события
+      eventLogger.logEvent(
+        'system', 
+        'FRAGMENT_RECEIVED', 
+        { sessionId, index: fragment.index, size: fragment.size }
+      );
+      
+      // Удаляем временный файл, так как мы уже сохранили его в fragmentManager
+      await fs.promises.unlink(filePath).catch(() => {});
+      
+      res.status(201).json({ 
+        success: true, 
+        message: 'Фрагмент успешно сохранен',
+        fragment
+      });
+    } catch (error) {
+      log(`Ошибка при приеме фрагмента: ${error}`, 'fragments');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при сохранении фрагмента записи',
+        error
+      });
+    }
+  });
+  
+  // Объединение фрагментов записи
+  app.get('/api/recording-fragments/combine', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.query;
+      
+      if (!sessionId) {
+        return res.status(400).json({ 
+          message: 'Не указан ID сессии записи' 
+        });
+      }
+      
+      // Получаем объединенный файл из менеджера фрагментов
+      const combinedBuffer = await fragmentManager.getCombinedFile(sessionId as string);
+      
+      if (!combinedBuffer) {
+        return res.status(404).json({ 
+          message: 'Не найдены фрагменты для указанной сессии' 
+        });
+      }
+      
+      // Логирование события
+      eventLogger.logEvent(
+        'system', 
+        'FRAGMENTS_COMBINED_REQUESTED', 
+        { sessionId, size: combinedBuffer.length }
+      );
+      
+      // Отправляем файл
+      res.set('Content-Type', 'audio/webm');
+      res.set('Content-Disposition', `attachment; filename="combined-${sessionId}.webm"`);
+      res.send(combinedBuffer);
+    } catch (error) {
+      log(`Ошибка при объединении фрагментов: ${error}`, 'fragments');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при объединении фрагментов записи',
+        error
+      });
+    }
+  });
+  
+  // Очистка фрагментов сессии
+  app.delete('/api/recording-fragments/:sessionId', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params;
+      
+      if (!sessionId) {
+        return res.status(400).json({ 
+          message: 'Не указан ID сессии записи' 
+        });
+      }
+      
+      // Очищаем фрагменты через менеджер
+      await fragmentManager.cleanupSession(sessionId);
+      
+      // Логирование события
+      eventLogger.logEvent(
+        'system', 
+        'FRAGMENTS_CLEANED', 
+        { sessionId }
+      );
+      
+      res.json({ 
+        success: true, 
+        message: 'Фрагменты успешно удалены' 
+      });
+    } catch (error) {
+      log(`Ошибка при очистке фрагментов: ${error}`, 'fragments');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при очистке фрагментов записи',
+        error
+      });
+    }
+  });
+  
+  // Эндпоинт для регистрации событий клиента
+  app.post('/api/events/recording-start', async (req: Request, res: Response) => {
+    try {
+      const { username, timestamp } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          message: 'Не указано имя пользователя' 
+        });
+      }
+      
+      // Логируем начало записи
+      eventLogger.logRecordingStart(username);
+      
+      res.json({ 
+        success: true, 
+        message: 'Событие начала записи зарегистрировано' 
+      });
+    } catch (error) {
+      log(`Ошибка при регистрации события: ${error}`, 'events');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при регистрации события',
+        error
+      });
+    }
+  });
+  
+  // Получение всех событий логов
+  app.get('/api/events', async (req: Request, res: Response) => {
+    try {
+      const events = eventLogger.getAllEvents();
+      res.json({ 
+        success: true, 
+        events 
+      });
+    } catch (error) {
+      log(`Ошибка при получении событий: ${error}`, 'events');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении списка событий',
+        error
+      });
+    }
+  });
+  
+  // Получение событий для конкретного пользователя
+  app.get('/api/events/user/:username', async (req: Request, res: Response) => {
+    try {
+      const { username } = req.params;
+      
+      if (!username) {
+        return res.status(400).json({ 
+          message: 'Не указано имя пользователя' 
+        });
+      }
+      
+      const events = eventLogger.getUserEvents(username);
+      res.json({ 
+        success: true, 
+        events 
+      });
+    } catch (error) {
+      log(`Ошибка при получении событий пользователя: ${error}`, 'events');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении списка событий пользователя',
+        error
+      });
+    }
+  });
+
   app.get('/api/files', async (req: Request, res: Response) => {
     try {
       const uploadsDir = path.join(__dirname, 'uploads');

@@ -121,7 +121,24 @@ export default function Home() {
       return;
     }
     
-    const started = audioRecorder.startRecording();
+    // Используем фрагментированную запись вместо обычной
+    const started = audioRecorder.startFragmentedRecording(
+      // Callback для сохранения фрагментов
+      (fragment) => {
+        console.log(`Сохранен фрагмент #${fragment.index}, размер: ${fragment.blob.size} байт`);
+        
+        // Можно добавить индикатор о сохранении фрагмента, если нужно
+        if (fragment.index > 0 && fragment.index % 5 === 0) { // каждые 5 фрагментов
+          toast({
+            title: "Данные сохраняются",
+            description: `Записано ${Math.round(fragment.index * 60)} секунд`,
+            duration: 2000,
+          });
+        }
+      },
+      60000 // 1 минута - размер фрагмента
+    );
+    
     if (started) {
       // Логируем событие начала записи
       try {
@@ -143,7 +160,7 @@ export default function Home() {
       setIsRecording(true);
       toast({
         title: "Визит начат",
-        description: "Таймер активен",
+        description: "Таймер активен с защитой от потери данных",
       });
     } else {
       toast({
