@@ -169,6 +169,54 @@ export default function AdminPanel() {
     }
   };
   
+  // Обновление статуса записи
+  const updateRecordingStatus = async (id: number, status: 'started' | 'completed' | 'error') => {
+    try {
+      const response = await fetch(`/api/recordings/${id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Сервер вернул ошибку: ${errorText}`);
+      }
+      
+      const updatedRecording = await response.json();
+      
+      // Обновляем запись в локальном состоянии
+      setRecordings(prevRecordings => 
+        prevRecordings.map(recording => 
+          recording.id === id ? { ...recording, status } : recording
+        )
+      );
+      
+      // Показываем уведомление об успешном обновлении
+      const statusMessages = {
+        started: 'В процессе',
+        completed: 'Завершена',
+        error: 'Ошибка'
+      };
+      
+      toast({
+        title: 'Статус записи обновлен',
+        description: `Запись #${id} теперь имеет статус: ${statusMessages[status]}`,
+        variant: 'default',
+      });
+      
+    } catch (error) {
+      console.error('Ошибка обновления статуса записи:', error);
+      toast({
+        title: 'Ошибка',
+        description: error instanceof Error ? error.message : 'Не удалось обновить статус записи',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Отправить сообщение с выдержкой из транскрипции
   const sendTranscriptViaClientBot = async (id: number) => {
     try {
@@ -238,56 +286,6 @@ export default function AdminPanel() {
     setTranscriptionModalVisible(false);
     if (!audioPlayerVisible) {
       setSelectedRecording(null);
-    }
-  };
-  
-  // Обновить статус записи
-  const updateRecordingStatus = async (id: number, newStatus: 'started' | 'completed' | 'error') => {
-    try {
-      const recording = recordings.find(r => r.id === id);
-      if (!recording) {
-        throw new Error('Запись не найдена');
-      }
-      
-      // Для статуса "error" запрашиваем сообщение об ошибке
-      let errorMessage = '';
-      if (newStatus === 'error') {
-        errorMessage = prompt('Введите описание ошибки:', '') || 'Неизвестная ошибка';
-      }
-      
-      const response = await fetch(`/api/recordings/${id}/status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          status: newStatus,
-          errorMessage: newStatus === 'error' ? errorMessage : undefined
-        }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Ошибка при обновлении статуса');
-      }
-      
-      const data = await response.json();
-      
-      toast({
-        title: 'Статус обновлен',
-        description: `Запись ${id} теперь имеет статус "${newStatus}"`,
-        variant: 'default',
-      });
-      
-      // Обновляем список записей
-      fetchRecordings();
-      
-    } catch (error) {
-      console.error('Error updating recording status:', error);
-      toast({
-        title: 'Ошибка',
-        description: 'Не удалось обновить статус записи',
-        variant: 'destructive',
-      });
     }
   };
 
