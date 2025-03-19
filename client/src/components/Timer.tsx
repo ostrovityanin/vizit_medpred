@@ -8,7 +8,7 @@ interface TimerProps {
 export default function Timer({ time, isRecording }: TimerProps) {
   return (
     <div className="bg-gray-900 rounded-2xl shadow-lg p-8 mb-6 text-center border border-gray-800">
-      <div className="text-7xl font-bold tabular-nums mb-4 text-white">
+      <div className="text-5xl font-medium tabular-nums mb-4 text-gray-400">
         {formatSeconds(time)}
       </div>
       
