@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Download, RefreshCcw, Send } from 'lucide-react';
+import { ArrowLeft, Download, RefreshCcw, Send, PlayCircle, XCircle } from 'lucide-react';
 import { Link } from 'wouter';
 import { useToast } from '@/hooks/use-toast';
 import { formatSeconds } from '@/lib/timer';
 import { useQuery } from '@tanstack/react-query';
 import { getQueryFn } from '@/lib/queryClient';
+import FileAudioPlayer from '@/components/FileAudioPlayer';
 
 interface Recording {
   id: number;
@@ -28,6 +29,7 @@ interface FileInfo {
 
 export default function FileExplorer() {
   const { toast } = useToast();
+  const [selectedAudioFile, setSelectedAudioFile] = useState<{id: number, filename: string} | null>(null);
   
   // Запрос информации о файлах
   const { 
@@ -74,6 +76,14 @@ export default function FileExplorer() {
     window.open(`/api/recordings/${fileId}/download`, '_blank');
   };
   
+  const handlePlayFile = (fileId: number, filename: string) => {
+    setSelectedAudioFile({ id: fileId, filename });
+  };
+  
+  const handleClosePlayer = () => {
+    setSelectedAudioFile(null);
+  };
+  
   const handleSendFile = async (fileId: number) => {
     try {
       const response = await fetch(`/api/recordings/${fileId}/send`, {
@@ -118,6 +128,27 @@ export default function FileExplorer() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Аудио плеер */}
+      {selectedAudioFile && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-neutral-200 p-4 shadow-lg z-50">
+          <div className="max-w-4xl mx-auto flex items-center">
+            <div className="flex-1">
+              <FileAudioPlayer 
+                audioUrl={`/api/recordings/${selectedAudioFile.id}/download`}
+                filename={selectedAudioFile.filename}
+              />
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleClosePlayer}
+              className="ml-2"
+            >
+              <XCircle className="h-5 w-5 text-neutral-500" />
+            </Button>
+          </div>
+        </div>
+      )}
       <header className="flex items-center justify-between mb-8">
         <Link href="/">
           <Button variant="ghost" size="sm">
@@ -241,7 +272,17 @@ export default function FileExplorer() {
                               <Button 
                                 variant="outline" 
                                 size="sm"
+                                onClick={() => handlePlayFile(file.recording!.id, file.filename)}
+                                title="Воспроизвести"
+                              >
+                                <PlayCircle className="h-3 w-3" />
+                              </Button>
+                              
+                              <Button 
+                                variant="outline" 
+                                size="sm"
                                 onClick={() => handleDownloadFile(file.recording!.id)}
+                                title="Скачать"
                               >
                                 <Download className="h-3 w-3" />
                               </Button>
@@ -251,6 +292,7 @@ export default function FileExplorer() {
                                   variant="outline" 
                                   size="sm"
                                   onClick={() => handleSendFile(file.recording!.id)}
+                                  title="Отправить"
                                 >
                                   <Send className="h-3 w-3" />
                                 </Button>
