@@ -877,10 +877,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Логируем начало записи
       eventLogger.logRecordingStart(username);
       
-      res.json({ 
-        success: true, 
-        message: 'Событие начала записи зарегистрировано' 
-      });
+      // Создаем запись в БД со статусом 'started'
+      try {
+        const recordingData = {
+          // Обязательные поля
+          duration: 0, // Начальная длительность
+          timestamp: timestamp || new Date().toISOString(),
+          targetUsername: 'archive', // По умолчанию
+          senderUsername: username,
+          status: 'started'
+        };
+        
+        // Валидация данных
+        const validData = insertRecordingSchema.parse(recordingData);
+        
+        // Создаем запись для админской базы
+        const recording = await storage.createRecording(validData);
+        
+        console.log(`[recording] Создана запись со статусом "started" для ${username}, ID: ${recording.id}`);
+        
+        res.json({ 
+          success: true, 
+          message: 'Событие начала записи зарегистрировано',
+          recordingId: recording.id 
+        });
+      } catch (dbError) {
+        console.error(`[recording] Ошибка при создании записи: ${dbError}`);
+        // Даже если не удалось создать запись, продолжаем работу
+        res.json({ 
+          success: true, 
+          message: 'Событие начала записи зарегистрировано, но не сохранено в БД',
+          error: dbError.message
+        });
+      }
     } catch (error) {
       log(`Ошибка при регистрации события: ${error}`, 'events');
       res.status(500).json({ 

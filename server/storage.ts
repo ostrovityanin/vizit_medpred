@@ -12,6 +12,7 @@ export interface IStorage {
   getAdminRecordings(): Promise<AdminRecording[]>;
   markAdminRecordingAsSent(id: number): Promise<AdminRecording | undefined>;
   getAdminRecordingById(id: number): Promise<AdminRecording | undefined>;
+  updateAdminRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined>;
   
   // Методы для пользовательских записей
   createUserRecording(recording: InsertUserRecording): Promise<UserRecording>;
@@ -24,6 +25,7 @@ export interface IStorage {
   getRecordings(): Promise<AdminRecording[]>;
   markRecordingAsSent(id: number): Promise<AdminRecording | undefined>;
   getRecordingById(id: number): Promise<AdminRecording | undefined>;
+  updateRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -167,11 +169,13 @@ export class MemStorage implements IStorage {
       ...insertRecording, 
       id, 
       sent: false,
+      filename: insertRecording.filename || null,
       senderUsername: insertRecording.senderUsername || null,
       fileSize: insertRecording.fileSize || null,
       transcription: insertRecording.transcription || null,
       transcriptionCost: insertRecording.transcriptionCost || null,
-      tokensProcessed: insertRecording.tokensProcessed || null
+      tokensProcessed: insertRecording.tokensProcessed || null,
+      status: insertRecording.status || 'started'
     };
     this.adminRecordings.set(id, recording);
     this.saveAdminToFile();
@@ -195,6 +199,17 @@ export class MemStorage implements IStorage {
 
   async getAdminRecordingById(id: number): Promise<AdminRecording | undefined> {
     return this.adminRecordings.get(id);
+  }
+  
+  async updateAdminRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined> {
+    const recording = this.adminRecordings.get(id);
+    if (recording) {
+      const updatedRecording = { ...recording, status };
+      this.adminRecordings.set(id, updatedRecording);
+      this.saveAdminToFile();
+      return updatedRecording;
+    }
+    return undefined;
   }
   
   // === Методы для пользовательских записей ===
@@ -249,6 +264,10 @@ export class MemStorage implements IStorage {
   
   async getRecordingById(id: number): Promise<AdminRecording | undefined> {
     return this.getAdminRecordingById(id);
+  }
+  
+  async updateRecordingStatus(id: number, status: string): Promise<AdminRecording | undefined> {
+    return this.updateAdminRecordingStatus(id, status);
   }
 }
 

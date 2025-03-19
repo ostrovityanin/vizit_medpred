@@ -5,7 +5,7 @@ import { z } from "zod";
 // Основная таблица для хранения всех записей (для админки)
 export const adminRecordings = pgTable("admin_recordings", {
   id: serial("id").primaryKey(),
-  filename: text("filename").notNull(),
+  filename: text("filename"),  // Может быть null для начатых, но не завершенных записей
   duration: integer("duration").notNull(),
   timestamp: text("timestamp").notNull(),
   targetUsername: text("target_username").notNull(),
@@ -15,6 +15,7 @@ export const adminRecordings = pgTable("admin_recordings", {
   transcription: text("transcription"),  // Распознанный текст из аудио
   transcriptionCost: text("transcription_cost"),  // Стоимость распознавания
   tokensProcessed: integer("tokens_processed"),  // Количество обработанных токенов
+  status: text("status").notNull().default('started'),  // Статус записи: 'started', 'completed', 'error'
 });
 
 // Таблица для хранения записей пользователей (для бота)
@@ -38,6 +39,7 @@ export const insertAdminRecordingSchema = createInsertSchema(adminRecordings).pi
   transcription: true,
   transcriptionCost: true,
   tokensProcessed: true,
+  status: true,
 });
 
 export const insertUserRecordingSchema = createInsertSchema(userRecordings).pick({
