@@ -94,6 +94,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Добавляем маршрут для скачивания записи аудио
+  app.get('/api/recordings/:id/download', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const recording = await storage.getRecordingById(id);
+      
+      if (!recording) {
+        return res.status(404).json({ message: 'Recording not found' });
+      }
+      
+      // Полный путь к аудиофайлу
+      const filePath = path.join(__dirname, 'uploads', recording.filename);
+      
+      // Проверка существования файла
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ message: 'Audio file not found on server' });
+      }
+      
+      // Отправляем файл для скачивания
+      res.download(filePath, `recording_${id}.wav`);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to download recording', error });
+    }
+  });
+
   app.post('/api/recordings/:id/send', async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);

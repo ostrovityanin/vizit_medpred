@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
+import Recordings from "@/pages/recordings";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -11,6 +12,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/recordings" component={Recordings} />
       <Route component={NotFound} />
     </Switch>
   );
