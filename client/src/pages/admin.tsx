@@ -28,6 +28,7 @@ export default function AdminPanel() {
   const [selectedRecording, setSelectedRecording] = useState<AdminRecording | null>(null);
   const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
   const [transcriptionModalVisible, setTranscriptionModalVisible] = useState(false);
+  const [fragmentsModalVisible, setFragmentsModalVisible] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -88,7 +89,7 @@ export default function AdminPanel() {
   
   const closeAudioPlayer = () => {
     setAudioPlayerVisible(false);
-    if (!transcriptionModalVisible) {
+    if (!transcriptionModalVisible && !fragmentsModalVisible) {
       setSelectedRecording(null);
     }
   };
@@ -285,7 +286,24 @@ export default function AdminPanel() {
   // Закрыть модальное окно с транскрипцией
   const closeTranscriptionModal = () => {
     setTranscriptionModalVisible(false);
-    if (!audioPlayerVisible) {
+    if (!audioPlayerVisible && !fragmentsModalVisible) {
+      setSelectedRecording(null);
+    }
+  };
+  
+  // Открыть модальное окно с фрагментами
+  const openFragmentsModal = (id: number) => {
+    const recording = recordings.find(r => r.id === id);
+    if (recording) {
+      setSelectedRecording(recording);
+      setFragmentsModalVisible(true);
+    }
+  };
+  
+  // Закрыть модальное окно с фрагментами
+  const closeFragmentsModal = () => {
+    setFragmentsModalVisible(false);
+    if (!audioPlayerVisible && !transcriptionModalVisible) {
       setSelectedRecording(null);
     }
   };
@@ -485,6 +503,16 @@ export default function AdminPanel() {
                             <MessageSquare className="h-4 w-4" />
                           </Button>
                         )}
+                        {/* Кнопка просмотра фрагментов */}
+                        <Button 
+                          onClick={() => openFragmentsModal(recording.id)}
+                          variant="outline" 
+                          size="sm"
+                          className="text-violet-700 border-violet-200 hover:bg-violet-50"
+                          title="Просмотреть фрагменты записи"
+                        >
+                          <Layers className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -535,6 +563,21 @@ export default function AdminPanel() {
                 {selectedRecording.transcription}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Модальное окно для просмотра фрагментов */}
+      {fragmentsModalVisible && selectedRecording && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-3xl p-4 max-h-[80vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Фрагменты записи #{selectedRecording.id}</h2>
+              <Button variant="ghost" size="sm" onClick={closeFragmentsModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <RecordingFragments recordingId={selectedRecording.id} />
           </div>
         </div>
       )}
