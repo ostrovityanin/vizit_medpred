@@ -279,7 +279,317 @@
       "size": 477067,
       "processed": false,
       "id": 28
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00000.webm",
+      "index": 0,
+      "timestamp": 1742424332276,
+      "sessionId": "session-1742424302256-311",
+      "size": 466521,
+      "processed": true,
+      "id": 29
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00001.webm",
+      "index": 1,
+      "timestamp": 1742424362276,
+      "sessionId": "session-1742424302256-311",
+      "size": 423210,
+      "processed": true,
+      "id": 30
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00002.webm",
+      "index": 2,
+      "timestamp": 1742424392265,
+      "sessionId": "session-1742424302256-311",
+      "size": 351956,
+      "processed": true,
+      "id": 31
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00003.webm",
+      "index": 3,
+      "timestamp": 1742424422277,
+      "sessionId": "session-1742424302256-311",
+      "size": 374351,
+      "processed": true,
+      "id": 32
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00004.webm",
+      "index": 4,
+      "timestamp": 1742424452279,
+      "sessionId": "session-1742424302256-311",
+      "size": 350327,
+      "processed": true,
+      "id": 33
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00005.webm",
+      "index": 5,
+      "timestamp": 1742424482281,
+      "sessionId": "session-1742424302256-311",
+      "size": 371689,
+      "processed": true,
+      "id": 34
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00006.webm",
+      "index": 6,
+      "timestamp": 1742424512279,
+      "sessionId": "session-1742424302256-311",
+      "size": 377264,
+      "processed": true,
+      "id": 35
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00007.webm",
+      "index": 7,
+      "timestamp": 1742424542283,
+      "sessionId": "session-1742424302256-311",
+      "size": 433446,
+      "processed": true,
+      "id": 36
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00008.webm",
+      "index": 8,
+      "timestamp": 1742424572276,
+      "sessionId": "session-1742424302256-311",
+      "size": 354641,
+      "processed": true,
+      "id": 37
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00009.webm",
+      "index": 9,
+      "timestamp": 1742424602280,
+      "sessionId": "session-1742424302256-311",
+      "size": 285990,
+      "processed": true,
+      "id": 38
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00010.webm",
+      "index": 10,
+      "timestamp": 1742424632282,
+      "sessionId": "session-1742424302256-311",
+      "size": 396929,
+      "processed": true,
+      "id": 39
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00011.webm",
+      "index": 11,
+      "timestamp": 1742424662277,
+      "sessionId": "session-1742424302256-311",
+      "size": 397384,
+      "processed": true,
+      "id": 40
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00012.webm",
+      "index": 12,
+      "timestamp": 1742424692276,
+      "sessionId": "session-1742424302256-311",
+      "size": 326723,
+      "processed": true,
+      "id": 41
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00013.webm",
+      "index": 13,
+      "timestamp": 1742424722276,
+      "sessionId": "session-1742424302256-311",
+      "size": 402645,
+      "processed": true,
+      "id": 42
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00014.webm",
+      "index": 14,
+      "timestamp": 1742424752280,
+      "sessionId": "session-1742424302256-311",
+      "size": 415384,
+      "processed": true,
+      "id": 43
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00015.webm",
+      "index": 15,
+      "timestamp": 1742424782277,
+      "sessionId": "session-1742424302256-311",
+      "size": 465796,
+      "processed": true,
+      "id": 44
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00016.webm",
+      "index": 16,
+      "timestamp": 1742424812276,
+      "sessionId": "session-1742424302256-311",
+      "size": 428581,
+      "processed": true,
+      "id": 45
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00017.webm",
+      "index": 17,
+      "timestamp": 1742424842283,
+      "sessionId": "session-1742424302256-311",
+      "size": 480750,
+      "processed": true,
+      "id": 46
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00018.webm",
+      "index": 18,
+      "timestamp": 1742424872275,
+      "sessionId": "session-1742424302256-311",
+      "size": 402347,
+      "processed": true,
+      "id": 47
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00019.webm",
+      "index": 19,
+      "timestamp": 1742424902277,
+      "sessionId": "session-1742424302256-311",
+      "size": 392465,
+      "processed": true,
+      "id": 48
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00020.webm",
+      "index": 20,
+      "timestamp": 1742424932281,
+      "sessionId": "session-1742424302256-311",
+      "size": 335109,
+      "processed": true,
+      "id": 49
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00021.webm",
+      "index": 21,
+      "timestamp": 1742424962278,
+      "sessionId": "session-1742424302256-311",
+      "size": 348750,
+      "processed": true,
+      "id": 50
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00022.webm",
+      "index": 22,
+      "timestamp": 1742424992279,
+      "sessionId": "session-1742424302256-311",
+      "size": 286407,
+      "processed": true,
+      "id": 51
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00023.webm",
+      "index": 23,
+      "timestamp": 1742425022282,
+      "sessionId": "session-1742424302256-311",
+      "size": 356122,
+      "processed": true,
+      "id": 52
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00024.webm",
+      "index": 24,
+      "timestamp": 1742425052279,
+      "sessionId": "session-1742424302256-311",
+      "size": 439139,
+      "processed": true,
+      "id": 53
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00025.webm",
+      "index": 25,
+      "timestamp": 1742425082274,
+      "sessionId": "session-1742424302256-311",
+      "size": 429605,
+      "processed": true,
+      "id": 54
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00026.webm",
+      "index": 26,
+      "timestamp": 1742425112284,
+      "sessionId": "session-1742424302256-311",
+      "size": 330793,
+      "processed": true,
+      "id": 55
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00027.webm",
+      "index": 27,
+      "timestamp": 1742425142281,
+      "sessionId": "session-1742424302256-311",
+      "size": 344391,
+      "processed": true,
+      "id": 56
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00028.webm",
+      "index": 28,
+      "timestamp": 1742425172280,
+      "sessionId": "session-1742424302256-311",
+      "size": 299948,
+      "processed": true,
+      "id": 57
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00029.webm",
+      "index": 29,
+      "timestamp": 1742425202269,
+      "sessionId": "session-1742424302256-311",
+      "size": 345331,
+      "processed": true,
+      "id": 58
+    },
+    {
+      "recordingId": 34,
+      "filename": "fragment-session-1742424302256-311-00030.webm",
+      "index": 30,
+      "timestamp": 1742425203604,
+      "sessionId": "session-1742424302256-311",
+      "size": 34923,
+      "processed": false,
+      "id": 59
     }
   ],
-  "currentId": 29
+  "currentId": 60
 }

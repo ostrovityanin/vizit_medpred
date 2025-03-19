@@ -448,7 +448,21 @@
       "transcription": null,
       "transcriptionCost": null,
       "tokensProcessed": null
+    },
+    {
+      "filename": "8a1d855a-7982-42f2-af6b-d88d0432d139.wav",
+      "duration": 0,
+      "timestamp": "2025-03-19T22:45:03.027Z",
+      "targetUsername": "archive",
+      "senderUsername": "iq1_1iq",
+      "status": "completed",
+      "id": 34,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 34
+  "currentId": 35
 }

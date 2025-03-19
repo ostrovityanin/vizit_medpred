@@ -1,6 +1,13 @@
 import OpenAI from 'openai';
 import fs from 'fs';
+import fsExtra from 'fs-extra';
+import path from 'path';
 import { log } from './vite';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
+
+// Инициализируем ffmpeg с установленной версией
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 // Проверяем наличие API ключа для OpenAI
 function isOpenAIConfigured(): boolean {
@@ -72,6 +79,119 @@ function calculateTranscriptionCost(durationSeconds: number): string {
   return cost.toFixed(4);
 }
 
+// Функция для разделения файла на части заданной длительности
+async function splitAudioFile(
+  inputPath: string, 
+  outputDir: string, 
+  segmentDurationSec: number = 300 // 5 минут по умолчанию
+): Promise<string[]> {
+  try {
+    log(`Начинаем разделение большого аудиофайла на части по ${segmentDurationSec} секунд`, 'openai');
+    
+    // Убедимся, что директория существует
+    await fsExtra.ensureDir(outputDir);
+    
+    // Генерируем имя для временных файлов
+    const basename = path.basename(inputPath, path.extname(inputPath));
+    const outputPattern = path.join(outputDir, `${basename}-%03d${path.extname(inputPath)}`);
+    
+    // Получаем информацию о длительности файла
+    return new Promise((resolve, reject) => {
+      let outputFiles: string[] = [];
+      
+      ffmpeg(inputPath)
+        .outputOptions([
+          `-f segment`,
+          `-segment_time ${segmentDurationSec}`,
+          `-c copy`, // Копируем без перекодирования
+          `-reset_timestamps 1`,
+          `-map 0`
+        ])
+        .output(outputPattern)
+        .on('error', (err) => {
+          log(`Ошибка при разделении файла: ${err.message}`, 'openai');
+          reject(err);
+        })
+        .on('end', () => {
+          // Ищем созданные файлы
+          const files = fs.readdirSync(outputDir)
+            .filter(file => file.startsWith(basename))
+            .map(file => path.join(outputDir, file))
+            .sort(); // Сортируем по имени для правильного порядка
+          
+          log(`Аудиофайл успешно разделен на ${files.length} частей`, 'openai');
+          resolve(files);
+        })
+        .run();
+    });
+  } catch (error) {
+    log(`Ошибка при разделении аудиофайла: ${error}`, 'openai');
+    throw error;
+  }
+}
+
+// Функция для объединения текстов транскрипций
+function combineTranscriptions(transcriptions: string[]): string {
+  // Простое объединение текстов с разделителем
+  return transcriptions.join('\n\n');
+}
+
+/**
+ * Оптимизирует аудиофайл для распознавания речи, уменьшая его размер
+ * @param inputPath Путь к исходному файлу
+ * @param outputPath Путь для сохранения оптимизированного файла (если не указан, сгенерируется автоматически)
+ * @returns Путь к оптимизированному файлу
+ */
+async function optimizeAudioForTranscription(
+  inputPath: string,
+  outputPath?: string
+): Promise<string> {
+  try {
+    // Если выходной путь не указан, генерируем его на основе входного
+    if (!outputPath) {
+      const dir = path.dirname(inputPath);
+      const basename = path.basename(inputPath, path.extname(inputPath));
+      outputPath = path.join(dir, `${basename}-optimized.mp3`);
+    }
+    
+    log(`Оптимизируем аудиофайл для распознавания: ${inputPath} -> ${outputPath}`, 'openai');
+    
+    return new Promise((resolve, reject) => {
+      ffmpeg(inputPath)
+        // Конвертируем в MP3 с низким битрейтом, достаточным для распознавания речи
+        .outputOptions([
+          '-ac 1',          // Моно (1 канал)
+          '-ar 16000',      // Частота дискретизации 16 кГц, достаточно для речи
+          '-b:a 32k',       // Битрейт 32 Кбит/с
+          '-f mp3'          // Формат MP3
+        ])
+        .output(outputPath)
+        .on('error', (err) => {
+          log(`Ошибка при оптимизации аудиофайла: ${err.message}`, 'openai');
+          reject(err);
+        })
+        .on('end', () => {
+          // Проверяем размер полученного файла
+          const stats = fs.statSync(outputPath);
+          const sizeMB = stats.size / (1024 * 1024);
+          
+          log(`Аудиофайл успешно оптимизирован: ${sizeMB.toFixed(2)} МБ`, 'openai');
+          
+          // Если размер всё ещё превышает 25 МБ, возвращаем null, чтобы обработать его по частям
+          if (sizeMB > 25) {
+            log(`Оптимизированный файл всё еще слишком большой (${sizeMB.toFixed(2)} МБ), требуется разделение`, 'openai');
+          }
+          
+          resolve(outputPath);
+        })
+        .run();
+    });
+  } catch (error) {
+    log(`Ошибка при оптимизации аудиофайла: ${error}`, 'openai');
+    throw error;
+  }
+}
+
 export async function transcribeAudio(filePath: string): Promise<{text: string | null, cost: string, tokensProcessed: number} | null> {
   try {
     // Проверяем наличие API ключа
@@ -84,11 +204,91 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
       };
     }
     
-    log(`Отправляем аудиофайл на распознавание: ${filePath}`, 'openai');
+    // Проверяем размер исходного файла
+    const fileStats = fs.statSync(filePath);
+    const fileSizeMB = fileStats.size / (1024 * 1024);
+    
+    log(`Размер исходного аудиофайла: ${fileSizeMB.toFixed(2)} МБ`, 'openai');
+    
+    // Проверяем, нужно ли оптимизировать файл
+    let fileToProcess = filePath;
+    
+    if (fileSizeMB > 20) { // Если файл больше 20 МБ, оптимизируем его
+      try {
+        // Оптимизируем файл
+        fileToProcess = await optimizeAudioForTranscription(filePath);
+        
+        // Проверяем размер оптимизированного файла
+        const optimizedStats = fs.statSync(fileToProcess);
+        const optimizedSizeMB = optimizedStats.size / (1024 * 1024);
+        
+        // Если файл все равно больше 25 МБ (лимит OpenAI), разделяем его и обрабатываем по частям
+        if (optimizedSizeMB > 25) {
+          log(`Оптимизированный файл слишком большой (${optimizedSizeMB.toFixed(2)} МБ), разделяем его на части`, 'openai');
+          
+          // Создаем временную директорию для частей файла
+          const tempDir = path.join(path.dirname(filePath), 'temp_segments');
+          await fsExtra.ensureDir(tempDir);
+          
+          // Разделяем файл на части по 5 минут
+          const segmentFiles = await splitAudioFile(fileToProcess, tempDir, 300);
+          
+          if (segmentFiles.length === 0) {
+            throw new Error('Не удалось разделить файл на части');
+          }
+          
+          log(`Файл разделен на ${segmentFiles.length} частей, обрабатываем последовательно`, 'openai');
+          
+          // Выполняем транскрипцию каждой части отдельно
+          const transcriptions: string[] = [];
+          let totalCost = 0;
+          let totalTokens = 0;
+          
+          for (let i = 0; i < segmentFiles.length; i++) {
+            const segmentFile = segmentFiles[i];
+            log(`Обрабатываем часть ${i+1}/${segmentFiles.length}: ${segmentFile}`, 'openai');
+            
+            // Вызываем транскрипцию для этой части (рекурсивно, но без дальнейшего разделения)
+            const segmentResult = await transcribeAudioSegment(segmentFile);
+            
+            if (segmentResult && segmentResult.text) {
+              transcriptions.push(`Часть ${i+1}:\n${segmentResult.text}`);
+              totalCost += parseFloat(segmentResult.cost);
+              totalTokens += segmentResult.tokensProcessed;
+            } else {
+              log(`Не удалось распознать часть ${i+1}`, 'openai');
+              transcriptions.push(`[Часть ${i+1}: Не распознана]`);
+            }
+          }
+          
+          // Объединяем все транскрипции
+          const combinedText = combineTranscriptions(transcriptions);
+          
+          // Очищаем временные файлы
+          try {
+            await fsExtra.remove(tempDir);
+            log(`Удалена временная директория: ${tempDir}`, 'openai');
+          } catch (cleanupError) {
+            log(`Ошибка при удалении временных файлов: ${cleanupError}`, 'openai');
+          }
+          
+          return {
+            text: combinedText,
+            cost: totalCost.toFixed(4),
+            tokensProcessed: totalTokens
+          };
+        }
+      } catch (optimizeError) {
+        log(`Ошибка при оптимизации файла: ${optimizeError}. Продолжаем с исходным файлом.`, 'openai');
+        fileToProcess = filePath; // В случае ошибки используем оригинальный файл
+      }
+    }
+    
+    log(`Отправляем аудиофайл на распознавание: ${fileToProcess}`, 'openai');
     
     // Шаг 1: Базовое распознавание с помощью Whisper
     const response = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(filePath),
+      file: fs.createReadStream(fileToProcess),
       model: "whisper-1",
       language: "ru",
       temperature: 0.0,
