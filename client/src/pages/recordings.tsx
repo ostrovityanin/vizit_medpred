@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
 
@@ -22,6 +22,7 @@ export default function Recordings() {
   const [loading, setLoading] = useState(true);
   const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null);
   const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
+  const [transcriptionModalVisible, setTranscriptionModalVisible] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -82,7 +83,32 @@ export default function Recordings() {
   
   const closeAudioPlayer = () => {
     setAudioPlayerVisible(false);
-    setSelectedRecording(null);
+    if (!transcriptionModalVisible) {
+      setSelectedRecording(null);
+    }
+  };
+  
+  // Открыть модальное окно с транскрипцией
+  const openTranscriptionModal = (id: number) => {
+    const recording = recordings.find(r => r.id === id);
+    if (recording && recording.transcription) {
+      setSelectedRecording(recording);
+      setTranscriptionModalVisible(true);
+    } else {
+      toast({
+        title: 'Текст не найден',
+        description: 'У этой записи отсутствует распознанный текст',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Закрыть модальное окно с транскрипцией
+  const closeTranscriptionModal = () => {
+    setTranscriptionModalVisible(false);
+    if (!audioPlayerVisible) {
+      setSelectedRecording(null);
+    }
   };
 
   return (
@@ -146,7 +172,9 @@ export default function Recordings() {
                     </td>
                     <td className="p-2 text-neutral-600">
                       {recording.transcription ? (
-                        <div className="text-sm italic">"{recording.transcription}"</div>
+                        <div className="text-sm italic max-w-xs truncate">
+                          "{recording.transcription}"
+                        </div>
                       ) : (
                         <div className="text-neutral-400 text-sm">Нет текста</div>
                       )}
@@ -158,14 +186,27 @@ export default function Recordings() {
                           variant="outline" 
                           size="sm"
                           className="text-neutral-700"
+                          title="Воспроизвести"
                         >
                           <Play className="h-4 w-4" />
                         </Button>
+                        {recording.transcription && (
+                          <Button 
+                            onClick={() => openTranscriptionModal(recording.id)}
+                            variant="outline" 
+                            size="sm"
+                            className="text-neutral-700"
+                            title="Показать текст"
+                          >
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button 
                           onClick={() => downloadRecording(recording.id)}
                           variant="outline" 
                           size="sm"
                           className="text-neutral-700"
+                          title="Скачать запись"
                         >
                           <DownloadCloud className="h-4 w-4" />
                         </Button>
@@ -210,10 +251,77 @@ export default function Recordings() {
                 <div>Отправитель: {selectedRecording.senderUsername}</div>
               )}
               {selectedRecording.transcription && (
-                <div className="mt-2 p-3 bg-neutral-50 rounded-lg italic">
-                  "{selectedRecording.transcription}"
+                <div className="flex justify-between items-center mt-2">
+                  <div className="text-sm line-clamp-2 italic overflow-hidden text-neutral-600">
+                    "{selectedRecording.transcription.substring(0, 150)}
+                    {selectedRecording.transcription.length > 150 ? '...' : ''}"
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="ml-2 flex-shrink-0"
+                    onClick={() => {
+                      closeAudioPlayer();
+                      openTranscriptionModal(selectedRecording.id);
+                    }}
+                  >
+                    <FileText className="h-4 w-4 mr-1" />
+                    <span>Открыть текст</span>
+                  </Button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Модальное окно для полного текста транскрипции */}
+      {transcriptionModalVisible && selectedRecording && selectedRecording.transcription && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg w-full max-w-2xl mx-4 p-5 max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium">Распознанный текст</h3>
+              <Button variant="ghost" size="sm" onClick={closeTranscriptionModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <div className="overflow-y-auto flex-1 pr-2">
+              <div className="text-neutral-800 whitespace-pre-wrap text-sm leading-relaxed bg-neutral-50 p-4 rounded-lg">
+                {selectedRecording.transcription?.split('\n').map((line, index) => {
+                  // Проверяем, содержит ли строка информацию о говорящем
+                  const speakerMatch = line.match(/^([А-Яа-я]+(?:\s[0-9])?|[A-Za-z]+(?:\s[0-9])?):(.+)$/);
+                  
+                  if (speakerMatch) {
+                    const [, speaker, speech] = speakerMatch;
+                    return (
+                      <div key={index} className="mb-2">
+                        <span className="font-semibold text-tgblue">{speaker}:</span>
+                        <span>{speech}</span>
+                      </div>
+                    );
+                  } else {
+                    return <div key={index} className="mb-2">{line}</div>;
+                  }
+                })}
+              </div>
+            </div>
+            
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-xs text-neutral-500">
+                Записано: {formatDate(selectedRecording.timestamp)}
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => {
+                  closeTranscriptionModal();
+                  playRecording(selectedRecording.id);
+                }}
+              >
+                <Play className="h-4 w-4 mr-1" />
+                <span>Слушать запись</span>
+              </Button>
             </div>
           </div>
         </div>
