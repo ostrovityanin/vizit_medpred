@@ -292,7 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/recordings/:id/status', async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id, 10);
-      const { status, sessionId } = req.body;
+      const { status, sessionId, forceProcess } = req.body;
       
       if (!status || !['started', 'completed', 'error'].includes(status)) {
         return res.status(400).json({ 
@@ -312,30 +312,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updatedRecording = await storage.updateRecordingStatus(id, status);
       
-      // Если статус 'completed' или 'error' и передан ID сессии,
-      // автоматически объединяем фрагменты и выполняем транскрипцию
-      if ((status === 'completed' || status === 'error') && sessionId) {
-        log(`Статус записи изменен на ${status}. Автоматически инициируем объединение фрагментов для сессии ${sessionId}`, 'recording');
+      // Если статус 'completed' или 'error' и передан ID сессии ИЛИ включен режим принудительной обработки,
+      // автоматически получаем фрагменты записи, объединяем их и выполняем транскрипцию
+      if ((status === 'completed' || status === 'error') && (sessionId || forceProcess)) {
+        // Если это принудительная обработка, отмечаем это в логах
+        if (forceProcess) {
+          log(`Принудительная обработка записи ID: ${id} с изменением статуса на ${status}`, 'recording');
+        } else {
+          log(`Статус записи изменен на ${status}. Автоматически инициируем объединение фрагментов для сессии ${sessionId}`, 'recording');
+        }
         
         try {
           // Запускаем процесс объединения фрагментов асинхронно
           (async () => {
             try {
               // Получаем объединенный файл
-              const combinedBuffer = await fragmentManager.getCombinedFile(sessionId);
+              let combinedBuffer: Buffer | null = null;
+              
+              // Если это принудительная обработка, попытаемся получить фрагменты записи по ID
+              if (forceProcess) {
+                log(`Принудительная обработка: получаем фрагменты для записи ID: ${id}`, 'fragments');
+                // Получаем список фрагментов для данной записи
+                const fragments = await storage.getRecordingFragments(id);
+                
+                if (fragments && fragments.length > 0) {
+                  // Берем sessionId из первого фрагмента
+                  const sessionIdFromFragments = fragments[0].sessionId;
+                  log(`Найдено ${fragments.length} фрагментов для записи ID: ${id}, sessionId: ${sessionIdFromFragments}`, 'fragments');
+                  
+                  // Используем sessionId из фрагментов для объединения
+                  combinedBuffer = await fragmentManager.getCombinedFile(sessionIdFromFragments);
+                } else {
+                  log(`Предупреждение: не найдены фрагменты для записи ID: ${id} при принудительной обработке`, 'fragments');
+                }
+              } else {
+                // Стандартный путь - используем переданный sessionId
+                combinedBuffer = await fragmentManager.getCombinedFile(sessionId);
+              }
               
               if (!combinedBuffer) {
-                log(`Предупреждение: не найдены фрагменты для сессии ${sessionId} при автоматическом объединении`, 'fragments');
+                log(`Предупреждение: не найдены фрагменты для сессии ${sessionId || "неизвестно"} при автоматическом объединении`, 'fragments');
                 return;
               }
               
               log(`Получен объединенный файл при автоматическом объединении, размер: ${combinedBuffer.length} байт`, 'fragments');
               
               // Конвертируем в WAV для транскрипции
-              const wavFilename = await fragmentManager.convertCombinedToWav(sessionId, id);
+              let sessionIdToUse = sessionId;
+              
+              // Если это принудительная обработка и у нас нет sessionId, получаем его из фрагментов
+              if (forceProcess && !sessionId) {
+                const fragments = await storage.getRecordingFragments(id);
+                if (fragments && fragments.length > 0) {
+                  sessionIdToUse = fragments[0].sessionId;
+                  log(`Для принудительной обработки используем sessionId ${sessionIdToUse} из фрагментов`, 'fragments');
+                }
+              }
+              
+              const wavFilename = await fragmentManager.convertCombinedToWav(sessionIdToUse, id);
               
               if (!wavFilename) {
-                log(`Ошибка при автоматической конвертации аудио в WAV формат для сессии ${sessionId}`, 'fragments');
+                log(`Ошибка при автоматической конвертации аудио в WAV формат для сессии ${sessionIdToUse || "неизвестно"}`, 'fragments');
                 return;
               }
               
