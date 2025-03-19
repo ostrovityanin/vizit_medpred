@@ -250,17 +250,17 @@ export default function Recordings() {
               <span>Назад</span>
             </Button>
           </Link>
-          <h1 className="text-xl font-bold text-tgblue">Архив записей</h1>
+          <h1 className="text-xl font-bold text-tgblue">Архив визитов</h1>
         </div>
       </header>
       
       {loading ? (
         <div className="text-center py-8">
-          <p className="text-neutral-500">Загрузка записей...</p>
+          <p className="text-neutral-500">Загрузка данных визитов...</p>
         </div>
       ) : recordings.length === 0 ? (
         <div className="text-center py-8 bg-white rounded-xl shadow-sm">
-          <p className="text-neutral-500">Записей пока нет</p>
+          <p className="text-neutral-500">Данных визитов пока нет</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
@@ -394,22 +394,22 @@ export default function Recordings() {
       <div className="mt-8 p-4 bg-blue-50 border border-blue-100 rounded-lg">
         <h3 className="text-blue-800 font-medium mb-2">Примечание</h3>
         <p className="text-sm text-blue-700 mb-2">
-          Система использует двух ботов для отправки записей:
+          Система использует двух ботов для отправки данных визитов:
         </p>
         <ul className="text-sm text-blue-700 list-disc pl-5 space-y-1">
           <li>
-            <strong>@KashMenBot</strong> - основной бот для администратора, автоматически получает все записи
+            <strong>@KashMenBot</strong> - основной бот для администратора, автоматически получает все данные визитов
           </li>
           <li>
-            <strong>@rsrobot</strong> - клиентский бот для непосредственной отправки записей пользователям
+            <strong>@MedPredRuBot</strong> - клиентский бот для непосредственной отправки данных визитов пользователям
           </li>
         </ul>
         <div className="mt-3 text-sm text-blue-700">
           <p className="mb-2"><strong>Новые возможности через кнопки:</strong></p>
           <ul className="list-disc pl-5 space-y-1">
-            <li><span className="text-blue-700">📩</span> - отправить запись пользователю через клиентский бот</li>
-            <li><span className="text-amber-700">🔔</span> - отправить уведомление о новой записи</li>
-            <li><span className="text-green-700">💬</span> - отправить текст записи пользователю</li>
+            <li><span className="text-blue-700">📩</span> - отправить аудио визита пользователю через клиентский бот</li>
+            <li><span className="text-amber-700">🔔</span> - отправить уведомление о новом визите</li>
+            <li><span className="text-green-700">💬</span> - отправить текст визита пользователю</li>
           </ul>
         </div>
         <p className="text-sm text-blue-700 mt-3">
@@ -422,7 +422,7 @@ export default function Recordings() {
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-md mx-4 p-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Прослушивание записи</h3>
+              <h3 className="text-lg font-medium">Прослушивание данных визита</h3>
               <Button variant="ghost" size="sm" onClick={closeAudioPlayer}>
                 <X className="h-4 w-4" />
               </Button>
