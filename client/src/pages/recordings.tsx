@@ -205,9 +205,14 @@ export default function Recordings() {
             />
             
             <div className="mt-4 text-sm text-neutral-500">
-              Записано: {formatDate(selectedRecording.timestamp)}
+              <div>Записано: {formatDate(selectedRecording.timestamp)}</div>
               {selectedRecording.senderUsername && (
-                <span className="block">Отправитель: {selectedRecording.senderUsername}</span>
+                <div>Отправитель: {selectedRecording.senderUsername}</div>
+              )}
+              {selectedRecording.transcription && (
+                <div className="mt-2 p-3 bg-neutral-50 rounded-lg italic">
+                  "{selectedRecording.transcription}"
+                </div>
               )}
             </div>
           </div>
