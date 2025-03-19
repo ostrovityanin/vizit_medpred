@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers, Volume2 } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
 import RecordingFragments from '@/components/RecordingFragments';
 import { sendAudioViaClientBot, notifyUserAboutRecording, sendMessageViaClientBot } from '@/lib/telegram';
+import { apiRequest } from '@/lib/queryClient';
 
 interface AdminRecording {
   id: number;
@@ -313,6 +314,49 @@ export default function AdminPanel() {
       setSelectedRecording(null);
     }
   };
+  
+  // Принудительно завершить запись и объединить фрагменты
+  const manuallyCompleteRecording = async (id: number) => {
+    try {
+      if (!confirm('Вы уверены, что хотите принудительно завершить запись и обработать её фрагменты? Это вручную запустит процесс объединения и распознавания аудио.')) {
+        return;
+      }
+      
+      toast({
+        title: 'Обработка...',
+        description: 'Запущена обработка фрагментов записи. Это может занять некоторое время.',
+        variant: 'default',
+      });
+      
+      // Обновляем статус на "completed"
+      await fetch(`/api/recordings/${id}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          status: 'completed',
+          forceProcess: true // Специальный флаг для принудительной обработки
+        })
+      });
+      
+      // Обновляем список записей
+      fetchRecordings();
+      
+      toast({
+        title: 'Запрос на обработку успешно отправлен',
+        description: 'Обработка записи запущена. Обновите список через некоторое время, чтобы увидеть результаты.',
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Error completing recording:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось запустить обработку записи',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <div className="w-full mx-auto px-2 py-4">
@@ -519,6 +563,19 @@ export default function AdminPanel() {
                         >
                           <Layers className="h-4 w-4" />
                         </Button>
+                        
+                        {/* Кнопка принудительного завершения записи */}
+                        {recording.status === 'started' && (
+                          <Button 
+                            onClick={() => manuallyCompleteRecording(recording.id)}
+                            variant="outline" 
+                            size="sm"
+                            className="text-teal-700 border-teal-200 hover:bg-teal-50"
+                            title="Принудительно завершить и обработать запись"
+                          >
+                            <Volume2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
