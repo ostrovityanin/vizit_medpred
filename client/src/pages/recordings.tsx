@@ -51,6 +51,12 @@ export default function Recordings() {
   };
 
   const formatDuration = (seconds: number) => {
+    // Убедимся, что значение времени не слишком большое
+    if (seconds > 24 * 60 * 60) {
+      // Если значение выглядит как timestamp, преобразуем его в секунды
+      seconds = Math.floor(seconds / 1000);
+    }
+    
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;

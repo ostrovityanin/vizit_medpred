@@ -174,21 +174,6 @@ export default function Home() {
               Архив записей
             </Button>
           </Link>
-          <Link href="/test-telegram">
-            <Button variant="outline" size="sm" className="text-xs">
-              Тест Telegram
-            </Button>
-          </Link>
-          <Link href="/files">
-            <Button variant="outline" size="sm" className="text-xs">
-              Файловый менеджер
-            </Button>
-          </Link>
-          <Link href="/audio">
-            <Button variant="outline" size="sm" className="text-xs">
-              Аудио плеер
-            </Button>
-          </Link>
         </div>
       </header>
 

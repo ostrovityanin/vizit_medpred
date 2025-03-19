@@ -57,7 +57,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           filename: req.file.filename,
           duration: parseInt(recordingData.duration, 10),
           timestamp: recordingData.timestamp,
-          targetUsername: recordingData.targetUsername
+          targetUsername: recordingData.targetUsername,
+          senderUsername: recordingData.senderUsername || "Пользователь" // Добавляем имя отправителя
         });
 
         const recording = await storage.createRecording(validData);

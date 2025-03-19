@@ -9,6 +9,7 @@ export const recordings = pgTable("recordings", {
   timestamp: text("timestamp").notNull(),
   targetUsername: text("target_username").notNull(),
   sent: boolean("sent").notNull().default(false),
+  senderUsername: text("sender_username"),  // Добавляем поле для имени отправителя
 });
 
 export const insertRecordingSchema = createInsertSchema(recordings).pick({
@@ -16,6 +17,7 @@ export const insertRecordingSchema = createInsertSchema(recordings).pick({
   duration: true,
   timestamp: true,
   targetUsername: true,
+  senderUsername: true,
 });
 
 export type InsertRecording = z.infer<typeof insertRecordingSchema>;
