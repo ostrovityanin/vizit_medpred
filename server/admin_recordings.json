@@ -267,7 +267,20 @@
       "tokensProcessed": 1090,
       "id": 22,
       "sent": false
+    },
+    {
+      "filename": "4165ce91-b7a7-4c7d-a56b-6f24c8044549.wav",
+      "duration": 60,
+      "timestamp": "2025-03-19T14:40:51.597Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 964715,
+      "transcription": "Человек 1: Скальпель.\nЧеловек 2: Ретрактор.",
+      "transcriptionCost": "0.0060",
+      "tokensProcessed": 904,
+      "id": 23,
+      "sent": false
     }
   ],
-  "currentId": 23
+  "currentId": 24
 }
