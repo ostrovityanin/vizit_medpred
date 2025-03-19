@@ -125,7 +125,7 @@ export default function Recordings() {
       console.error('Error sending via client bot:', error);
       toast({
         title: 'Ошибка',
-        description: 'Не удалось отправить аудиозапись через клиентский бот',
+        description: 'Не удалось отправить аудио визита через клиентский бот',
         variant: 'destructive',
       });
     }
@@ -148,7 +148,7 @@ export default function Recordings() {
       if (success) {
         toast({
           title: 'Успешно',
-          description: `Уведомление о записи отправлено пользователю @${username}`,
+          description: `Уведомление о визите отправлено пользователю @${username}`,
           variant: 'default',
         });
       } else {
@@ -179,7 +179,7 @@ export default function Recordings() {
       if (!recording.transcription) {
         toast({
           title: 'Ошибка',
-          description: 'У этой записи отсутствует распознанный текст',
+          description: 'У этого визита отсутствует распознанный текст',
           variant: 'destructive',
         });
         return;
@@ -190,14 +190,14 @@ export default function Recordings() {
       if (!username) return;
       
       // Формируем сообщение с выдержкой из транскрипции
-      const messageText = `📝 <b>Текст аудиозаписи от ${formatDate(recording.timestamp)}</b>\n\n${recording.transcription.substring(0, 1000)}${recording.transcription.length > 1000 ? '...' : ''}`;
+      const messageText = `📝 <b>Текст визита от ${formatDate(recording.timestamp)}</b>\n\n${recording.transcription.substring(0, 1000)}${recording.transcription.length > 1000 ? '...' : ''}`;
       
       const success = await sendMessageViaClientBot(username, messageText);
       
       if (success) {
         toast({
           title: 'Успешно',
-          description: `Текст записи отправлен пользователю @${username}`,
+          description: `Текст визита отправлен пользователю @${username}`,
           variant: 'default',
         });
       } else {
@@ -226,7 +226,7 @@ export default function Recordings() {
     } else {
       toast({
         title: 'Текст не найден',
-        description: 'У этой записи отсутствует распознанный текст',
+        description: 'У этого визита отсутствует распознанный текст',
         variant: 'destructive',
       });
     }

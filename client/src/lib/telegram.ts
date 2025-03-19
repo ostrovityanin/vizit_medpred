@@ -1,5 +1,5 @@
 /**
- * Отправляет аудиозапись получателю через админский бот (старый способ)
+ * Отправляет аудио визита получателю через админский бот (старый способ)
  */
 export async function sendAudioToRecipient(blob: Blob, recipient: string, senderUsername: string = "Пользователь"): Promise<boolean> {
   try {
@@ -56,7 +56,7 @@ export async function sendAudioToRecipient(blob: Blob, recipient: string, sender
 }
 
 /**
- * Отправляет аудиозапись получателю через клиентский бот
+ * Отправляет аудио визита получателю через клиентский бот
  */
 export async function sendAudioViaClientBot(recordingId: number, recipient: string): Promise<boolean> {
   try {
