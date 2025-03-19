@@ -492,7 +492,7 @@ export class AudioRecorder {
       };
       
       // Останавливаем запись
-      if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      if (this.mediaRecorder && (this.mediaRecorder.state === 'recording' || this.mediaRecorder.state === 'paused')) {
         this.mediaRecorder.stop();
       }
     });

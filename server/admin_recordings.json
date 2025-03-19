@@ -378,7 +378,21 @@
       "transcription": null,
       "transcriptionCost": null,
       "tokensProcessed": null
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-03-19T21:51:50.183Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "started",
+      "id": 29,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 29
+  "currentId": 30
 }
