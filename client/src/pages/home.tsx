@@ -39,22 +39,23 @@ export default function Home() {
   // Функция для остановки записи, которую можно безопасно вызывать из useRef колбэка
   const stopRecordingRef = useRef<() => Promise<void>>();
   
+  // Теперь используем только setTimeout, так что таймер не будет автоматически останавливать запись
   const timerRef = useRef(new TimerClass((seconds) => {
     setTimerSeconds(seconds);
-    
-    // Автоматически останавливаем запись через 1 минуту
-    if (seconds >= MAX_RECORDING_TIME && isRecording) {
-      if (stopRecordingRef.current) {
-        stopRecordingRef.current();
-      }
-    }
   }));
 
-  // Обновляем ссылку на функцию остановки при каждом изменении состояния записи
+  // Автоматическая остановка записи через 1 минуту
   useEffect(() => {
-    // Только когда запись активна, обновляем ссылку на функцию остановки
+    let autoStopTimerId: number | null = null;
+    
+    // Только когда запись активна, устанавливаем таймер автоостановки
     if (isRecording) {
-      stopRecordingRef.current = async () => {
+      console.log('Установлен таймер автоостановки на 60 секунд');
+      
+      // Устанавливаем таймер на автоматическую остановку через 60 секунд
+      autoStopTimerId = window.setTimeout(async () => {
+        console.log('Сработал таймер автоостановки');
+        
         // Проверяем, что запись все еще идет
         if (isRecording) {
           const duration = timerRef.current.stop();
@@ -76,11 +77,30 @@ export default function Home() {
             await sendRecording(blob);
           }
         }
+      }, MAX_RECORDING_TIME * 1000); // Переводим секунды в миллисекунды
+      
+      // Для отладки - создаем ссылку на функцию остановки
+      stopRecordingRef.current = async () => {
+        console.log('Вызвана stopRecordingRef.current()');
+        if (autoStopTimerId) {
+          clearTimeout(autoStopTimerId);
+        }
       };
     } else {
-      // Если запись не активна, очищаем ссылку
+      // Если запись не активна и существует таймер, очищаем его
+      if (autoStopTimerId) {
+        clearTimeout(autoStopTimerId);
+      }
+      // Очищаем ссылку на функцию остановки
       stopRecordingRef.current = undefined;
     }
+    
+    // Очистка при размонтировании
+    return () => {
+      if (autoStopTimerId) {
+        clearTimeout(autoStopTimerId);
+      }
+    };
   }, [isRecording]);
 
   useEffect(() => {

@@ -254,7 +254,20 @@
       "tokensProcessed": 20,
       "id": 21,
       "sent": false
+    },
+    {
+      "filename": "4531fad7-0d21-4140-b70a-23e5450be8e5.wav",
+      "duration": 72,
+      "timestamp": "2025-03-19T14:37:35.390Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1162857,
+      "transcription": "Извините, но вы не предоставили текст для анализа. Пожалуйста, предоставьте текст, и я с удовольствием помогу вам его отформатировать.",
+      "transcriptionCost": "0.0073",
+      "tokensProcessed": 1090,
+      "id": 22,
+      "sent": false
     }
   ],
-  "currentId": 22
+  "currentId": 23
 }
