@@ -123,6 +123,22 @@ export default function Home() {
     
     const started = audioRecorder.startRecording();
     if (started) {
+      // Логируем событие начала записи
+      try {
+        await fetch('/api/events/recording-start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: senderUsername,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      } catch (error) {
+        console.error('Ошибка при логировании начала записи:', error);
+      }
+      
       timerRef.current.start();
       setIsRecording(true);
       toast({
