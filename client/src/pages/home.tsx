@@ -120,12 +120,18 @@ export default function Home() {
       setShowPermissionModal(true);
       return;
     }
+
+    // Генерируем уникальный ID сессии для фрагментированной записи
+    const sessionId = `session-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    
+    // Сохраняем ID сессии для последующей отправки фрагментов
+    localStorage.setItem('recordingSessionId', sessionId);
     
     // Используем фрагментированную запись с 30-секундными фрагментами
     const started = audioRecorder.startFragmentedRecording(
       // Callback для сохранения фрагментов
       (fragment) => {
-        console.log(`Сохранен фрагмент #${fragment.index}, размер: ${fragment.blob.size} байт`);
+        console.log(`Сохранен фрагмент #${fragment.index}, размер: ${fragment.blob.size} байт, sessionId: ${sessionId}`);
         
         // Уведомление при сохранении каждого 30-секундного фрагмента (только для каждого 10-го фрагмента)
         if (fragment.index > 0 && fragment.index % 10 === 0) {
@@ -139,7 +145,8 @@ export default function Home() {
           console.log(`Запись продолжается: сохранен фрагмент #${fragment.index} (${minutesRecorded} минут)`);
         }
       },
-      30000 // 30 секунд - размер фрагмента
+      30000, // 30 секунд - размер фрагмента
+      sessionId  // Передаем ID сессии для связывания фрагментов
     );
     
     if (started) {
@@ -154,6 +161,7 @@ export default function Home() {
           body: JSON.stringify({
             targetUsername: 'archive',
             senderUsername: senderUsername,
+            sessionId: sessionId, // Передаем ID сессии на сервер
           }),
         });
         
@@ -179,7 +187,8 @@ export default function Home() {
           body: JSON.stringify({
             username: senderUsername,
             timestamp: new Date().toISOString(),
-            recordingId: recordingId ? parseInt(recordingId, 10) : undefined // Передаем ID записи, если он доступен
+            recordingId: recordingId ? parseInt(recordingId, 10) : undefined, // Передаем ID записи, если он доступен
+            sessionId: sessionId // Добавляем ID сессии
           }),
         });
       } catch (error) {
@@ -235,12 +244,21 @@ export default function Home() {
       // Получаем ID ранее созданной записи, если она была создана при старте
       const recordingId = localStorage.getItem('currentRecordingId');
       
+      // Получаем ID сессии, если он был сохранен при старте записи
+      const sessionId = localStorage.getItem('recordingSessionId');
+      
       const formData = new FormData();
       formData.append('audio', blob, 'recording.wav');
       formData.append('duration', String(timerRef.current.getTime()));
       formData.append('timestamp', new Date().toISOString());
       formData.append('targetUsername', 'archive');  // Используем фиксированное значение
       formData.append('senderUsername', senderUsername);
+      
+      // Добавляем ID сессии для объединения фрагментов
+      if (sessionId) {
+        formData.append('sessionId', sessionId);
+        console.log(`Добавляем ID сессии для объединения фрагментов: ${sessionId}`);
+      }
       
       // Добавляем ID существующей записи, если она есть
       if (recordingId) {
