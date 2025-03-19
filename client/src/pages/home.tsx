@@ -335,10 +335,11 @@ export default function Home() {
       if (!response.ok) {
         console.error('Ошибка сохранения визита:', await response.text());
         
-        // Если произошла ошибка и у нас есть recordingId, обновляем статус на "error"
-        if (recordingId) {
+        // Если произошла ошибка и у нас есть ID записи, обновляем статус на "error"
+        const failedRecordingId = localStorage.getItem('currentRecordingId');
+        if (failedRecordingId) {
           try {
-            await fetch(`/api/recordings/${recordingId}/status`, {
+            await fetch(`/api/recordings/${failedRecordingId}/status`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -348,7 +349,7 @@ export default function Home() {
                 errorMessage: 'Ошибка при сохранении финальной записи'
               }),
             });
-            console.log(`Запись ${recordingId} помечена как ошибочная`);
+            console.log(`Запись ${failedRecordingId} помечена как ошибочная`);
           } catch (statusError) {
             console.error('Ошибка при обновлении статуса:', statusError);
           }
@@ -359,6 +360,27 @@ export default function Home() {
 
       const recording = await response.json();
       console.log('Визит успешно сохранен:', recording);
+      
+      // Получаем ID записи из ответа или из localStorage
+      const successRecordingId = recording.id || localStorage.getItem('currentRecordingId');
+      
+      // Устанавливаем статус "completed" для записи, когда пользователь останавливает запись вручную
+      if (successRecordingId) {
+        try {
+          await fetch(`/api/recordings/${successRecordingId}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              status: 'completed'
+            }),
+          });
+          console.log(`Запись ${successRecordingId} помечена как завершенная`);
+        } catch (statusError) {
+          console.error('Ошибка при обновлении статуса записи:', statusError);
+        }
+      }
       
       // Очищаем ID текущей записи
       localStorage.removeItem('currentRecordingId');
