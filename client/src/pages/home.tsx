@@ -184,6 +184,11 @@ export default function Home() {
               Файловый менеджер
             </Button>
           </Link>
+          <Link href="/audio">
+            <Button variant="outline" size="sm" className="text-xs">
+              Аудио плеер
+            </Button>
+          </Link>
         </div>
       </header>
 

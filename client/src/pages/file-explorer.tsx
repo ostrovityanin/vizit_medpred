@@ -77,7 +77,12 @@ export default function FileExplorer() {
   };
   
   const handlePlayFile = (fileId: number, filename: string) => {
+    console.log("Playing file:", fileId, filename);
     setSelectedAudioFile({ id: fileId, filename });
+    
+    // Попробуем воспроизвести напрямую через API
+    const audio = new Audio(`/api/recordings/${fileId}/download`);
+    audio.play().catch(err => console.error("Error playing audio:", err));
   };
   
   const handleClosePlayer = () => {
