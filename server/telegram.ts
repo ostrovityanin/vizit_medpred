@@ -59,6 +59,13 @@ export async function resolveTelegramUsername(username: string): Promise<number 
 /**
  * Sends an audio file to a Telegram user
  */
+/**
+ * Отправляет аудиофайл пользователю Telegram
+ * 
+ * Важно: для отправки сообщений пользователь должен начать диалог с ботом,
+ * отправив команду /start. Иначе бот не сможет отправить сообщение и будет ошибка
+ * "Bad Request: chat not found"
+ */
 export async function sendAudioToTelegram(
   filePath: string, 
   chatId: number | string, 
