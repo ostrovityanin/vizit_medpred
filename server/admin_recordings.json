@@ -90,7 +90,46 @@
       "tokensProcessed": 208,
       "id": 7,
       "sent": false
+    },
+    {
+      "filename": "0a58df1b-02b7-4803-807f-e71dd9af71df.wav",
+      "duration": 7,
+      "timestamp": "2025-03-19T17:57:40.090Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 113352,
+      "transcription": "Человек 1: \"Вот мы живём в Микон-Джунгаре, и в Микон-Джунгаре есть область Джунгар-Микон.\"",
+      "transcriptionCost": "0.0007",
+      "tokensProcessed": 106,
+      "id": 8,
+      "sent": false
+    },
+    {
+      "filename": "ef7d3593-9c23-4a27-ab21-30f0a5a85b3a.wav",
+      "duration": 17,
+      "timestamp": "2025-03-19T17:58:48.865Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 278876,
+      "transcription": "Женщина 1: Есть, девочки, вопросы какие-нибудь?\nЖенщина 2: Пока нет.\nЖенщина 1: Ну что, давайте тогда до встречи.\nЖенщина 2: До свидания.",
+      "transcriptionCost": "0.0017",
+      "tokensProcessed": 261,
+      "id": 9,
+      "sent": false
+    },
+    {
+      "filename": "0594036c-7b69-4bef-9617-5076eae3ea41.wav",
+      "duration": 231,
+      "timestamp": "2025-03-19T18:03:50.484Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 3750170,
+      "transcription": "Эксперт: Так как в задании не указано конкретных ошибок в транскрипции, предполагаю, что она была представлена верно. Таким образом, исправлений не требуется.",
+      "transcriptionCost": "0.0234",
+      "tokensProcessed": 3516,
+      "id": 10,
+      "sent": false
     }
   ],
-  "currentId": 8
+  "currentId": 11
 }

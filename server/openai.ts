@@ -98,6 +98,18 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
     const transcription = cleanText(response.text);
     log(`Базовое распознавание успешно: ${transcription}`, 'openai');
     
+    // Проверка на повторяющиеся паттерны, что может указывать на проблему с аудио
+    const hasPatternRepetition = /(.{2,5})\1{10,}/g.test(transcription) || 
+                               /((?:[А-Яа-я]+ ){1,3})\1{5,}/g.test(transcription);
+    if (hasPatternRepetition) {
+      log(`Обнаружен повторяющийся паттерн в транскрипции, возможно проблема с аудиофайлом`, 'openai');
+      return {
+        text: 'В аудиофайле обнаружены повторяющиеся паттерны или шум. Возможно проблема с записью.',
+        cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность 1 минута
+        tokensProcessed: 100 // Минимальное количество токенов
+      };
+    }
+    
     // Шаг 2: Используем ChatGPT для идентификации говорящих и форматирования диалога
     try {
       log(`Делим текст на говорящих...`, 'openai');
@@ -124,6 +136,26 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
                          (enhancedTranscription.choices[0].message.content || transcription);
       log(`Улучшенная транскрипция: ${improvedText}`, 'openai');
       
+      // Проверяем, не содержит ли улучшенная транскрипция ошибок
+      const firstPassErrorPatterns = [
+        /в задании не указано/i,
+        /исправлений не требуется/i,
+        /транскрипция представлена верно/i,
+        /я не могу изменить/i,
+        /я должен сохранить/i
+      ];
+      
+      const containsFirstPassErrorMessage = firstPassErrorPatterns.some(pattern => pattern.test(improvedText));
+      
+      if (containsFirstPassErrorMessage) {
+        log('Обнаружен ответ GPT с метаинструкциями вместо транскрипции в первом проходе', 'openai');
+        return {
+          text: 'Качество аудиозаписи не позволяет сделать точную транскрипцию. Проверьте аудиофайл.',
+          cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность
+          tokensProcessed: 100 // Минимальное количество токенов
+        };
+      }
+      
       // Теперь определяем говорящих
       const completion = await openai.chat.completions.create({
         model: "gpt-4",
@@ -143,6 +175,26 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
       
       const formattedText = completion.choices[0].message.content || '';
       log(`Разделение на говорящих: ${formattedText}`, 'openai');
+      
+      // Проверяем, не содержит ли ответ сообщений вроде "в задании не указано", "исправлений не требуется" и т.п.
+      const errorPatterns = [
+        /в задании не указано/i,
+        /исправлений не требуется/i,
+        /транскрипция представлена верно/i,
+        /я не могу изменить/i,
+        /я должен сохранить/i
+      ];
+      
+      const containsErrorMessage = errorPatterns.some(pattern => pattern.test(formattedText));
+      
+      if (containsErrorMessage) {
+        log('Обнаружен ответ GPT с метаинструкциями вместо транскрипции', 'openai');
+        return {
+          text: 'Качество аудиозаписи не позволяет сделать точную транскрипцию. Проверьте аудиофайл.',
+          cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность
+          tokensProcessed: 100 // Минимальное количество токенов
+        };
+      }
       
       // Обрабатываем результат для лучшего форматирования
       const finalText = parseDialogueFromText(formattedText);
