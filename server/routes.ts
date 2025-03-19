@@ -364,6 +364,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Полный путь к аудиофайлу
+      // Проверяем, что filename существует, а не null
+      if (!recording.filename) {
+        return res.status(404).json({ message: 'Audio filename is missing' });
+      }
+      
       const filePath = path.join(__dirname, 'uploads', recording.filename);
       
       // Проверка существования файла
@@ -388,6 +393,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Полный путь к аудиофайлу
+      // Проверяем, что filename существует, а не null
+      if (!recording.filename) {
+        return res.status(404).json({ message: 'Audio filename is missing' });
+      }
+      
       const filePath = path.join(__dirname, 'uploads', recording.filename);
       
       // Проверка существования файла
@@ -802,6 +812,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Полный путь к аудиофайлу
+      // Проверяем, что filename существует, а не null
+      if (!recording.filename) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Имя аудиофайла отсутствует'
+        });
+      }
+      
       const filePath = path.join(__dirname, 'uploads', recording.filename);
       
       // Проверка существования файла

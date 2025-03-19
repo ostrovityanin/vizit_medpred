@@ -142,6 +142,29 @@ export default function Home() {
     if (started) {
       // Логируем событие начала записи
       try {
+        // Создаем запись со статусом "started"
+        const startResponse = await fetch('/api/recordings/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            targetUsername: 'archive',
+            senderUsername: senderUsername,
+          }),
+        });
+        
+        if (startResponse.ok) {
+          const data = await startResponse.json();
+          console.log('Создана запись со статусом started:', data);
+          
+          // Сохраняем ID записи для последующего обновления
+          localStorage.setItem('currentRecordingId', String(data.recordingId));
+        } else {
+          console.error('Ошибка при создании записи со статусом started:', await startResponse.text());
+        }
+        
+        // Логируем событие в системе
         await fetch('/api/events/recording-start', {
           method: 'POST',
           headers: {
@@ -202,12 +225,21 @@ export default function Home() {
   // Функция для сохранения данных визита
   const sendRecording = async (blob: Blob) => {
     try {
+      // Получаем ID ранее созданной записи, если она была создана при старте
+      const recordingId = localStorage.getItem('currentRecordingId');
+      
       const formData = new FormData();
       formData.append('audio', blob, 'recording.wav');
       formData.append('duration', String(timerRef.current.getTime()));
       formData.append('timestamp', new Date().toISOString());
       formData.append('targetUsername', 'archive');  // Используем фиксированное значение
       formData.append('senderUsername', senderUsername);
+      
+      // Добавляем ID существующей записи, если она есть
+      if (recordingId) {
+        formData.append('recordingId', recordingId);
+        console.log(`Добавляем к записи со статусом started (ID: ${recordingId})`);
+      }
 
       const response = await fetch('/api/recordings', {
         method: 'POST',
@@ -216,14 +248,59 @@ export default function Home() {
 
       if (!response.ok) {
         console.error('Ошибка сохранения визита:', await response.text());
+        
+        // Если произошла ошибка и у нас есть recordingId, обновляем статус на "error"
+        if (recordingId) {
+          try {
+            await fetch(`/api/recordings/${recordingId}/status`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                status: 'error',
+                errorMessage: 'Ошибка при сохранении финальной записи'
+              }),
+            });
+            console.log(`Запись ${recordingId} помечена как ошибочная`);
+          } catch (statusError) {
+            console.error('Ошибка при обновлении статуса:', statusError);
+          }
+        }
+        
         return false;
       }
 
       const recording = await response.json();
       console.log('Визит успешно сохранен:', recording);
+      
+      // Очищаем ID текущей записи
+      localStorage.removeItem('currentRecordingId');
+      
       return true;
     } catch (error) {
       console.error('Ошибка при сохранении визита:', error);
+      
+      // Если есть ID записи и произошла ошибка, обновляем статус
+      const recordingId = localStorage.getItem('currentRecordingId');
+      if (recordingId) {
+        try {
+          await fetch(`/api/recordings/${recordingId}/status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              status: 'error',
+              errorMessage: 'Исключение при сохранении финальной записи'
+            }),
+          });
+          console.log(`Запись ${recordingId} помечена как ошибочная после исключения`);
+        } catch (statusError) {
+          console.error('Ошибка при обновлении статуса:', statusError);
+        }
+      }
+      
       return false;
     }
   };
