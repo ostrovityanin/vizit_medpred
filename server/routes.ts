@@ -1031,32 +1031,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Получаем объединенный файл из менеджера фрагментов
+      // Сначала получаем объединенный файл из менеджера фрагментов (в формате WebM)
       const combinedBuffer = await fragmentManager.getCombinedFile(sessionId as string);
       
       if (!combinedBuffer) {
         return res.status(404).json({ 
           message: 'Не найдены фрагменты для указанной сессии' 
         });
-      }
-      
-      // Если передан ID записи, обновляем информацию о записи
-      if (recordingId) {
-        try {
-          const recordingIdNum = parseInt(recordingId as string, 10);
-          if (!isNaN(recordingIdNum)) {
-            // Получаем текущую запись
-            const existingRecording = await storage.getRecordingById(recordingIdNum);
-            
-            if (existingRecording) {
-              // Запись найдена, обновляем статус на 'completed'
-              await storage.updateRecordingStatus(recordingIdNum, 'completed');
-              log(`Обновлен статус записи с ID: ${recordingIdNum} на 'completed' при объединении фрагментов`, 'recording');
-            }
-          }
-        } catch (error) {
-          log(`Ошибка при обновлении статуса записи ${recordingId}: ${error}`, 'fragments');
-        }
       }
       
       // Логирование события
@@ -1066,15 +1047,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { sessionId, size: combinedBuffer.length, recordingId: recordingId || undefined }
       );
       
-      // Отправляем файл
-      res.set('Content-Type', 'audio/webm');
-      res.set('Content-Disposition', `attachment; filename="combined-${sessionId}.webm"`);
-      res.send(combinedBuffer);
+      // Конвертируем объединенный WebM в WAV и сохраняем в uploads
+      const wavFilename = await fragmentManager.convertCombinedToWav(
+        sessionId as string, 
+        recordingId as string
+      );
+      
+      if (!wavFilename) {
+        return res.status(500).json({ 
+          message: 'Ошибка при конвертации аудио в WAV формат' 
+        });
+      }
+      
+      // Логирование события
+      eventLogger.logEvent(
+        'system', 
+        'FRAGMENTS_COMBINED_AND_CONVERTED', 
+        { sessionId, wavFilename, recordingId: recordingId || undefined }
+      );
+      
+      // Формируем ответ с информацией о созданном WAV файле
+      res.json({
+        success: true,
+        message: 'Фрагменты успешно объединены и конвертированы',
+        filename: wavFilename,
+        path: `/api/recordings/${recordingId}/download`
+      });
     } catch (error) {
-      log(`Ошибка при объединении фрагментов: ${error}`, 'fragments');
+      log(`Ошибка при объединении и конвертации фрагментов: ${error}`, 'fragments');
       res.status(500).json({ 
         success: false, 
-        message: 'Ошибка при объединении фрагментов записи',
+        message: 'Ошибка при объединении и конвертации фрагментов записи',
         error
       });
     }

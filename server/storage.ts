@@ -1,7 +1,7 @@
 import { 
-  adminRecordings, userRecordings, 
-  type AdminRecording, type UserRecording, 
-  type InsertAdminRecording, type InsertUserRecording 
+  adminRecordings, userRecordings, recordingFragments,
+  type AdminRecording, type UserRecording, type RecordingFragment,
+  type InsertAdminRecording, type InsertUserRecording, type InsertRecordingFragment
 } from "@shared/schema";
 import fs from 'fs';
 import path from 'path';
@@ -20,6 +20,12 @@ export interface IStorage {
   getUserRecordingById(id: number): Promise<UserRecording | undefined>;
   markUserRecordingAsSent(id: number): Promise<UserRecording | undefined>;
   
+  // Методы для фрагментов записей
+  createRecordingFragment(fragment: InsertRecordingFragment): Promise<RecordingFragment>;
+  getRecordingFragments(recordingId: number): Promise<RecordingFragment[]>;
+  getFragmentsBySessionId(sessionId: string): Promise<RecordingFragment[]>;
+  markFragmentAsProcessed(id: number): Promise<RecordingFragment | undefined>;
+  
   // Поддержка обратной совместимости
   createRecording(recording: InsertAdminRecording): Promise<AdminRecording>;
   getRecordings(): Promise<AdminRecording[]>;
@@ -31,10 +37,13 @@ export interface IStorage {
 export class MemStorage implements IStorage {
   private adminRecordings: Map<number, AdminRecording>;
   private userRecordings: Map<number, UserRecording>;
+  private recordingFragments: Map<number, RecordingFragment>;
   private adminStorageFile: string;
   private userStorageFile: string;
+  private fragmentsStorageFile: string;
   adminCurrentId: number;
   userCurrentId: number;
+  fragmentCurrentId: number;
 
   constructor() {
     // В ES модулях __dirname не определен, используем import.meta.url
@@ -42,11 +51,14 @@ export class MemStorage implements IStorage {
     const moduleDir = path.dirname(modulePath);
     this.adminStorageFile = path.join(moduleDir, 'admin_recordings.json');
     this.userStorageFile = path.join(moduleDir, 'user_recordings.json');
+    this.fragmentsStorageFile = path.join(moduleDir, 'recording_fragments.json');
     
     this.adminRecordings = new Map();
     this.userRecordings = new Map();
+    this.recordingFragments = new Map();
     this.adminCurrentId = 1;
     this.userCurrentId = 1;
+    this.fragmentCurrentId = 1;
     
     // Загружаем данные из файлов при инициализации
     this.loadFromFiles();

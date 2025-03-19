@@ -28,6 +28,18 @@ export const userRecordings = pgTable("user_recordings", {
   sent: boolean("sent").notNull().default(false),
 });
 
+// Таблица для хранения фрагментов аудиозаписей
+export const recordingFragments = pgTable("recording_fragments", {
+  id: serial("id").primaryKey(),
+  recordingId: integer("recording_id").notNull(),  // Связь с основной записью
+  filename: text("filename").notNull(),  // Имя файла фрагмента
+  index: integer("index").notNull(),     // Порядковый номер фрагмента
+  timestamp: integer("timestamp").notNull(), // Временная метка создания фрагмента
+  sessionId: text("session_id").notNull(),  // ID сессии записи
+  size: integer("size").notNull(),       // Размер фрагмента в байтах
+  processed: boolean("processed").notNull().default(false), // Был ли фрагмент уже обработан
+});
+
 // Схемы для вставки записей
 export const insertAdminRecordingSchema = createInsertSchema(adminRecordings).pick({
   filename: true,
@@ -49,12 +61,25 @@ export const insertUserRecordingSchema = createInsertSchema(userRecordings).pick
   timestamp: true,
 });
 
+export const insertRecordingFragmentSchema = createInsertSchema(recordingFragments).pick({
+  recordingId: true,
+  filename: true,
+  index: true,
+  timestamp: true,
+  sessionId: true,
+  size: true,
+  processed: true,
+});
+
 // Типы для использования в приложении
 export type InsertAdminRecording = z.infer<typeof insertAdminRecordingSchema>;
 export type AdminRecording = typeof adminRecordings.$inferSelect;
 
 export type InsertUserRecording = z.infer<typeof insertUserRecordingSchema>;
 export type UserRecording = typeof userRecordings.$inferSelect;
+
+export type InsertRecordingFragment = z.infer<typeof insertRecordingFragmentSchema>;
+export type RecordingFragment = typeof recordingFragments.$inferSelect;
 
 // Для обратной совместимости
 export const recordings = adminRecordings;
