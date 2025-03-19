@@ -215,7 +215,20 @@
       "tokensProcessed": 27,
       "id": 18,
       "sent": false
+    },
+    {
+      "filename": "4f90cdbd-0527-42b4-adbc-022c661f5804.wav",
+      "duration": 10,
+      "timestamp": "2024-03-19T12:00:00Z",
+      "targetUsername": "newtestuser",
+      "senderUsername": "newtestuser",
+      "fileSize": 39348,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на разных говорящих, его невозможно отформатировать как диалог. Текст \"\"Продолжение следует...\"\" можно отнести к Нарратору:\nНарратор: \"Продолжение следует...\"",
+      "transcriptionCost": "0.0002",
+      "tokensProcessed": 37,
+      "id": 19,
+      "sent": false
     }
   ],
-  "currentId": 19
+  "currentId": 20
 }

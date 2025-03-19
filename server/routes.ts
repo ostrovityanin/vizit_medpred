@@ -36,13 +36,11 @@ const upload = multer({
   storage: storageConfig,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    // Принимаем любые типы файлов для тестирования
-    // if (file.mimetype.startsWith('audio/')) {
-    //   cb(null, true);
-    // } else {
-    //   cb(new Error('Not an audio file'));
-    // }
-    cb(null, true);
+    if (file.mimetype.startsWith('audio/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not an audio file'));
+    }
   }
 });
 
