@@ -18,7 +18,21 @@ export default function Home() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [recipient] = useState('@ostrovityanin');
+  const [senderUsername, setSenderUsername] = useState<string>("Пользователь");
   
+  // Получаем информацию о пользователе из Telegram WebApp
+  useEffect(() => {
+    if (window.Telegram?.WebApp) {
+      const webAppUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (webAppUser) {
+        const username = webAppUser.username || 
+                        (webAppUser.first_name ? 
+                          `${webAppUser.first_name}${webAppUser.last_name ? ' ' + webAppUser.last_name : ''}` : 
+                          "Пользователь");
+        setSenderUsername(username);
+      }
+    }
+  }, []);
   const timerRef = useRef(new TimerClass((seconds) => setTimerSeconds(seconds)));
   const { toast } = useToast();
 

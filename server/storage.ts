@@ -18,7 +18,12 @@ export class MemStorage implements IStorage {
 
   async createRecording(insertRecording: InsertRecording): Promise<Recording> {
     const id = this.currentId++;
-    const recording: Recording = { ...insertRecording, id, sent: false };
+    const recording: Recording = { 
+      ...insertRecording, 
+      id, 
+      sent: false,
+      senderUsername: insertRecording.senderUsername || null 
+    };
     this.recordings.set(id, recording);
     return recording;
   }

@@ -2,11 +2,26 @@ export async function sendAudioToRecipient(blob: Blob, recipient: string): Promi
   try {
     console.log(`Sending audio to recipient: ${recipient}`);
     
+    // Get sender info from Telegram WebApp if available
+    let senderUsername = "Пользователь";
+    if (window.Telegram?.WebApp) {
+      const webAppUser = window.Telegram.WebApp.initDataUnsafe?.user;
+      if (webAppUser) {
+        senderUsername = webAppUser.username || 
+                         (webAppUser.first_name ? 
+                          `${webAppUser.first_name}${webAppUser.last_name ? ' ' + webAppUser.last_name : ''}` : 
+                          "Пользователь");
+      }
+    }
+    
+    console.log(`Sender username: ${senderUsername}`);
+    
     const formData = new FormData();
     formData.append('audio', blob, 'recording.wav');
     formData.append('duration', String(Math.floor(Date.now() / 1000)));
     formData.append('timestamp', new Date().toISOString());
     formData.append('targetUsername', recipient);
+    formData.append('senderUsername', senderUsername);
 
     const response = await fetch('/api/recordings', {
       method: 'POST',

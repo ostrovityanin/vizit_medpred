@@ -10,6 +10,7 @@ interface Recording {
   duration: number;
   timestamp: string;
   targetUsername: string;
+  senderUsername?: string | null;
   sent: boolean;
 }
 
@@ -94,6 +95,7 @@ export default function Recordings() {
             <thead>
               <tr className="bg-neutral-50">
                 <th className="p-4 text-left text-neutral-600 font-medium">Дата</th>
+                <th className="p-4 text-left text-neutral-600 font-medium">Отправитель</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Получатель</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Длительность</th>
                 <th className="p-4 text-left text-neutral-600 font-medium">Статус</th>
@@ -104,6 +106,11 @@ export default function Recordings() {
               {recordings.map((recording) => (
                 <tr key={recording.id} className="border-t border-neutral-100 hover:bg-neutral-50">
                   <td className="p-4 text-neutral-800">{formatDate(recording.timestamp)}</td>
+                  <td className="p-4 text-neutral-800">
+                    {recording.senderUsername ? 
+                      recording.senderUsername : 
+                      <span className="text-neutral-400">Нет данных</span>}
+                  </td>
                   <td className="p-4 text-neutral-800">@{recording.targetUsername}</td>
                   <td className="p-4 text-neutral-800">{formatDuration(recording.duration)}</td>
                   <td className="p-4">
