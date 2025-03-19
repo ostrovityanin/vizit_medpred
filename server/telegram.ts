@@ -65,17 +65,26 @@ export async function sendAudioToTelegram(
   }
 
   try {
+    // Ensure chatId starts with @
+    const formattedChatId = (typeof chatId === 'string' && !chatId.startsWith('@')) 
+      ? `@${chatId}` 
+      : chatId.toString();
+      
     // Prepare form data with the audio file
     const form = new FormData();
-    form.append('chat_id', chatId.toString());
+    form.append('chat_id', formattedChatId);
     form.append('caption', caption);
     form.append('audio', fs.createReadStream(filePath));
 
-    log(`Sending audio to chat_id: ${chatId}`, 'telegram');
+    log(`Sending audio to chat_id: ${formattedChatId}`, 'telegram');
+    log(`Using bot token: ${BOT_TOKEN.substring(0, 5)}...`, 'telegram');
 
     // Send the request to the Telegram API
+    const apiUrl = `https://api.telegram.org/bot${BOT_TOKEN}/sendAudio`;
+    log(`Calling Telegram API: ${apiUrl.substring(0, 30)}...`, 'telegram');
+    
     const response = await axios.post(
-      `https://api.telegram.org/bot${BOT_TOKEN}/sendAudio`,
+      apiUrl,
       form,
       {
         headers: {
@@ -85,14 +94,18 @@ export async function sendAudioToTelegram(
     );
 
     if (response.status === 200 && response.data.ok) {
-      log(`Successfully sent audio to ${chatId}`, 'telegram');
+      log(`Successfully sent audio to ${formattedChatId}`, 'telegram');
       return true;
     } else {
       log(`Failed to send audio: ${JSON.stringify(response.data)}`, 'telegram');
       return false;
     }
-  } catch (error) {
-    log(`Error sending audio: ${error}`, 'telegram');
+  } catch (error: any) {
+    log(`Error sending audio: ${error.message}`, 'telegram');
+    if (error.response) {
+      log(`Error response data: ${JSON.stringify(error.response.data)}`, 'telegram');
+      log(`Error response status: ${error.response.status}`, 'telegram');
+    }
     return false;
   }
 }

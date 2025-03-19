@@ -117,7 +117,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Отправка аудио через Telegram бот
       const success = await sendAudioToTelegram(
         filePath, 
-        'ostrovityanin', // Фиксированное имя пользователя
+        '@ostrovityanin', // Фиксированное имя пользователя с символом @
         `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`
       );
       
