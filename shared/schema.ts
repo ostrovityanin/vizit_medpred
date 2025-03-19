@@ -21,6 +21,7 @@ export const insertRecordingSchema = createInsertSchema(recordings).pick({
   targetUsername: true,
   senderUsername: true,
   fileSize: true,
+  transcription: true,
 });
 
 export type InsertRecording = z.infer<typeof insertRecordingSchema>;
