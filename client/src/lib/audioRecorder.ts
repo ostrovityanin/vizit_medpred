@@ -250,10 +250,18 @@ export class AudioRecorder {
       // Всегда сохраняем текущий ID сессии в localStorage
       localStorage.setItem('recordingSessionId', sessionId);
       
+      // Получаем ID записи, если она уже создана
+      const recordingId = localStorage.getItem('currentRecordingId');
+      
       // Логируем информацию о фрагменте
-      console.log(`Отправляем фрагмент #${fragment.index} для сессии ${sessionId}, размер: ${fragment.blob.size} байт`);
+      console.log(`Отправляем фрагмент #${fragment.index} для сессии ${sessionId}${recordingId ? ', запись ID: ' + recordingId : ''}, размер: ${fragment.blob.size} байт`);
       
       formData.append('sessionId', sessionId);
+      
+      // Добавляем ID записи, если она уже создана
+      if (recordingId) {
+        formData.append('recordingId', recordingId);
+      }
       
       // Отправляем фрагмент на сервер
       const response = await fetch('/api/recording-fragments', {

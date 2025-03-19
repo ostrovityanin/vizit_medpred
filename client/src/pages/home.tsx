@@ -167,7 +167,10 @@ export default function Home() {
           console.error('Ошибка при создании записи со статусом started:', await startResponse.text());
         }
         
-        // Логируем событие в системе
+        // Получаем ID записи, если он был сохранен выше
+        const recordingId = localStorage.getItem('currentRecordingId');
+        
+        // Логируем событие в системе и передаем ID записи для предотвращения дублирования
         await fetch('/api/events/recording-start', {
           method: 'POST',
           headers: {
@@ -176,6 +179,7 @@ export default function Home() {
           body: JSON.stringify({
             username: senderUsername,
             timestamp: new Date().toISOString(),
+            recordingId: recordingId ? parseInt(recordingId, 10) : undefined // Передаем ID записи, если он доступен
           }),
         });
       } catch (error) {
