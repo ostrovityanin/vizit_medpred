@@ -77,7 +77,20 @@
       "tokensProcessed": 1795,
       "id": 6,
       "sent": false
+    },
+    {
+      "filename": "06661d81-e64b-4138-9686-043d81a472ba.wav",
+      "duration": 13,
+      "timestamp": "2025-03-19T17:51:52.150Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 221716,
+      "transcription": "Человек 1: \"Определённые, ну, как сказать, по рваным было видно, откуда человек, чьего рода.\"",
+      "transcriptionCost": "0.0014",
+      "tokensProcessed": 208,
+      "id": 7,
+      "sent": false
     }
   ],
-  "currentId": 7
+  "currentId": 8
 }
