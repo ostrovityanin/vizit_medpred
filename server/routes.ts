@@ -10,6 +10,7 @@ import { sendAudioToTelegram, sendTextToTelegram, resolveTelegramUsername, getBo
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import { transcribeAudio } from './openai';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -61,13 +62,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileSize = stats.size;
         }
         
+        // Распознаем текст из аудио
+        log('Начинаем распознавание речи...', 'openai');
+        const transcriptionText = await transcribeAudio(filePath);
+        log(`Результат распознавания: ${transcriptionText}`, 'openai');
+        
         const validData = insertRecordingSchema.parse({
           filename: req.file.filename,
           duration: parseInt(recordingData.duration, 10),
           timestamp: recordingData.timestamp,
           targetUsername: recordingData.targetUsername,
           senderUsername: recordingData.senderUsername || "Пользователь", // Добавляем имя отправителя
-          fileSize: fileSize // Добавляем размер файла
+          fileSize: fileSize, // Добавляем размер файла
+          transcription: transcriptionText // Добавляем распознанный текст
         });
 
         const recording = await storage.createRecording(validData);

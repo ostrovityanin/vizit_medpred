@@ -11,6 +11,7 @@ export const recordings = pgTable("recordings", {
   sent: boolean("sent").notNull().default(false),
   senderUsername: text("sender_username"),  // Добавляем поле для имени отправителя
   fileSize: integer("file_size"),  // Размер файла в байтах
+  transcription: text("transcription"),  // Распознанный текст из аудио
 });
 
 export const insertRecordingSchema = createInsertSchema(recordings).pick({

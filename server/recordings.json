@@ -1,0 +1,25 @@
+{
+  "recordings": [
+    {
+      "filename": "1823eaf0-37f2-4210-82be-a6630f5dbb6b.wav",
+      "duration": 1742346515,
+      "timestamp": "2025-03-19T01:08:35.131Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 23099,
+      "id": 1,
+      "sent": false
+    },
+    {
+      "filename": "7f8a501f-004c-4bc8-a070-f0e194fbab06.wav",
+      "duration": 1742346527,
+      "timestamp": "2025-03-19T01:08:47.429Z",
+      "targetUsername": "@ostrovityanin",
+      "senderUsername": "Qovum",
+      "fileSize": 22102,
+      "id": 2,
+      "sent": false
+    }
+  ],
+  "currentId": 3
+}
