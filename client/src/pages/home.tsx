@@ -192,6 +192,11 @@ export default function Home() {
               Архив визитов
             </Button>
           </Link>
+          <Link href="/client-bot-test">
+            <Button variant="outline" size="sm" className="text-xs">
+              Тест клиент-бота
+            </Button>
+          </Link>
         </div>
       </header>
 

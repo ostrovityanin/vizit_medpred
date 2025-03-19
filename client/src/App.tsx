@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Recordings from "@/pages/recordings";
+import ClientBotTest from "@/pages/client-bot-test";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -13,6 +14,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/recordings" component={Recordings} />
+      <Route path="/client-bot-test" component={ClientBotTest} />
       <Route component={NotFound} />
     </Switch>
   );

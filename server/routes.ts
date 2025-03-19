@@ -366,14 +366,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
+      // Подробное логирование
+      log(`Запрошены записи для пользователя: @${username}`, 'client-bot');
+      
       // Получаем все записи
       const allRecordings = await storage.getRecordings();
+      log(`Всего записей в базе: ${allRecordings.length}`, 'client-bot');
+      
+      // Показываем, что у нас есть в базе
+      allRecordings.forEach((rec, index) => {
+        log(`Запись #${index + 1}: filename=${rec.filename}, sender=${rec.senderUsername || 'не указан'}, target=${rec.targetUsername}`, 'client-bot');
+      });
+      
+      // Проверяем и очищаем username (убираем возможный @ в начале)
+      const cleanUsername = username.replace(/^@/, '');
+      log(`Очищенное имя пользователя: ${cleanUsername}`, 'client-bot');
       
       // Фильтруем записи, в которых пользователь является ТОЛЬКО отправителем
       // Это гарантирует, что пользователь видит только свои записи
-      const userRecordings = allRecordings.filter(recording => 
-        (recording.senderUsername && recording.senderUsername.toLowerCase() === username.toLowerCase())
-      );
+      const userRecordings = allRecordings.filter(recording => {
+        // Если senderUsername не существует, результат всегда false
+        if (!recording.senderUsername) {
+          log(`Запись ${recording.filename}: sender=null, match=false`, 'client-bot');
+          return false;
+        }
+        
+        // Очищаем senderUsername от возможного @ в начале
+        const cleanSender = recording.senderUsername.replace(/^@/, '');
+        
+        // Сравниваем в нижнем регистре
+        const isSender = cleanSender.toLowerCase() === cleanUsername.toLowerCase();
+        
+        log(`Запись ${recording.filename}: sender=${recording.senderUsername} (clean=${cleanSender}), match=${isSender}`, 'client-bot');
+        return isSender;
+      });
+      
+      log(`Отфильтровано записей для @${username}: ${userRecordings.length}`, 'client-bot');
       
       res.json({
         success: true,

@@ -111,7 +111,20 @@
       "tokensProcessed": 119,
       "id": 10,
       "sent": false
+    },
+    {
+      "filename": "3c6dde37-409f-4717-adf4-0703cec9b05c.wav",
+      "duration": 4,
+      "timestamp": "2025-03-19T13:42:04.895Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 60210,
+      "transcription": "Так как в представленном тексте нет диалога или указаний на различных говорящих, невозможно определить и разметить разных говорящих. Вероятно, это фраза от одного говорящего.\nГоворящий 1: \"Продолжение следует...\"",
+      "transcriptionCost": "0.0004",
+      "tokensProcessed": 56,
+      "id": 11,
+      "sent": false
     }
   ],
-  "currentId": 11
+  "currentId": 12
 }
