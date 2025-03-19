@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Recordings from "@/pages/recordings";
 import TestTelegram from "@/pages/test-telegram";
+import FileExplorer from "@/pages/file-explorer";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/recordings" component={Recordings} />
       <Route path="/test-telegram" component={TestTelegram} />
+      <Route path="/files" component={FileExplorer} />
       <Route component={NotFound} />
     </Switch>
   );

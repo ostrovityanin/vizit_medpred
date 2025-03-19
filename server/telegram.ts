@@ -13,6 +13,62 @@ export interface TelegramUser {
 }
 
 /**
+ * Получает информацию о боте
+ */
+export async function getBotInfo(): Promise<any> {
+  if (!BOT_TOKEN) {
+    log('No Telegram Bot Token provided', 'telegram');
+    return null;
+  }
+
+  try {
+    const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getMe`);
+    
+    if (response.status === 200 && response.data.ok) {
+      log(`Bot info: ${JSON.stringify(response.data.result)}`, 'telegram');
+      return response.data.result;
+    } else {
+      log(`Failed to get bot info: ${JSON.stringify(response.data)}`, 'telegram');
+      return null;
+    }
+  } catch (error: any) {
+    log(`Error getting bot info: ${error.message}`, 'telegram');
+    if (error.response) {
+      log(`Response data: ${JSON.stringify(error.response.data)}`, 'telegram');
+    }
+    return null;
+  }
+}
+
+/**
+ * Получает список обновлений (сообщений) для бота
+ */
+export async function getBotUpdates(): Promise<any> {
+  if (!BOT_TOKEN) {
+    log('No Telegram Bot Token provided', 'telegram');
+    return null;
+  }
+
+  try {
+    const response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates`);
+    
+    if (response.status === 200 && response.data.ok) {
+      log(`Updates count: ${response.data.result.length}`, 'telegram');
+      return response.data.result;
+    } else {
+      log(`Failed to get updates: ${JSON.stringify(response.data)}`, 'telegram');
+      return null;
+    }
+  } catch (error: any) {
+    log(`Error getting updates: ${error.message}`, 'telegram');
+    if (error.response) {
+      log(`Response data: ${JSON.stringify(error.response.data)}`, 'telegram');
+    }
+    return null;
+  }
+}
+
+/**
  * Resolves a username to a chat_id using Telegram's getChat API
  */
 export async function resolveTelegramUsername(username: string): Promise<number | string | null> {

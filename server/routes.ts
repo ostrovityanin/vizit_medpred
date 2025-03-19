@@ -6,7 +6,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import path from "path";
 import fs from "fs";
-import { sendAudioToTelegram, sendTextToTelegram, resolveTelegramUsername } from './telegram';
+import { sendAudioToTelegram, sendTextToTelegram, resolveTelegramUsername, getBotInfo, getBotUpdates } from './telegram';
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
@@ -225,6 +225,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Эндпоинт для получения информации о боте
+  app.get('/api/telegram/bot-info', async (req: Request, res: Response) => {
+    try {
+      const botInfo = await getBotInfo();
+      if (!botInfo) {
+        return res.status(500).json({ success: false, message: 'Не удалось получить информацию о боте' });
+      }
+      
+      res.json({
+        success: true,
+        botInfo
+      });
+    } catch (error) {
+      log(`Error getting bot info: ${error}`, 'telegram');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении информации о боте',
+        error
+      });
+    }
+  });
+  
+  // Эндпоинт для получения обновлений бота
+  app.get('/api/telegram/updates', async (req: Request, res: Response) => {
+    try {
+      const updates = await getBotUpdates();
+      if (!updates) {
+        return res.status(500).json({ success: false, message: 'Не удалось получить обновления для бота' });
+      }
+      
+      res.json({
+        success: true,
+        updates
+      });
+    } catch (error) {
+      log(`Error getting bot updates: ${error}`, 'telegram');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении обновлений для бота',
+        error
+      });
+    }
+  });
+
+  // Эндпоинт для получения информации о файлах на сервере
+  app.get('/api/files', async (req: Request, res: Response) => {
+    try {
+      const uploadsDir = path.join(__dirname, 'uploads');
+      
+      // Проверяем существует ли директория
+      if (!fs.existsSync(uploadsDir)) {
+        return res.json({ files: [] });
+      }
+      
+      // Получаем список файлов в директории
+      const files = fs.readdirSync(uploadsDir);
+      
+      // Получаем информацию о каждом файле
+      const fileDetails = files.map(filename => {
+        const filePath = path.join(uploadsDir, filename);
+        const stats = fs.statSync(filePath);
+        
+        return {
+          filename,
+          size: stats.size,
+          created: stats.birthtime,
+          modified: stats.mtime,
+          fullPath: filePath
+        };
+      });
+      
+      // Получаем записи из базы данных
+      const recordings = await storage.getRecordings();
+      
+      // Объединяем информацию о файлах с данными из базы
+      const combinedData = fileDetails.map(file => {
+        // Находим запись в базе, которая соответствует файлу
+        const recording = recordings.find(rec => rec.filename === file.filename);
+        
+        return {
+          ...file,
+          recording: recording || null,
+          inDatabase: !!recording
+        };
+      });
+      
+      res.json({
+        success: true,
+        files: combinedData
+      });
+    } catch (error) {
+      log(`Error getting file info: ${error}`, 'express');
+      res.status(500).json({ 
+        success: false, 
+        message: 'Ошибка при получении информации о файлах',
+        error
+      });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }
