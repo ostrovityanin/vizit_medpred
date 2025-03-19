@@ -99,11 +99,33 @@ export default function Home() {
     }
   };
   
-  // Выделяем логику отправки в отдельную функцию
+  // Функция для сохранения данных визита
   const sendRecording = async (blob: Blob) => {
-    // В этой функции больше нет логики явной отправки получателю
-    // Теперь просто сохраняем данные на сервере
-    return true;
+    try {
+      const formData = new FormData();
+      formData.append('audio', blob, 'recording.wav');
+      formData.append('duration', String(timerRef.current.getTime()));
+      formData.append('timestamp', new Date().toISOString());
+      formData.append('targetUsername', 'archive');  // Используем фиксированное значение
+      formData.append('senderUsername', senderUsername);
+
+      const response = await fetch('/api/recordings', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        console.error('Ошибка сохранения визита:', await response.text());
+        return false;
+      }
+
+      const recording = await response.json();
+      console.log('Визит успешно сохранен:', recording);
+      return true;
+    } catch (error) {
+      console.error('Ошибка при сохранении визита:', error);
+      return false;
+    }
   };
 
   const handleAllowPermission = async () => {
