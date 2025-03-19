@@ -12,6 +12,8 @@ export const recordings = pgTable("recordings", {
   senderUsername: text("sender_username"),  // Добавляем поле для имени отправителя
   fileSize: integer("file_size"),  // Размер файла в байтах
   transcription: text("transcription"),  // Распознанный текст из аудио
+  transcriptionCost: text("transcription_cost"),  // Стоимость распознавания
+  tokensProcessed: integer("tokens_processed"),  // Количество обработанных токенов
 });
 
 export const insertRecordingSchema = createInsertSchema(recordings).pick({
@@ -22,6 +24,8 @@ export const insertRecordingSchema = createInsertSchema(recordings).pick({
   senderUsername: true,
   fileSize: true,
   transcription: true,
+  transcriptionCost: true,
+  tokensProcessed: true,
 });
 
 export type InsertRecording = z.infer<typeof insertRecordingSchema>;

@@ -79,7 +79,9 @@ export class MemStorage implements IStorage {
       sent: false,
       senderUsername: insertRecording.senderUsername || null,
       fileSize: insertRecording.fileSize || null,
-      transcription: insertRecording.transcription || null
+      transcription: insertRecording.transcription || null,
+      transcriptionCost: insertRecording.transcriptionCost || null,
+      tokensProcessed: insertRecording.tokensProcessed || null
     };
     this.recordings.set(id, recording);
     this.saveToFile(); // Сохраняем данные после добавления новой записи

@@ -51,7 +51,23 @@ function parseDialogueFromText(text: string): string {
   }
 }
 
-export async function transcribeAudio(filePath: string): Promise<string | null> {
+// Функция для расчета стоимости транскрипции в долларах
+function calculateTranscriptionCost(durationSeconds: number): string {
+  // Цены на Whisper API (по состоянию на март 2025)
+  // https://openai.com/pricing
+  const costPerMinute = 0.006; // $0.006 за минуту
+  
+  // Переводим секунды в минуты
+  const durationMinutes = durationSeconds / 60;
+  
+  // Рассчитываем стоимость
+  const cost = durationMinutes * costPerMinute;
+  
+  // Возвращаем стоимость в формате строки с двумя десятичными знаками
+  return cost.toFixed(4);
+}
+
+export async function transcribeAudio(filePath: string): Promise<{text: string | null, cost: string, tokensProcessed: number} | null> {
   try {
     log(`Отправляем аудиофайл на распознавание: ${filePath}`, 'openai');
     
@@ -115,11 +131,43 @@ export async function transcribeAudio(filePath: string): Promise<string | null> 
       
       // Обрабатываем результат для лучшего форматирования
       const finalText = parseDialogueFromText(formattedText);
-      return finalText;
+      
+      // Получаем статистику файла, чтобы узнать его продолжительность
+      const stats = fs.statSync(filePath);
+      
+      // Используем общую продолжительность аудио для расчета стоимости
+      // Это берем из продолжительности файла в байтах / средний битрейт
+      // Для простоты возьмем примерную оценку: 16KB на 1 секунду для WAV файла
+      const estimatedDurationSeconds = stats.size / 16000;
+      
+      // Оценка количества токенов: приблизительно 15 токенов на секунду для русского языка
+      const estimatedTokens = Math.round(estimatedDurationSeconds * 15);
+      
+      // Рассчитываем стоимость
+      const cost = calculateTranscriptionCost(estimatedDurationSeconds);
+      
+      log(`Стоимость распознавания: $${cost} (${estimatedTokens} токенов)`, 'openai');
+      
+      return {
+        text: finalText,
+        cost: cost,
+        tokensProcessed: estimatedTokens
+      };
       
     } catch (error) {
       log(`Ошибка при разделении на говорящих, возвращаем базовую транскрипцию: ${error}`, 'openai');
-      return transcription;
+      
+      // Для упрощения также вернем оценочную стоимость и для базовой транскрипции
+      const stats = fs.statSync(filePath);
+      const estimatedDurationSeconds = stats.size / 16000;
+      const estimatedTokens = Math.round(estimatedDurationSeconds * 15);
+      const cost = calculateTranscriptionCost(estimatedDurationSeconds);
+      
+      return {
+        text: transcription,
+        cost: cost,
+        tokensProcessed: estimatedTokens
+      };
     }
     
   } catch (error) {
