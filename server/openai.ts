@@ -28,8 +28,29 @@ function cleanText(text: string): string {
 // Функция для разделения текста на диалог
 function parseDialogueFromText(text: string): string {
   try {
-    // Сначала очищаем текст от нежелательных символов
-    const cleanedText = cleanText(text);
+    // Удаляем типичные строки субтитров, которые не являются частью диалога
+    const subtitlesCleanupPatterns = [
+      // Информация о редакторах, корректорах и переводчиках
+      /(?:^|\n)(?:Редактор\s+субтитров|Корректор|Перевод)[\s\w\.]+/gi,
+      
+      // "Продолжение следует" и похожие фразы в конце
+      /(?:^|\n)(?:Продолжение следует|Конец серии|To be continued|End of episode)[\s\.\…]*/gi,
+      
+      // Копирайты и прочая техническая информация
+      /(?:^|\n)(?:©|All rights reserved|Права защищены)[\s\w\.\d]+/gi,
+      
+      // Другие технические метки субтитров
+      /(?:^|\n)(?:\[\w+\]|\(\w+\)|#\w+)[\s\:]*/gi
+    ];
+    
+    // Применяем все паттерны очистки
+    let cleanedText = text;
+    subtitlesCleanupPatterns.forEach(pattern => {
+      cleanedText = cleanedText.replace(pattern, '');
+    });
+    
+    // Очищаем от нерусских символов
+    cleanedText = cleanText(cleanedText);
     
     const lines = cleanedText.split('\n');
     let processedText = '';
@@ -56,7 +77,11 @@ function parseDialogueFromText(text: string): string {
       }
     }
     
-    return processedText.trim();
+    // Убираем потенциальные многократные переносы строк, возникшие после очистки
+    let result = processedText.trim();
+    result = result.replace(/\n{3,}/g, '\n\n');
+    
+    return result;
   } catch (error) {
     log(`Ошибка при обработке диалога: ${error}`, 'openai');
     return text;
