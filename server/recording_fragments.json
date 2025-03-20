@@ -597,7 +597,7 @@
       "timestamp": 1742426841173,
       "sessionId": "session-1742426811152-775",
       "size": 471677,
-      "processed": false,
+      "processed": true,
       "id": 60
     },
     {
@@ -607,7 +607,7 @@
       "timestamp": 1742426871172,
       "sessionId": "session-1742426811152-775",
       "size": 479337,
-      "processed": false,
+      "processed": true,
       "id": 61
     },
     {
@@ -617,7 +617,7 @@
       "timestamp": 1742426901168,
       "sessionId": "session-1742426811152-775",
       "size": 495142,
-      "processed": false,
+      "processed": true,
       "id": 62
     },
     {
@@ -627,7 +627,7 @@
       "timestamp": 1742426931173,
       "sessionId": "session-1742426811152-775",
       "size": 478881,
-      "processed": false,
+      "processed": true,
       "id": 63
     },
     {
@@ -637,7 +637,7 @@
       "timestamp": 1742426961173,
       "sessionId": "session-1742426811152-775",
       "size": 495284,
-      "processed": false,
+      "processed": true,
       "id": 64
     },
     {
@@ -647,7 +647,7 @@
       "timestamp": 1742426991210,
       "sessionId": "session-1742426811152-775",
       "size": 479070,
-      "processed": false,
+      "processed": true,
       "id": 65
     },
     {
@@ -657,7 +657,7 @@
       "timestamp": 1742427021187,
       "sessionId": "session-1742426811152-775",
       "size": 478822,
-      "processed": false,
+      "processed": true,
       "id": 66
     },
     {
@@ -667,7 +667,7 @@
       "timestamp": 1742427051207,
       "sessionId": "session-1742426811152-775",
       "size": 108971,
-      "processed": false,
+      "processed": true,
       "id": 67
     },
     {
@@ -677,7 +677,7 @@
       "timestamp": 1742427081192,
       "sessionId": "session-1742426811152-775",
       "size": 6919,
-      "processed": false,
+      "processed": true,
       "id": 68
     },
     {
@@ -687,9 +687,89 @@
       "timestamp": 1742427111163,
       "sessionId": "session-1742426811152-775",
       "size": 8464,
-      "processed": false,
+      "processed": true,
       "id": 69
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00000.webm",
+      "index": 0,
+      "timestamp": 1742428642839,
+      "sessionId": "session-1742428612808-374",
+      "size": 472718,
+      "processed": true,
+      "id": 70
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00001.webm",
+      "index": 1,
+      "timestamp": 1742428672829,
+      "sessionId": "session-1742428612808-374",
+      "size": 478703,
+      "processed": true,
+      "id": 71
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00002.webm",
+      "index": 2,
+      "timestamp": 1742428702831,
+      "sessionId": "session-1742428612808-374",
+      "size": 495559,
+      "processed": true,
+      "id": 72
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00003.webm",
+      "index": 3,
+      "timestamp": 1742428732831,
+      "sessionId": "session-1742428612808-374",
+      "size": 478834,
+      "processed": true,
+      "id": 73
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00004.webm",
+      "index": 4,
+      "timestamp": 1742428762830,
+      "sessionId": "session-1742428612808-374",
+      "size": 495640,
+      "processed": true,
+      "id": 74
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00005.webm",
+      "index": 5,
+      "timestamp": 1742428792830,
+      "sessionId": "session-1742428612808-374",
+      "size": 479321,
+      "processed": true,
+      "id": 75
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00006.webm",
+      "index": 6,
+      "timestamp": 1742428822831,
+      "sessionId": "session-1742428612808-374",
+      "size": 479062,
+      "processed": true,
+      "id": 76
+    },
+    {
+      "recordingId": 36,
+      "filename": "fragment-session-1742428612808-374-00007.webm",
+      "index": 7,
+      "timestamp": 1742428846827,
+      "sessionId": "session-1742428612808-374",
+      "size": 403780,
+      "processed": false,
+      "id": 77
     }
   ],
-  "currentId": 70
+  "currentId": 78
 }

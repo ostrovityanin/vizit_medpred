@@ -21,6 +21,11 @@ export class AudioRecorder {
   private fragmentDuration: number = 30000; // 30 секунд на фрагмент
   private isFragmentedRecording: boolean = false;
   private onFragmentSaved: ((fragment: AudioFragment) => void) | null = null;
+  
+  // Ограничение по времени записи (15 минут = 900 секунд = 900000 мс)
+  private maxRecordingDuration: number = 900000;
+  private recordingStartTime: number = 0;
+  private maxDurationTimeout: number | null = null;
 
   // Параметры усиления звука
   private gainValue: number = 2.5; // Коэффициент усиления (регулируемый)
@@ -145,6 +150,8 @@ export class AudioRecorder {
 
     try {
       this.audioChunks = [];
+      // Фиксируем время начала записи
+      this.recordingStartTime = Date.now();
       
       // Пробуем создать медиа рекордер с улучшенными опциями
       try {
@@ -166,9 +173,30 @@ export class AudioRecorder {
         }
       };
 
+      // Настраиваем автоматическое завершение по достижению лимита времени
+      if (this.maxDurationTimeout) {
+        clearTimeout(this.maxDurationTimeout);
+      }
+      
+      // Устанавливаем таймер на максимальную длительность записи (15 минут)
+      this.maxDurationTimeout = window.setTimeout(() => {
+        console.log(`Достигнут предел длительности записи (${this.maxRecordingDuration / 60000} минут). Автоматическое завершение.`);
+        this.stopRecording().then(blob => {
+          // Отправляем событие о завершении записи по времени
+          const event = new CustomEvent('recordingMaxDurationReached', { 
+            detail: { 
+              blob,
+              duration: (Date.now() - this.recordingStartTime) / 1000,
+              message: 'Запись автоматически завершена из-за превышения максимальной длительности'
+            } 
+          });
+          window.dispatchEvent(event);
+        });
+      }, this.maxRecordingDuration);
+      
       // Начинаем запись с частотой сбора данных 1 секунда
       this.mediaRecorder.start(1000);
-      console.log('Recording started with enhanced audio settings');
+      console.log('Recording started with enhanced audio settings and auto-completion timer');
       return true;
     } catch (error) {
       console.error('Error starting recording:', error);
@@ -510,6 +538,12 @@ export class AudioRecorder {
     if (this.fragmentInterval !== null) {
       clearInterval(this.fragmentInterval);
       this.fragmentInterval = null;
+    }
+    
+    // Останавливаем таймер автоматического завершения
+    if (this.maxDurationTimeout) {
+      clearTimeout(this.maxDurationTimeout);
+      this.maxDurationTimeout = null;
     }
     
     // Останавливаем запись
