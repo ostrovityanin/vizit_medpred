@@ -346,16 +346,41 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
     log(`Отправляем аудиофайл на распознавание: ${fileToProcess}`, 'openai');
     
     try {
-      // Шаг 1: Базовое распознавание с помощью Whisper
+      // Единственный шаг: Базовое распознавание с помощью Whisper с напрямую выделенными говорящими
       const response = await openai.audio.transcriptions.create({
         file: fs.createReadStream(fileToProcess),
         model: "whisper-1",
         language: "ru",
         temperature: 0.0,
+        response_format: "verbose_json", // Запрашиваем расширенный формат ответа
       });
+      
+      // Извлекаем текст и информацию о сегментах
+      let transcription = '';
+      let segments = [];
+      
+      try {
+        if (typeof response === 'string') {
+          // Если ответ получен как строка, пробуем распарсить JSON
+          const parsedResponse = JSON.parse(response);
+          transcription = parsedResponse.text || '';
+          segments = parsedResponse.segments || [];
+        } else {
+          // Если ответ уже является объектом
+          transcription = response.text || '';
+          segments = (response as any).segments || [];
+        }
+      } catch (parseError) {
+        log(`Ошибка при парсинге ответа Whisper: ${parseError}. Используем текст напрямую.`, 'openai');
+        if (typeof response === 'string') {
+          transcription = response;
+        } else if (typeof response.text === 'string') {
+          transcription = response.text;
+        }
+      }
   
       // Очищаем от нерусских символов сразу
-      const transcription = cleanText(response.text);
+      transcription = cleanText(transcription);
       log(`Базовое распознавание успешно: ${transcription}`, 'openai');
       
       // Проверка на повторяющиеся паттерны, что может указывать на проблему с аудио
@@ -370,53 +395,11 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
         };
       }
       
-      // Шаг 2: Используем ChatGPT для идентификации говорящих и форматирования диалога
+      // Используем однопроходный метод с GPT-4 для идентификации говорящих
       try {
         log(`Делим текст на говорящих...`, 'openai');
         
-        // Дополнительный проход для улучшения базовой транскрипции
-        const enhancedTranscription = await openai.chat.completions.create({
-          model: "gpt-4",
-          messages: [
-            {
-              role: "system",
-              content: "Ты эксперт по анализу транскрипций аудиозаписей. Твоя задача - сохранить исходный текст максимально точно, исправляя только явные ошибки распознавания. ВАЖНО: НИКОГДА не заменяй нецензурные слова на приличные эквиваленты, сохраняй ТОЧНО то, что говорили люди, даже если это грубые или нецензурные выражения. Не изобретай новое содержание, работай только с тем, что есть в тексте."
-            },
-            {
-              role: "user",
-              content: `Вот сырая транскрипция аудиозаписи. Исправь только технические ошибки, но сохрани ВСЕ слова точно как они были произнесены, включая грубые и нецензурные: "${transcription}"`
-            }
-          ],
-          temperature: 0.1,
-          max_tokens: 2000,
-        });
-        
-        // Если текст очень короткий, лучше не улучшать во избежание искажений
-        const improvedText = transcription.length < 20 ? transcription : 
-                           (enhancedTranscription.choices[0].message.content || transcription);
-        log(`Улучшенная транскрипция: ${improvedText}`, 'openai');
-        
-        // Проверяем, не содержит ли улучшенная транскрипция ошибок
-        const firstPassErrorPatterns = [
-          /в задании не указано/i,
-          /исправлений не требуется/i,
-          /транскрипция представлена верно/i,
-          /я не могу изменить/i,
-          /я должен сохранить/i
-        ];
-        
-        const containsFirstPassErrorMessage = firstPassErrorPatterns.some(pattern => pattern.test(improvedText));
-        
-        if (containsFirstPassErrorMessage) {
-          log('Обнаружен ответ GPT с метаинструкциями вместо транскрипции в первом проходе', 'openai');
-          return {
-            text: 'Качество аудиозаписи не позволяет сделать точную транскрипцию. Проверьте аудиофайл.',
-            cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность
-            tokensProcessed: 100 // Минимальное количество токенов
-          };
-        }
-        
-        // Теперь определяем говорящих
+        // Единственный проход через GPT-4 для разделения на говорящих
         const completion = await openai.chat.completions.create({
           model: "gpt-4",
           messages: [
@@ -426,7 +409,7 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
             },
             {
               role: "user",
-              content: `Определи разных говорящих в этой транскрипции и отформатируй текст как полноценный диалог, указывая, кто говорит каждую фразу. Сохрани ТОЧНОЕ содержание текста, включая нецензурные выражения: "${improvedText}"`
+              content: `Определи разных говорящих в этой транскрипции и отформатируй текст как полноценный диалог, указывая, кто говорит каждую фразу. Сохрани ТОЧНОЕ содержание текста, включая нецензурные выражения: "${transcription}"`
             }
           ],
           temperature: 0.1,
