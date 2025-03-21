@@ -8,6 +8,7 @@ import Recordings from "@/pages/recordings";
 import ClientBotTest from "@/pages/client-bot-test";
 import Admin from "@/pages/admin";
 import UserRecordings from "@/pages/user-recordings";
+import Architecture from "@/pages/architecture";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/admin" component={Admin} />
       <Route path="/admin-panel" component={Admin} />
       <Route path="/user-recordings" component={UserRecordings} />
+      <Route path="/architecture" component={Architecture} />
       <Route component={NotFound} />
     </Switch>
   );
