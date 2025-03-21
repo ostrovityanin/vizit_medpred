@@ -1,1 +1,15 @@
-{"fragments": []}
+{
+  "fragments": [
+    {
+      "recordingId": 1,
+      "filename": "fragment-session-1742547887242-624-00000.webm",
+      "index": 0,
+      "timestamp": 1742547890176,
+      "sessionId": "session-1742547887242-624",
+      "size": 38713,
+      "processed": true,
+      "id": 1
+    }
+  ],
+  "currentId": 2
+}

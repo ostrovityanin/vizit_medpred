@@ -1,1 +1,19 @@
-{"recordings": []}
+{
+  "recordings": [
+    {
+      "filename": "12e774e4-0792-48e3-bc9d-d9637a1e2fc8.wav",
+      "duration": 0,
+      "timestamp": "2025-03-21T09:04:47.562Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 1,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Человек 1: Крестист.",
+      "transcriptionCost": "0.0014",
+      "tokensProcessed": 203
+    }
+  ],
+  "currentId": 2
+}

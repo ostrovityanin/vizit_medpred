@@ -1,1 +1,13 @@
-{"recordings": []}
+{
+  "recordings": [
+    {
+      "adminRecordingId": 1,
+      "username": "ostrovityanin",
+      "duration": 0,
+      "timestamp": "2025-03-21T09:04:47.562Z",
+      "id": 1,
+      "sent": false
+    }
+  ],
+  "currentId": 2
+}
