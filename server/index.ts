@@ -60,21 +60,59 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = 5000;
+  const startTime = Date.now();
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
+    keepAliveTimeout: 65000
   }, () => {
-    log(`serving on port ${port}`);
+    log(`Server started on port ${port} at ${new Date().toISOString()}`);
   });
 
-  // Автоматическое восстановление при ошибках
+  // Мониторинг состояния сервера
+  setInterval(() => {
+    const uptime = (Date.now() - startTime) / 1000;
+    const memoryUsage = process.memoryUsage();
+    log(`Server Status:
+      Uptime: ${uptime}s
+      Memory: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memoryUsage.heapTotal / 1024 / 1024)}MB
+      Active: ${server.listening ? 'Yes' : 'No'}`, 
+    'monitor');
+    
+    if (!server.listening) {
+      log('WARNING: Server not listening! Attempting restart...', 'error');
+      server.listen(port, "0.0.0.0");
+    }
+  }, 30000);
+
+  // Расширенное логирование ошибок
   process.on('uncaughtException', (error) => {
-    log(`Unexpected error: ${error.message}`, 'error');
+    log(`CRITICAL ERROR - uncaughtException:
+      Message: ${error.message}
+      Stack: ${error.stack}
+      Time: ${new Date().toISOString()}`, 
+    'error');
   });
 
-  process.on('unhandledRejection', (error) => {
-    log(`Unhandled promise rejection: ${error}`, 'error');
+  process.on('unhandledRejection', (error: any) => {
+    log(`CRITICAL ERROR - unhandledRejection:
+      Message: ${error?.message || error}
+      Stack: ${error?.stack || 'No stack trace'}
+      Time: ${new Date().toISOString()}`, 
+    'error');
+  });
+
+  // Мониторинг системных событий
+  process.on('SIGTERM', () => {
+    log('Received SIGTERM signal', 'system');
+    server.close();
+  });
+
+  process.on('SIGINT', () => {
+    log('Received SIGINT signal', 'system');
+    server.close();
   });
 
   // Graceful shutdown
