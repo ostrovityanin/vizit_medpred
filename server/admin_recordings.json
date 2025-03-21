@@ -13,7 +13,21 @@
       "transcription": "Человек 1: Крестист.",
       "transcriptionCost": "0.0014",
       "tokensProcessed": 203
+    },
+    {
+      "filename": "6508e0cc-4584-4ee8-95cf-4c6ef88ce83d.wav",
+      "duration": 0,
+      "timestamp": "2025-03-21T09:07:19.093Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 2,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Человек 1: Тест, тест, тест.",
+      "transcriptionCost": "0.0024",
+      "tokensProcessed": 362
     }
   ],
-  "currentId": 2
+  "currentId": 3
 }
