@@ -28,8 +28,10 @@ function cleanText(text: string): string {
 // Функция для разделения текста на диалог
 function parseDialogueFromText(text: string): string {
   try {
-    // Просто используем текст как есть, так как теперь мы дали правильные инструкции модели
+    // Минимальная очистка - только сохраняем текст
     let cleanedText = text;
+    
+    // Функции очистки нет нужны, так как мы инструктировали модель не добавлять лишнее
     
     const lines = cleanedText.split('\n');
     let processedText = '';
