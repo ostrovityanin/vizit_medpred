@@ -67,4 +67,24 @@ app.use((req, res, next) => {
   }, () => {
     log(`serving on port ${port}`);
   });
+
+  // Автоматическое восстановление при ошибках
+  process.on('uncaughtException', (error) => {
+    log(`Unexpected error: ${error.message}`, 'error');
+  });
+
+  process.on('unhandledRejection', (error) => {
+    log(`Unhandled promise rejection: ${error}`, 'error');
+  });
+
+  // Graceful shutdown
+  const shutdown = () => {
+    server.close(() => {
+      log('Server shutting down gracefully');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 })();
