@@ -1,4 +1,4 @@
-import express, { type Express, Request, Response } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRecordingSchema } from "@shared/schema";
@@ -1837,28 +1837,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Добавляем прямой доступ к публичным файлам
+  // Путь к папке с публичными файлами
   const clientPublicPath = path.resolve(__dirname, '../client/public');
-  app.use(express.static(clientPublicPath, {
-    index: false, // Не использовать index.html по умолчанию
-    setHeaders: (res: express.Response, filePath: string) => {
-      // Для HTML, установим правильный Content-Type
-      if (filePath.endsWith('.html')) {
-        res.setHeader('Content-Type', 'text/html');
-      }
-      // Для Markdown, установим правильный Content-Type
-      else if (filePath.endsWith('.md')) {
-        res.setHeader('Content-Type', 'text/markdown');
-      }
-      // Для .zab файлов и других бинарных файлов
-      else if (filePath.endsWith('.zab') || filePath.endsWith('.deb') || filePath.endsWith('.zip')) {
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.setHeader('Content-Disposition', `attachment; filename="${filePath.split('/').pop()}"`);
-      }
+
+  // Специальные маршруты для HTML-страниц
+  app.get('/zepp-os-docs.html', (req: Request, res: Response) => {
+    const filePath = path.join(clientPublicPath, 'zepp-os-docs.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html');
+      res.send(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      res.status(404).send('Файл документации Zepp OS не найден');
     }
-  }));
-  
-  // Добавляем специальный маршрут для загрузки файлов
+  });
+
+  app.get('/replit-guide.html', (req: Request, res: Response) => {
+    const filePath = path.join(clientPublicPath, 'replit-guide.html');
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/html');
+      res.send(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      res.status(404).send('Файл руководства по Replit не найден');
+    }
+  });
+
+  // Маршрут для Markdown-файлов
+  app.get('/:filename.md', (req: Request, res: Response) => {
+    const filename = req.params.filename;
+    const filePath = path.join(clientPublicPath, `${filename}.md`);
+    
+    if (fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', 'text/markdown');
+      res.send(fs.readFileSync(filePath, 'utf8'));
+    } else {
+      res.status(404).send('Markdown файл не найден');
+    }
+  });
+
+  // Маршрут для .zab, .deb и .zip файлов
+  app.get('/:filename', (req: Request, res: Response, next: NextFunction) => {
+    const filename = req.params.filename;
+    const filePath = path.join(clientPublicPath, filename);
+    
+    // Проверяем существование файла и расширение
+    if (fs.existsSync(filePath) && 
+        (filename.endsWith('.zab') || filename.endsWith('.deb') || filename.endsWith('.zip'))) {
+      res.download(filePath);
+    } else {
+      // Для остальных URL, переходим к следующему обработчику
+      // (это позволит Vite обрабатывать маршруты клиентского приложения)
+      next();
+    }
+  });
+
+  // Специальный маршрут для загрузки файлов
   app.get('/download/:filename', (req: Request, res: Response) => {
     const filename = req.params.filename;
     const filePath = path.join(clientPublicPath, filename);
