@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import express, { type Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertRecordingSchema } from "@shared/schema";
@@ -1834,6 +1834,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: 'Ошибка при получении информации о файлах',
         error
       });
+    }
+  });
+  
+  // Добавляем прямой доступ к публичным файлам
+  const clientPublicPath = path.resolve(__dirname, '../client/public');
+  app.use(express.static(clientPublicPath, {
+    index: false, // Не использовать index.html по умолчанию
+    setHeaders: (res: express.Response, filePath: string) => {
+      // Для HTML, установим правильный Content-Type
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Content-Type', 'text/html');
+      }
+      // Для Markdown, установим правильный Content-Type
+      else if (filePath.endsWith('.md')) {
+        res.setHeader('Content-Type', 'text/markdown');
+      }
+      // Для .zab файлов и других бинарных файлов
+      else if (filePath.endsWith('.zab') || filePath.endsWith('.deb') || filePath.endsWith('.zip')) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${filePath.split('/').pop()}"`);
+      }
+    }
+  }));
+  
+  // Добавляем специальный маршрут для загрузки файлов
+  app.get('/download/:filename', (req: Request, res: Response) => {
+    const filename = req.params.filename;
+    const filePath = path.join(clientPublicPath, filename);
+    
+    if (fs.existsSync(filePath)) {
+      res.download(filePath);
+    } else {
+      res.status(404).send('Файл не найден');
     }
   });
   
