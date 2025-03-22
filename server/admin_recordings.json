@@ -55,7 +55,21 @@
       "status": "completed",
       "id": 4,
       "sent": false
+    },
+    {
+      "filename": "97f335e9-9d3e-4478-a920-4e41ff7044b4.wav",
+      "duration": 90,
+      "timestamp": "2025-03-22T20:51:42.897Z",
+      "targetUsername": "archive",
+      "senderUsername": "TestDevice-Amazfit",
+      "status": "completed",
+      "fileSize": 2066086,
+      "transcription": null,
+      "id": 5,
+      "sent": false,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 5
+  "currentId": 6
 }

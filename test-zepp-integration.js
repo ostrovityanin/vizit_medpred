@@ -51,7 +51,11 @@ async function sendFragment(index) {
     
     // Создаем FormData для отправки
     const formData = new FormData();
-    formData.append('fragmentAudio', fs.createReadStream(fragmentPath));
+    // Явно указываем MIME тип аудио для WebM файла
+    formData.append('fragmentAudio', fs.createReadStream(fragmentPath), {
+      filename: path.basename(fragmentPath),
+      contentType: 'audio/webm'
+    });
     formData.append('sessionId', SESSION_ID);
     formData.append('index', index.toString());
     formData.append('deviceId', DEVICE_ID);
