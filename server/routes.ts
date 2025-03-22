@@ -1539,15 +1539,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Создаем запись в хранилище
       const newRecording = await storage.createRecording({
-        title: `Запись с устройства ${deviceId || 'Zepp'}`,
-        description: `Запись создана с помощью Zepp OS приложения. Длительность: ${duration || 'неизвестна'}`,
-        duration: duration ? parseInt(duration, 10) : 0,
-        status: 'completed',
-        clientUsername: deviceId || 'zepp-device',
         filename: path.basename(wavFilePath),
-        transcription: null,
-        sent: false,
-        createdAt: new Date().toISOString()
+        duration: duration ? parseInt(duration, 10) : 0,
+        timestamp: new Date().toISOString(),
+        targetUsername: 'archive', // Архив для Zepp записей
+        senderUsername: deviceId || 'zepp-device',
+        status: 'completed',
+        fileSize: combinedBuffer ? combinedBuffer.length : 0,
+        transcription: null
       });
       
       log(`Создана новая запись от Zepp с ID: ${newRecording.id}`, 'zepp');
@@ -1603,14 +1602,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }, 0);
       }
       
+      // Формируем ответ с данными записи
       res.json({
         success: true,
         message: 'Запись успешно создана',
         recording: {
           id: newRecording.id,
-          title: newRecording.title,
           duration: newRecording.duration,
-          status: newRecording.status
+          status: newRecording.status,
+          deviceId: deviceId || 'zepp-device',
+          sessionId: sessionId,
+          timestamp: newRecording.timestamp
         }
       });
       
