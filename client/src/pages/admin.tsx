@@ -370,6 +370,14 @@ export default function AdminPanel() {
           </Link>
           <h1 className="text-xl font-bold text-tgblue">Админ-панель</h1>
         </div>
+        <div className="flex items-center">
+          <Link href="/zepp-os-docs">
+            <Button variant="outline" size="sm" className="mr-2">
+              <FileText className="h-4 w-4 mr-1" />
+              <span>Документация Zepp OS</span>
+            </Button>
+          </Link>
+        </div>
       </header>
       
       {loading ? (

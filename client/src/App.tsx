@@ -9,6 +9,7 @@ import ClientBotTest from "@/pages/client-bot-test";
 import Admin from "@/pages/admin";
 import UserRecordings from "@/pages/user-recordings";
 import Architecture from "@/pages/architecture";
+import ZeppOSDocs from "@/pages/zepp-os-docs";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/admin-panel" component={Admin} />
       <Route path="/user-recordings" component={UserRecordings} />
       <Route path="/architecture" component={Architecture} />
+      <Route path="/zepp-os-docs" component={ZeppOSDocs} />
       <Route component={NotFound} />
     </Switch>
   );
