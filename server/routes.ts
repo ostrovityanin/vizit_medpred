@@ -14,6 +14,8 @@ import { dirname } from 'path';
 import { transcribeAudio } from './openai';
 import { fragmentManager } from './fragments';
 import { eventLogger } from './event-logger';
+import apiDocsRouter from './api-docs';
+import apiFilesRouter from './api-files';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -48,6 +50,12 @@ const upload = multer({
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes
+  
+  // API для доступа к документации
+  app.use('/api/docs', apiDocsRouter);
+  
+  // API для доступа к файлам
+  app.use('/api/files', apiFilesRouter);
   // Функция для безопасного обращения с timestamp
   const safeTimestamp = (timestamp: string | null | undefined): string => {
     return timestamp || new Date().toISOString();
