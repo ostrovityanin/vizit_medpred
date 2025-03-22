@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers, Volume2 } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers, Volume2, ExternalLink } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
 import RecordingFragments from '@/components/RecordingFragments';
@@ -370,11 +370,17 @@ export default function AdminPanel() {
           </Link>
           <h1 className="text-xl font-bold text-tgblue">Админ-панель</h1>
         </div>
-        <div className="flex items-center">
+        <div className="flex items-center space-x-2">
           <Link href="/zepp-os-docs">
-            <Button variant="outline" size="sm" className="mr-2">
+            <Button variant="outline" size="sm">
               <FileText className="h-4 w-4 mr-1" />
               <span>Документация Zepp OS</span>
+            </Button>
+          </Link>
+          <Link href="/replit-guide">
+            <Button variant="outline" size="sm">
+              <ExternalLink className="h-4 w-4 mr-1" />
+              <span>Доступ к проектам</span>
             </Button>
           </Link>
         </div>
