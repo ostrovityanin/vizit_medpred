@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Руководство по доступу к проектам в Replit</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #f9fafb;
+      color: #111827;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    pre {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.375rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    code {
+      background-color: #f3f4f6;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.875em;
+    }
+  </style>
+</head>
+<body>
+  <div class="container mx-auto py-10 px-4">
+    <div class="flex flex-col space-y-6">
+      <div class="flex items-center justify-between">
+        <h1 class="text-3xl font-bold">Как открыть локальные проекты в Replit</h1>
+        <a href="/" class="px-4 py-2 bg-white border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50">
+          Вернуться на главную
+        </a>
+      </div>
+
+      <div class="card">
+        <div class="p-6">
+          <h2 class="text-xl font-bold mb-2">Доступ к вашим Replit проектам</h2>
+          <p class="text-gray-600 mb-6">
+            Инструкция по открытию и запуску локальных проектов в Replit
+          </p>
+          
+          <div class="space-y-6">
+            <div>
+              <h3 class="text-lg font-semibold mb-2">Способ 1: Через Webview</h3>
+              <p class="mb-3">
+                Самый простой способ доступа к локальным проектам в Replit - использовать встроенный Webview, 
+                который автоматически создает URL для доступа к вашему серверу.
+              </p>
+              
+              <ol class="list-decimal pl-6 space-y-2">
+                <li>
+                  <strong>Откройте ваш проект в Replit</strong>
+                  <p>Войдите в свой аккаунт Replit и откройте нужный проект.</p>
+                </li>
+                <li>
+                  <strong>Запустите сервер</strong>
+                  <p>Нажмите на кнопку "Run" вверху, чтобы запустить сервер.</p>
+                </li>
+                <li>
+                  <strong>Откройте вкладку Webview</strong>
+                  <p>
+                    В верхней части интерфейса найдите вкладку "Webview" (обычно справа от вкладки "Console").
+                    Это автоматически откроет браузер, показывающий ваш проект на порту 5000.
+                  </p>
+                </li>
+                <li>
+                  <strong>Используйте URL из Webview</strong>
+                  <p>
+                    Webview создаст URL вида <code>https://your-project-name.username.repl.co</code>, 
+                    который вы можете использовать для доступа к проекту из любого браузера.
+                  </p>
+                </li>
+              </ol>
+
+              <div class="bg-blue-50 p-4 rounded-md mt-4">
+                <p class="font-medium">Пример URL:</p>
+                <code>https://sound-timer-tracker-nivarank.replit.app</code>
+              </div>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-semibold mb-2">Способ 2: Через порт 5000 (локально)</h3>
+              <p class="mb-3">
+                Если вы работаете непосредственно в редакторе Replit, вы также можете получить доступ к вашему 
+                проекту через порт 5000 локально.
+              </p>
+              
+              <ol class="list-decimal pl-6 space-y-2">
+                <li>
+                  <strong>Запустите сервер в Replit</strong>
+                  <p>Убедитесь, что ваш проект запущен и сервер работает.</p>
+                </li>
+                <li>
+                  <strong>Откройте локальный URL</strong>
+                  <p>
+                    В браузере внутри Replit или в отдельной вкладке введите: <code>http://localhost:5000</code>
+                  </p>
+                </li>
+                <li>
+                  <strong>Доступ к специфическим страницам</strong>
+                  <p>
+                    Для перехода на определенные страницы или маршруты добавьте их к URL.
+                    Например: <code>http://localhost:5000/zepp-os-docs</code>
+                  </p>
+                </li>
+              </ol>
+            </div>
+
+            <div>
+              <h3 class="text-lg font-semibold mb-2">Способ 3: Загрузка файлов из проекта</h3>
+              <p class="mb-3">
+                Чтобы скачать или получить доступ к определенным файлам из вашего проекта:
+              </p>
+              
+              <ol class="list-decimal pl-6 space-y-2">
+                <li>
+                  <strong>Поместите файлы в директорию public</strong>
+                  <p>
+                    Любые файлы, помещенные в директорию <code>client/public/</code>, будут доступны напрямую через URL вашего проекта.
+                  </p>
+                </li>
+                <li>
+                  <strong>Используйте прямые ссылки</strong>
+                  <p>
+                    Для доступа к файлу используйте формат:<br />
+                    <code>http://localhost:5000/имя_файла.расширение</code> (локально) или<br />
+                    <code>https://your-project-name.username.repl.co/имя_файла.расширение</code> (публично)
+                  </p>
+                </li>
+                <li>
+                  <strong>Примеры доступа к файлам:</strong>
+                  <ul class="list-disc pl-6">
+                    <li>
+                      <code>http://localhost:5000/basic_zepp.zab</code> - доступ к файлу basic_zepp.zab
+                    </li>
+                    <li>
+                      <code>http://localhost:5000/zepp_all_packages.zip</code> - скачивание архива с пакетами
+                    </li>
+                    <li>
+                      <code>http://localhost:5000/zepp_installation_guide_updated.md</code> - просмотр руководства
+                    </li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+
+            <div class="bg-yellow-50 p-4 rounded-md border border-yellow-200">
+              <h3 class="text-lg font-semibold text-yellow-800 mb-2">Важно помнить</h3>
+              <ul class="list-disc pl-6 text-yellow-700 space-y-1">
+                <li>Ваш проект должен быть запущен для доступа к файлам и страницам</li>
+                <li>Порт 5000 стандартный для большинства проектов, но может отличаться в зависимости от настроек</li>
+                <li>Публичные URL (с .repl.co) будут работать только если ваш проект публичный или поделенный</li>
+                <li>Для непрерывного доступа к проекту используйте функцию "Always On" в Replit (требуется подписка)</li>
+              </ul>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 mt-6">
+              <a href="https://replit.com/~" target="_blank" rel="noopener noreferrer" class="no-underline">
+                <button class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded flex items-center justify-center">
+                  Открыть Replit
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              </a>
+              
+              <a href="https://docs.replit.com/" target="_blank" rel="noopener noreferrer" class="no-underline">
+                <button class="w-full sm:w-auto bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 py-2 px-4 rounded flex items-center justify-center">
+                  Документация Replit
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

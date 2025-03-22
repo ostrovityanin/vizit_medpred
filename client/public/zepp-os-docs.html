@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Документация по Zepp OS</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+      background-color: #f9fafb;
+      color: #111827;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    .card {
+      background-color: white;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      overflow: hidden;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .tab {
+      cursor: pointer;
+      padding: 0.75rem 1rem;
+      font-weight: 500;
+      text-align: center;
+      border-bottom: 2px solid transparent;
+    }
+    .tab.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+    pre {
+      background-color: #f3f4f6;
+      padding: 1rem;
+      border-radius: 0.375rem;
+      overflow-x: auto;
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    code {
+      background-color: #f3f4f6;
+      padding: 0.2rem 0.4rem;
+      border-radius: 0.25rem;
+      font-size: 0.875em;
+    }
+    .download-card {
+      transition: all 0.2s ease-in-out;
+    }
+    .download-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .accordion-header {
+      cursor: pointer;
+      padding: 1rem;
+      font-weight: 500;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .accordion-content {
+      padding: 1rem;
+      display: none;
+    }
+    .accordion-item.open .accordion-content {
+      display: block;
+    }
+    .accordion-item.open .accordion-icon {
+      transform: rotate(180deg);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">Документация по Zepp OS</h1>
+      <a href="/" class="px-4 py-2 bg-white border border-gray-300 rounded-md font-medium text-gray-700 hover:bg-gray-50">
+        Вернуться на главную
+      </a>
+    </div>
+
+    <!-- Пакеты для скачивания -->
+    <div class="card mb-6">
+      <div class="p-6 border-b">
+        <h2 class="text-xl font-bold">Пакеты для установки</h2>
+        <p class="text-gray-600 mt-1">Здесь вы можете скачать различные версии пакетов для Zepp OS</p>
+      </div>
+      <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <a href="/basic_zepp.zab" download class="no-underline">
+            <div class="download-card card h-full">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Базовый пакет</h3>
+                <p class="text-gray-500 text-sm">basic_zepp.zab</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Простой базовый пакет для Zepp OS</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/minimal_fixed_zepp.zab" download class="no-underline">
+            <div class="download-card card h-full">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Исправленный минимальный пакет</h3>
+                <p class="text-gray-500 text-sm">minimal_fixed_zepp.zab</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Исправленная минимальная версия с правильной структурой</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/pure_minimal_zepp.zab" download class="no-underline">
+            <div class="download-card card h-full">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Чистый минимальный пакет</h3>
+                <p class="text-gray-500 text-sm">pure_minimal_zepp.zab</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Максимально упрощенная версия с корректным манифестом</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/fixed_zepp_app.zab" download class="no-underline">
+            <div class="download-card card h-full">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Пакет с исправленной структурой</h3>
+                <p class="text-gray-500 text-sm">fixed_zepp_app.zab</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Полная версия с исправленной файловой структурой</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/pure-minimal-zepp.deb" download class="no-underline">
+            <div class="download-card card h-full">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Debian-пакет</h3>
+                <p class="text-gray-500 text-sm">pure-minimal-zepp.deb</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Альтернативный метод установки через Debian-пакет</p>
+              </div>
+            </div>
+          </a>
+          
+          <a href="/zepp_all_packages.zip" download class="no-underline">
+            <div class="download-card card h-full bg-blue-50">
+              <div class="p-4 border-b">
+                <h3 class="text-lg font-semibold">Все пакеты и документация</h3>
+                <p class="text-gray-500 text-sm">zepp_all_packages.zip</p>
+              </div>
+              <div class="p-4">
+                <p class="text-sm">Архив, содержащий все пакеты и документацию</p>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Табы -->
+    <div class="card">
+      <div class="flex border-b">
+        <div class="tab active" data-tab="installation">Установка</div>
+        <div class="tab" data-tab="limitations">Ограничения</div>
+        <div class="tab" data-tab="integration">Тестирование</div>
+      </div>
+      
+      <!-- Таб: Установка -->
+      <div id="installation" class="tab-content active p-6">
+        <div class="prose max-w-none">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Установка через Zepp OS Store</h3>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>Скачайте файл .zab с этой страницы</li>
+              <li>Откройте приложение Zepp на вашем смартфоне</li>
+              <li>Перейдите в раздел "Профиль" → "Мои устройства"</li>
+              <li>Выберите ваши смарт-часы</li>
+              <li>Нажмите на "Управление приложениями"</li>
+              <li>В верхнем правом углу нажмите "+" и выберите скачанный файл .zab</li>
+              <li>Следуйте инструкциям на экране для завершения установки</li>
+            </ol>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Альтернативный метод установки (Debian-пакет)</h3>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>Скачайте файл .deb с этой страницы</li>
+              <li>На устройстве с Ubuntu/Debian выполните команду: <code>sudo dpkg -i pure-minimal-zepp.deb</code></li>
+              <li>Приложение будет установлено в директорию: <code>/usr/share/zepp/apps/pure-minimal-zepp</code></li>
+            </ol>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Настройка Zepp OS Simulator</h3>
+            <ol class="list-decimal pl-5 space-y-2">
+              <li>Установите Zepp OS Simulator, следуя <a href="https://docs.zepp.com/docs/guides/tools/simulator/zepp-os-simulator/" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">официальной документации</a></li>
+              <li>Создайте новый проект или откройте существующий</li>
+              <li>Извлеките файлы из скачанного .zab пакета</li>
+              <li>Скопируйте файлы в директорию вашего проекта</li>
+              <li>Запустите симулятор и выберите ваш проект</li>
+            </ol>
+          </div>
+
+          <h3 class="text-xl font-semibold mb-3">Установка с помощью base64</h3>
+          <p class="mb-2">Если у вас есть только base64-закодированная версия пакета:</p>
+
+          <div class="mb-3">
+            <h4 class="font-medium mb-1">Linux/Mac:</h4>
+            <pre>echo 'BASE64_СТРОКА' | base64 -d > имя_файла.zab</pre>
+          </div>
+
+          <div class="mb-3">
+            <h4 class="font-medium mb-1">Windows (PowerShell):</h4>
+            <pre>[System.Convert]::FromBase64String('BASE64_СТРОКА') | Set-Content -Path имя_файла.zab -Encoding Byte</pre>
+          </div>
+
+          <div class="mb-3">
+            <h4 class="font-medium mb-1">Python:</h4>
+            <pre>import base64
+with open('имя_файла.zab', 'wb') as f:
+    f.write(base64.b64decode('BASE64_СТРОКА'))</pre>
+          </div>
+
+          <p class="mt-4">
+            Базовую base64-строку пакета basic_zepp.zab можно найти в файле 
+            <a href="/zepp_installation_guide_updated.md" class="text-blue-600 hover:underline" download>zepp_installation_guide_updated.md</a>
+          </p>
+        </div>
+      </div>
+      
+      <!-- Таб: Ограничения -->
+      <div id="limitations" class="tab-content p-6">
+        <div class="prose max-w-none">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Технические ограничения</h3>
+            <ul class="list-disc pl-5 space-y-2">
+              <li><strong>Размер памяти:</strong> Ограниченный объем оперативной памяти (около 4MB)</li>
+              <li><strong>Файловая система:</strong> Ограниченное пространство для хранения файлов</li>
+              <li><strong>Время записи:</strong> Максимальная длительность непрерывной записи аудио - около 60 секунд</li>
+              <li><strong>Сетевые запросы:</strong> Ограниченный размер сетевых пакетов, рекомендуется отправлять файлы частями</li>
+              <li><strong>Энергопотребление:</strong> Запись аудио и сетевые операции значительно увеличивают расход батареи</li>
+            </ul>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Структурные особенности</h3>
+            <ul class="list-disc pl-5 space-y-2">
+              <li>Необходимо строго соблюдать структуру директорий пакета</li>
+              <li>Зависимость от версии API в файле app.json или manifest.json</li>
+              <li>Различия в путях к файлам между симулятором и реальным устройством</li>
+              <li>Отсутствие полноценной поддержки ES6+ JavaScript</li>
+            </ul>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Рекомендации по разработке</h3>
+            <ul class="list-disc pl-5 space-y-2">
+              <li>Разделять аудиозаписи на фрагменты по 30 секунд</li>
+              <li>Использовать легковесные UI-компоненты</li>
+              <li>Минимизировать количество сетевых запросов</li>
+              <li>Добавлять обработку ошибок для всех операций с файлами и сетью</li>
+              <li>Тестировать на реальном устройстве, а не только в симуляторе</li>
+            </ul>
+          </div>
+          
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold mb-3">Совместимость</h3>
+            <ul class="list-disc pl-5 space-y-2">
+              <li><strong>Поддерживаемые устройства:</strong> Amazfit GTR 3, GTR 3 Pro, GTS 3, T-Rex 2, и новее</li>
+              <li><strong>Версия Zepp OS:</strong> Рекомендуется 2.0 и выше</li>
+              <li><strong>Приложение Zepp:</strong> Последняя версия для Android или iOS</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Таб: Тестирование интеграции -->
+      <div id="integration" class="tab-content p-6">
+        <div class="prose max-w-none">
+          <h3 class="text-xl font-semibold mb-3">Тестирование интеграции</h3>
+          
+          <p class="mb-4">
+            Для тестирования интеграции с сервером без физического устройства Zepp OS вы можете использовать 
+            скрипт test-zepp-integration.js, который эмулирует отправку аудиофрагментов с устройства.
+          </p>
+          
+          <h4 class="text-lg font-medium mb-2">Шаги для тестирования:</h4>
+          <ol class="list-decimal pl-5 space-y-2 mb-4">
+            <li>Убедитесь, что сервер запущен и работает</li>
+            <li>Скачайте скрипт <a href="/test-zepp-integration.js" download class="text-blue-600 hover:underline">test-zepp-integration.js</a></li>
+            <li>Запустите скрипт командой <code>node test-zepp-integration.js</code></li>
+            <li>Скрипт отправит 3 тестовых аудиофрагмента и финализирует запись</li>
+            <li>Проверьте в административной панели появление новой записи и её статус</li>
+          </ol>
+          
+          <div class="bg-gray-100 p-4 rounded-md mb-4">
+            <h4 class="text-lg font-medium mb-2">Пример кода</h4>
+            <pre class="bg-gray-50 p-3 rounded-md text-sm overflow-x-auto">
+/**
+ * Отправляет фрагмент на сервер
+ * @param {number} index - Индекс фрагмента
+ */
+async function sendFragment(index) {
+  console.log(`Отправка фрагмента ${index}...`);
+  
+  // В реальной интеграции здесь был бы код чтения аудиофайла
+  // и отправки его на сервер через fetch или XMLHttpRequest
+  
+  const response = await fetch(`http://localhost:5000/api/audio-fragments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sessionId: 'test-session-123',
+      index: index,
+      duration: 10, // 10 секунд для каждого фрагмента
+      isEmulation: true
+    }),
+  });
+  
+  const data = await response.json();
+  console.log(`Фрагмент ${index} отправлен успешно:`, data);
+}
+
+/**
+ * Финализирует запись, отправляя запрос на объединение фрагментов
+ */
+async function finalizeRecording() {
+  console.log('Финализация записи...');
+  
+  const response = await fetch(`http://localhost:5000/api/recordings/finalize`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      sessionId: 'test-session-123',
+      fragmentCount: 3,
+      totalDuration: 30, // Общая длительность всех фрагментов
+      targetUsername: 'test_user',
+    }),
+  });
+  
+  const data = await response.json();
+  console.log('Запись финализирована:', data);
+}
+
+/**
+ * Запускает тестирование интеграции
+ */
+async function runTest() {
+  try {
+    // Отправка трех фрагментов
+    await sendFragment(0);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза 1 секунда
+    
+    await sendFragment(1);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза 1 секунда
+    
+    await sendFragment(2);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Пауза 1 секунда
+    
+    // Финализация записи
+    await finalizeRecording();
+    
+    console.log('Тестирование интеграции завершено успешно!');
+  } catch (error) {
+    console.error('Ошибка при тестировании интеграции:', error);
+  }
+}
+
+// Запуск тестирования
+runTest();</pre>
+          </div>
+          
+          <h4 class="text-lg font-medium mb-2">Дополнительные возможности</h4>
+          <ul class="list-disc pl-5 space-y-2">
+            <li>Изменение <code>sessionId</code> для тестирования разных сессий записи</li>
+            <li>Добавление задержек между запросами для эмуляции реальных условий</li>
+            <li>Модификация количества фрагментов и их длительности</li>
+            <li>Установка разных значений для <code>targetUsername</code></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Функционал табов
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        // Скрываем все содержимое табов
+        document.querySelectorAll('.tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Убираем активный класс со всех табов
+        document.querySelectorAll('.tab').forEach(t => {
+          t.classList.remove('active');
+        });
+        
+        // Активируем выбранный таб
+        tab.classList.add('active');
+        
+        // Показываем содержимое выбранного таба
+        const tabId = tab.getAttribute('data-tab');
+        document.getElementById(tabId).classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>
