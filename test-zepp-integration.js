@@ -3,16 +3,23 @@
  * Эмулирует отправку аудио фрагментов и финализацию записи
  */
 
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const FormData = require('form-data');
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import FormData from 'form-data';
 
 // Конфигурация
 const SERVER_URL = 'http://localhost:5000'; // Адрес нашего сервера
 const TEST_SESSION_ID = 'test-zepp-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
 const TEST_FRAGMENTS_COUNT = 3; // Количество тестовых фрагментов для отправки
-const TEST_AUDIO_PATH = './server/fragments/fragment-session-1742402867910-584-00001.webm'; // Путь к тестовому аудиофайлу
+// Проверяем несколько путей с тестовыми аудиофайлами
+const TEST_AUDIO_PATHS = [
+  './server/fragments/fragment-session-1742402867910-584-00001.webm',
+  './server/fragments/combined-session-1742402867910-584.webm',
+  './server/fragments/combined-test-zepp-1742676698212-276.webm'
+];
+// Выбираем первый существующий файл
+const TEST_AUDIO_PATH = TEST_AUDIO_PATHS.find(path => fs.existsSync(path)) || TEST_AUDIO_PATHS[0];
 
 /**
  * Отправляет фрагмент на сервер
