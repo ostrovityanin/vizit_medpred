@@ -31,8 +31,8 @@
       "module": {
         "page": {
           "pages": [
-            "pages/index",
-            "pages/recording"
+            "page/index",
+            "page/recording"
           ]
         }
       },
