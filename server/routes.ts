@@ -1390,6 +1390,239 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // Обработчик для приема фрагментов от Zepp OS приложения
+  app.post('/api/zepp/recording-fragments', upload.single('fragmentAudio'), async (req: Request, res: Response) => {
+    try {
+      const { sessionId, index, deviceId } = req.body;
+      
+      log(`Получен аудио-фрагмент от Zepp устройства. SessionId: ${sessionId}, Index: ${index}, DeviceId: ${deviceId}`, 'zepp');
+      
+      if (!req.file) {
+        log(`Ошибка: отсутствует файл фрагмента в запросе от Zepp`, 'zepp');
+        return res.status(400).json({
+          success: false,
+          message: 'Отсутствует файл фрагмента'
+        });
+      }
+      
+      if (!sessionId || index === undefined) {
+        log(`Ошибка: отсутствуют необходимые параметры в запросе от Zepp`, 'zepp');
+        return res.status(400).json({
+          success: false,
+          message: 'Отсутствуют необходимые параметры (sessionId, index)'
+        });
+      }
+      
+      // Преобразование параметров
+      const parsedIndex = parseInt(index, 10);
+      const timestamp = Date.now();
+      
+      if (isNaN(parsedIndex)) {
+        log(`Ошибка: некорректное значение индекса: ${index}`, 'zepp');
+        return res.status(400).json({
+          success: false,
+          message: 'Некорректное значение индекса'
+        });
+      }
+      
+      // Чтение содержимого файла
+      const uploadDir = path.join(__dirname, 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        log(`Директория загрузок не существует, создаём: ${uploadDir}`, 'zepp');
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      
+      const filePath = path.join(uploadDir, req.file.filename);
+      
+      if (!fs.existsSync(filePath)) {
+        log(`Ошибка: файл фрагмента от Zepp не найден: ${filePath}`, 'zepp');
+        return res.status(500).json({
+          success: false,
+          message: 'Внутренняя ошибка сервера: файл фрагмента не найден'
+        });
+      }
+      
+      // Чтение файла в буфер
+      let fileBuffer;
+      try {
+        fileBuffer = await fs.promises.readFile(filePath);
+        log(`Файл от Zepp успешно прочитан, размер: ${fileBuffer.length} байт`, 'zepp');
+      } catch (readError) {
+        log(`Ошибка при чтении файла от Zepp: ${readError}`, 'zepp');
+        return res.status(500).json({
+          success: false,
+          message: 'Внутренняя ошибка сервера при чтении файла фрагмента'
+        });
+      }
+      
+      // Сохранение фрагмента через менеджер
+      log(`Сохранение фрагмента Zepp через менеджер, index=${parsedIndex}, sessionId=${sessionId}`, 'zepp');
+      
+      const fragment = await fragmentManager.saveFragment(
+        fileBuffer,
+        parsedIndex,
+        timestamp,
+        sessionId
+      );
+      
+      if (!fragment) {
+        log(`Предупреждение: не удалось сохранить фрагмент от Zepp через менеджер`, 'zepp');
+      } else {
+        log(`Фрагмент от Zepp успешно сохранен, размер: ${fragment.size} байт`, 'zepp');
+        
+        // Логирование события
+        eventLogger.logEvent(
+          deviceId || 'zepp-device',
+          'FRAGMENT_RECEIVED',
+          {
+            sessionId,
+            index: parsedIndex,
+            size: fragment.size,
+            deviceId
+          }
+        );
+      }
+      
+      res.status(201).json({
+        success: true,
+        message: 'Фрагмент успешно получен и сохранен',
+        fragment: fragment || { index: parsedIndex, sessionId, timestamp }
+      });
+      
+    } catch (error) {
+      log(`Критическая ошибка при приеме фрагмента от Zepp: ${error}`, 'zepp');
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка при обработке фрагмента от Zepp устройства'
+      });
+    }
+  });
+  
+  // Обработчик для создания записи из Zepp фрагментов
+  app.post('/api/zepp/finalize-recording', async (req: Request, res: Response) => {
+    try {
+      const { sessionId, deviceId, duration, fragments } = req.body;
+      
+      log(`Запрос на финализацию записи от Zepp. SessionId: ${sessionId}, DeviceId: ${deviceId}`, 'zepp');
+      
+      if (!sessionId) {
+        log(`Ошибка: не указан sessionId для финализации записи от Zepp`, 'zepp');
+        return res.status(400).json({
+          success: false,
+          message: 'Не указан ID сессии'
+        });
+      }
+      
+      // Получаем объединенный файл из менеджера фрагментов
+      const combinedBuffer = await fragmentManager.getCombinedFile(sessionId);
+      
+      if (!combinedBuffer) {
+        log(`Ошибка: не найдены фрагменты для сессии ${sessionId} от Zepp`, 'zepp');
+        return res.status(404).json({
+          success: false,
+          message: 'Не найдены фрагменты для указанной сессии'
+        });
+      }
+      
+      log(`Получен объединенный файл от Zepp, размер: ${combinedBuffer.length} байт`, 'zepp');
+      
+      // Конвертируем объединенный файл в WAV формат для транскрипции
+      const wavFilePath = await fragmentManager.convertCombinedToWav(sessionId);
+      
+      if (!wavFilePath) {
+        log(`Ошибка: не удалось конвертировать файл от Zepp в WAV формат`, 'zepp');
+        return res.status(500).json({
+          success: false,
+          message: 'Не удалось конвертировать аудиофайл'
+        });
+      }
+      
+      // Создаем запись в хранилище
+      const newRecording = await storage.createRecording({
+        title: `Запись с устройства ${deviceId || 'Zepp'}`,
+        description: `Запись создана с помощью Zepp OS приложения. Длительность: ${duration || 'неизвестна'}`,
+        duration: duration ? parseInt(duration, 10) : 0,
+        status: 'completed',
+        clientUsername: deviceId || 'zepp-device',
+        filename: path.basename(wavFilePath),
+        transcription: null,
+        sent: false,
+        createdAt: new Date().toISOString()
+      });
+      
+      log(`Создана новая запись от Zepp с ID: ${newRecording.id}`, 'zepp');
+      
+      // Логирование события
+      eventLogger.logEvent(
+        deviceId || 'zepp-device',
+        'RECORDING_COMPLETED',
+        {
+          sessionId,
+          recordingId: newRecording.id,
+          duration: duration || 0,
+          fragments: fragments || 0
+        }
+      );
+      
+      // Запуск процесса транскрипции в фоне
+      if (process.env.OPENAI_API_KEY) {
+        log(`Запуск транскрипции для записи от Zepp с ID: ${newRecording.id}`, 'zepp');
+        
+        // Запускаем транскрипцию в отдельном процессе
+        setTimeout(async () => {
+          try {
+            const transcriptionResult = await transcribeAudio(wavFilePath);
+            
+            if (transcriptionResult && transcriptionResult.text) {
+              // Обновляем запись с транскрипцией
+              await storage.updateRecording({
+                ...newRecording,
+                transcription: transcriptionResult.text,
+                status: 'transcribed'
+              });
+              
+              log(`Транскрипция для записи от Zepp с ID: ${newRecording.id} завершена успешно`, 'zepp');
+              
+              // Логирование события
+              eventLogger.logEvent(
+                deviceId || 'zepp-device',
+                'TRANSCRIPTION_COMPLETED',
+                {
+                  sessionId,
+                  recordingId: newRecording.id,
+                  cost: transcriptionResult.cost,
+                  tokens: transcriptionResult.tokensProcessed
+                }
+              );
+            } else {
+              log(`Ошибка: не удалось получить транскрипцию для записи от Zepp с ID: ${newRecording.id}`, 'zepp');
+            }
+          } catch (transcriptionError) {
+            log(`Ошибка при транскрипции записи от Zepp с ID: ${newRecording.id}: ${transcriptionError}`, 'zepp');
+          }
+        }, 0);
+      }
+      
+      res.json({
+        success: true,
+        message: 'Запись успешно создана',
+        recording: {
+          id: newRecording.id,
+          title: newRecording.title,
+          duration: newRecording.duration,
+          status: newRecording.status
+        }
+      });
+      
+    } catch (error) {
+      log(`Критическая ошибка при финализации записи от Zepp: ${error}`, 'zepp');
+      res.status(500).json({
+        success: false,
+        message: 'Ошибка при финализации записи с Zepp устройства'
+      });
+    }
+  });
+  
   // Эндпоинт для регистрации событий клиента
   app.post('/api/events/recording-start', async (req: Request, res: Response) => {
     try {
