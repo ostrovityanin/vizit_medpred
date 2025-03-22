@@ -19,7 +19,17 @@
       "size": 70111,
       "processed": true,
       "id": 2
+    },
+    {
+      "recordingId": 3,
+      "filename": "fragment-session-1742591942526-876-00000.webm",
+      "index": 0,
+      "timestamp": 1742591945838,
+      "sessionId": "session-1742591942526-876",
+      "size": 45523,
+      "processed": true,
+      "id": 3
     }
   ],
-  "currentId": 3
+  "currentId": 4
 }

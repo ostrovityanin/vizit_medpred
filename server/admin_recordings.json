@@ -27,7 +27,35 @@
       "transcription": "Человек 1: Тест, тест, тест.",
       "transcriptionCost": "0.0024",
       "tokensProcessed": 362
+    },
+    {
+      "filename": "35f52740-d4d1-4512-ac21-7a32603f140e.wav",
+      "duration": 0,
+      "timestamp": "2025-03-21T21:19:02.726Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 3,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Человек 1: До скорой встречи!",
+      "transcriptionCost": "0.0017",
+      "tokensProcessed": 248
+    },
+    {
+      "filename": "c9e2d656-844c-40eb-9bea-5465d1d1ce22.wav",
+      "duration": 2,
+      "timestamp": "2025-03-21T21:19:11.439Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 264678,
+      "transcription": "Человек 1: До скорой встречи!",
+      "transcriptionCost": "0.0017",
+      "tokensProcessed": 248,
+      "status": "completed",
+      "id": 4,
+      "sent": false
     }
   ],
-  "currentId": 3
+  "currentId": 5
 }
