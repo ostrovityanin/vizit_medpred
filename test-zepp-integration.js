@@ -3,140 +3,122 @@
  * Эмулирует отправку аудио фрагментов и финализацию записи
  */
 
-import fs from 'fs';
-import path from 'path';
-import FormData from 'form-data';
-import axios from 'axios';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+const FormData = require('form-data');
 
-// ES Module compatibility
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// Конфигурация
+const SERVER_URL = 'http://localhost:5000'; // Адрес нашего сервера
+const TEST_SESSION_ID = 'test-zepp-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
+const TEST_FRAGMENTS_COUNT = 3; // Количество тестовых фрагментов для отправки
+const TEST_AUDIO_PATH = './server/fragments/fragment-session-1742402867910-584-00001.webm'; // Путь к тестовому аудиофайлу
 
-// Настройки тестирования
-const API_URL = 'http://localhost:5000';
-const FRAGMENTS_DIR = path.join(__dirname, 'server', 'fragments');
-const SESSION_ID = `test-zepp-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-const DEVICE_ID = 'TestDevice-Amazfit';
-const TOTAL_FRAGMENTS = 3;
-
-// Создаем временный каталог для тестирования, если он не существует
-const TEMP_DIR = path.join(__dirname, 'temp');
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR);
-}
-
-// Функция для отправки фрагмента на сервер
+/**
+ * Отправляет фрагмент на сервер
+ * @param {number} index - Индекс фрагмента
+ */
 async function sendFragment(index) {
   try {
-    console.log(`\n[Fragment ${index}] Отправка фрагмента #${index} на сервер...`);
-    
-    // Получаем список существующих фрагментов для тестирования
-    const fragmentFiles = fs.readdirSync(FRAGMENTS_DIR)
-      .filter(file => file.startsWith('fragment-session'))
-      .sort();
-    
-    if (fragmentFiles.length === 0) {
-      console.error('Не найдены тестовые фрагменты в директории', FRAGMENTS_DIR);
+    // Проверяем наличие тестового аудиофайла
+    if (!fs.existsSync(TEST_AUDIO_PATH)) {
+      console.error(`Тестовый аудиофайл не найден: ${TEST_AUDIO_PATH}`);
       return false;
     }
-    
-    // Выбираем файл для тестирования (по индексу или случайно)
-    const fileIndex = index % fragmentFiles.length;
-    const fragmentFile = fragmentFiles[fileIndex];
-    const fragmentPath = path.join(FRAGMENTS_DIR, fragmentFile);
-    
-    console.log(`Используем файл для тестирования: ${fragmentFile}`);
-    
-    // Создаем FormData для отправки
+
     const formData = new FormData();
-    // Явно указываем MIME тип аудио для WebM файла
-    formData.append('fragmentAudio', fs.createReadStream(fragmentPath), {
-      filename: path.basename(fragmentPath),
-      contentType: 'audio/webm'
-    });
-    formData.append('sessionId', SESSION_ID);
-    formData.append('index', index.toString());
-    formData.append('deviceId', DEVICE_ID);
+    formData.append('fragmentAudio', fs.createReadStream(TEST_AUDIO_PATH));
+    formData.append('sessionId', TEST_SESSION_ID);
+    formData.append('index', index);
+    formData.append('deviceInfo', JSON.stringify({
+      model: 'gtr3-pro',
+      firmware: '3.0.0',
+      battery: 85,
+      storage: { free: 1024 * 1024 * 50, total: 1024 * 1024 * 100 }
+    }));
+
+    console.log(`Отправка фрагмента ${index + 1}/${TEST_FRAGMENTS_COUNT}...`);
     
-    // Отправляем запрос
-    const response = await axios.post(`${API_URL}/api/zepp/recording-fragments`, formData, {
+    const response = await axios.post(`${SERVER_URL}/api/zepp/recording-fragments`, formData, {
       headers: {
         ...formData.getHeaders(),
       },
     });
-    
-    console.log(`[Fragment ${index}] Ответ сервера:`, response.data);
+
+    console.log(`Фрагмент ${index + 1} отправлен. Ответ:`, response.data);
     return true;
   } catch (error) {
-    console.error(`[Fragment ${index}] Ошибка при отправке фрагмента:`, 
-                  error.response ? error.response.data : error.message);
+    console.error(`Ошибка при отправке фрагмента ${index + 1}:`, error.message);
+    if (error.response) {
+      console.error('Детали ошибки:', error.response.data);
+    }
     return false;
   }
 }
 
-// Функция для финализации записи
+/**
+ * Финализирует запись, отправляя запрос на объединение фрагментов
+ */
 async function finalizeRecording() {
   try {
-    console.log('\n[Finalize] Финализация записи...');
+    console.log('Финализация записи...');
     
-    const response = await axios.post(`${API_URL}/api/zepp/finalize-recording`, {
-      sessionId: SESSION_ID,
-      deviceId: DEVICE_ID,
-      duration: TOTAL_FRAGMENTS * 30, // 30 секунд на фрагмент
-      fragments: TOTAL_FRAGMENTS
+    const response = await axios.post(`${SERVER_URL}/api/zepp/finalize-recording`, {
+      sessionId: TEST_SESSION_ID,
+      fragmentCount: TEST_FRAGMENTS_COUNT,
+      duration: 30 * TEST_FRAGMENTS_COUNT, // 30 секунд на фрагмент
+      deviceInfo: {
+        model: 'gtr3-pro',
+        firmware: '3.0.0',
+        appVersion: '1.0.0'
+      }
     });
-    
-    console.log('[Finalize] Ответ сервера:', response.data);
-    
-    if (response.data.recording && response.data.recording.id) {
-      console.log(`\n[Success] Запись успешно создана, ID: ${response.data.recording.id}`);
-      return response.data.recording.id;
-    } else {
-      console.log('\n[Warning] Запись создана, но ID не получен');
-      return null;
-    }
+
+    console.log('Запись финализирована. Ответ:', response.data);
+    return response.data;
   } catch (error) {
-    console.error('[Finalize] Ошибка при финализации записи:', 
-                  error.response ? error.response.data : error.message);
+    console.error('Ошибка при финализации записи:', error.message);
+    if (error.response) {
+      console.error('Детали ошибки:', error.response.data);
+    }
     return null;
   }
 }
 
-// Главная функция для последовательного выполнения тестов
+/**
+ * Запускает тестирование интеграции
+ */
 async function runTest() {
-  console.log('=== Тестирование интеграции Zepp OS ===');
-  console.log(`Сессия: ${SESSION_ID}`);
-  console.log(`Устройство: ${DEVICE_ID}`);
-  console.log(`Фрагменты: ${TOTAL_FRAGMENTS}`);
-  console.log('======================================\n');
+  console.log(`Начало тестирования интеграции Zepp OS. Сессия: ${TEST_SESSION_ID}`);
   
-  // Отправляем фрагменты последовательно
-  for (let i = 0; i < TOTAL_FRAGMENTS; i++) {
+  // Отправляем фрагменты
+  let allFragmentsSent = true;
+  for (let i = 0; i < TEST_FRAGMENTS_COUNT; i++) {
     const success = await sendFragment(i);
     if (!success) {
-      console.error(`\n[Error] Не удалось отправить фрагмент #${i}, прерываем тест`);
-      return;
+      allFragmentsSent = false;
+      console.error(`Не удалось отправить фрагмент ${i + 1}. Тест прерван.`);
+      break;
     }
     
-    // Небольшая задержка между отправками
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Небольшая пауза между отправками
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
   
-  // Финализируем запись
-  const recordingId = await finalizeRecording();
-  
-  if (recordingId) {
-    console.log(`\n[Completed] Тестирование успешно завершено`);
-    console.log(`Сессия: ${SESSION_ID}`);
-    console.log(`Запись ID: ${recordingId}`);
+  // Если все фрагменты отправлены успешно, финализируем запись
+  if (allFragmentsSent) {
+    const result = await finalizeRecording();
+    if (result && result.success) {
+      console.log(`\n✅ Интеграция работает успешно! Создана запись с ID: ${result.recordingId}`);
+    } else {
+      console.error('\n❌ Тест не пройден. Не удалось финализировать запись.');
+    }
   } else {
-    console.log(`\n[Completed with Warning] Тестирование завершено с предупреждениями`);
+    console.error('\n❌ Тест не пройден. Не все фрагменты были отправлены успешно.');
   }
 }
 
 // Запускаем тест
 runTest().catch(error => {
-  console.error('Критическая ошибка при выполнении теста:', error);
+  console.error('Неожиданная ошибка при выполнении теста:', error);
 });
