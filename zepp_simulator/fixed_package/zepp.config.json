@@ -1,0 +1,59 @@
+{
+  "app": {
+    "package": "com.zeppvoice.recorder",
+    "name": {
+      "ru-RU": "Запись Аудио",
+      "en-US": "Audio Recorder"
+    },
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "vendor": "ZeppVoiceRecorder",
+    "description": "Приложение для записи аудио с микрофона часов",
+    "icon": "icon.png",
+    "cover": {
+      "icon": "cover.png"
+    },
+    "appType": "app",
+    "runtime": {
+      "apiVersion": {
+        "compatible": "3.0.0",
+        "target": "3.0.0",
+        "minVersion": "3.0.0"
+      }
+    },
+    "configVersion": "v3",
+    "permissions": [
+      "data:os.device.info",
+      "device:os.local_storage", 
+      "device:os.notification",
+      "data:user.info",
+      "device:os.microphone",
+      "device:os.http"
+    ],
+    "platforms": [
+      {
+        "name": "gtr3-pro",
+        "deviceSource": 6553601
+      }
+    ],
+    "defaultLanguage": "ru-RU",
+    "debug": false
+  },
+  "module": {
+    "page": {
+      "pages": [
+        "page/index",
+        "page/recording"
+      ],
+      "window": {
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTextStyle": "black",
+        "navigationBarTitleText": "Запись Аудио",
+        "backgroundColor": "#efefef",
+        "backgroundTextStyle": "light"
+      }
+    }
+  }
+}
