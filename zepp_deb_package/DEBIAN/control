@@ -1,0 +1,9 @@
+Package: pure-minimal-zepp
+Version: 1.0-1
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: ZeppVoiceRecorder <dev@example.com>
+Description: Pure Minimal Zepp App
+ A minimalistic app for Zepp OS.
+

@@ -1,0 +1,26 @@
+{
+  "package": "com.zeppvoice.pureminimal",
+  "name": "PureMinimalZepp",
+  "version": {
+    "code": 1,
+    "name": "1.0.0"
+  },
+  "icon": "icon.png",
+  "developer": {
+    "name": "ZeppVoiceRecorder",
+    "email": "dev@example.com",
+    "url": "https://example.com"
+  },
+  "permissions": [
+    "data:os.device.info",
+    "device:os.local_storage"
+  ],
+  "platforms": [
+    {
+      "name": "gtr3-pro",
+      "deviceSource": 6553601
+    }
+  ],
+  "defaultLanguage": "ru-RU",
+  "debug": false
+}
