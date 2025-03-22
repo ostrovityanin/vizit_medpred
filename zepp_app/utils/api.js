@@ -1,13 +1,15 @@
 import { request } from '@zos/request';
 import { getDeviceInfo } from '@zos/device';
 import { localStorage } from '@zos/storage';
+import { file as fsFile } from '@zos/fs';
 
 // Получаем информацию об устройстве для идентификации
 const deviceInfo = getDeviceInfo();
 const deviceId = deviceInfo.deviceName + '_' + deviceInfo.deviceId;
 
-// Базовый URL сервера, будет меняться на URL вашего сервера
-const BASE_URL = 'https://your-server-url.example';
+// Базовый URL сервера - будет автоматически заменен на URL сервера при компиляции
+// В режиме разработки можно использовать localhost с правильным портом
+const BASE_URL = 'https://telegram-voice-assistant.mrosminin.repl.co';
 
 /**
  * Отправка аудиофайла на сервер
@@ -18,8 +20,17 @@ const BASE_URL = 'https://your-server-url.example';
  */
 export const sendAudioFragment = async (filePath, sessionId, index = 0) => {
   try {
+    console.log(`Отправка фрагмента: ${filePath}, sessionId: ${sessionId}, index: ${index}`);
+    
     // Чтение файла в двоичном формате
-    const fileData = await hmFS.readFile(filePath);
+    const fileData = await fsFile.read(filePath);
+    
+    if (!fileData || !fileData.length) {
+      console.error('Ошибка: файл пуст или не существует');
+      return { error: 'Файл пуст или не существует' };
+    }
+    
+    console.log(`Размер файла: ${fileData.byteLength} байт`);
     
     // Формирование multipart/form-data
     const formData = new FormData();
@@ -28,49 +39,67 @@ export const sendAudioFragment = async (filePath, sessionId, index = 0) => {
     formData.append('index', index.toString());
     formData.append('deviceId', deviceId);
     
-    // Отправка запроса
+    console.log('Отправка запроса на сервер...');
+    
+    // Отправка запроса на новый API эндпоинт для Zepp
     const result = await request({
       method: 'POST',
-      url: `${BASE_URL}/api/recording-fragments`,
+      url: `${BASE_URL}/api/zepp/recording-fragments`,
       headers: {
         'Content-Type': 'multipart/form-data'
       },
       body: formData
     });
     
-    if (result.statusCode === 200) {
+    if (result && (result.statusCode === 200 || result.statusCode === 201)) {
+      console.log('Фрагмент успешно отправлен');
       return JSON.parse(result.body);
     } else {
-      console.error('Ошибка отправки файла:', result.statusCode);
-      return { error: `Ошибка отправки (${result.statusCode})` };
+      console.error(`Ошибка отправки файла: ${result ? result.statusCode : 'Нет ответа'}`);
+      return { error: `Ошибка отправки (${result ? result.statusCode : 'Нет ответа'})` };
     }
   } catch (error) {
     console.error('Ошибка при отправке аудио:', error);
-    return { error: 'Ошибка отправки: ' + error.message };
+    return { error: 'Ошибка отправки: ' + (error.message || JSON.stringify(error)) };
   }
 };
 
 /**
  * Уведомление сервера о завершении записи, запрос объединения фрагментов
  * @param {string} sessionId - Идентификатор сессии записи
+ * @param {number} duration - Общая длительность записи в секундах
+ * @param {number} fragmentCount - Количество фрагментов
  * @returns {Promise<object>} - Ответ сервера с информацией о записи
  */
-export const finishRecording = async (sessionId) => {
+export const finishRecording = async (sessionId, duration = 0, fragmentCount = 0) => {
   try {
+    console.log(`Завершение записи: sessionId: ${sessionId}, длительность: ${duration}с, фрагментов: ${fragmentCount}`);
+    
+    // Отправка запроса на новый API эндпоинт для Zepp
     const result = await request({
-      method: 'GET',
-      url: `${BASE_URL}/api/recording-fragments/combine?sessionId=${sessionId}`,
+      method: 'POST',
+      url: `${BASE_URL}/api/zepp/finalize-recording`,
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sessionId,
+        deviceId,
+        duration,
+        fragments: fragmentCount
+      })
     });
     
-    if (result.statusCode === 200) {
+    if (result && (result.statusCode === 200 || result.statusCode === 201)) {
+      console.log('Запись успешно завершена на сервере');
       return JSON.parse(result.body);
     } else {
-      console.error('Ошибка завершения записи:', result.statusCode);
-      return { error: `Ошибка завершения (${result.statusCode})` };
+      console.error(`Ошибка завершения записи: ${result ? result.statusCode : 'Нет ответа'}`);
+      return { error: `Ошибка завершения (${result ? result.statusCode : 'Нет ответа'})` };
     }
   } catch (error) {
     console.error('Ошибка при запросе завершения:', error);
-    return { error: 'Ошибка: ' + error.message };
+    return { error: 'Ошибка: ' + (error.message || JSON.stringify(error)) };
   }
 };
 
