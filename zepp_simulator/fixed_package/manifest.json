@@ -1,0 +1,51 @@
+{
+  "manifestVersion": 2,
+  "appName": "AudioRecorder",
+  "appType": "app",
+  "version": {
+    "code": 1,
+    "name": "1.0.0"
+  },
+  "icon": "icon.png",
+  "vender": "ZeppVoiceRecorder",
+  "description": "Приложение для записи аудио и отправки на сервер",
+  "permissions": [
+    "data:os.device.info",
+    "device:os.local_storage",
+    "device:os.notification",
+    "data:user.info",
+    "device:os.microphone",
+    "device:os.http"
+  ],
+  "runtime": {
+    "apiVersion": {
+      "compatible": "3.0.0",
+      "target": "3.0.0",
+      "minVersion": "3.0.0"
+    }
+  },
+  "targets": {
+    "gtr3-pro": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index",
+            "page/recording"
+          ]
+        }
+      },
+      "platforms": [
+        {
+          "st": "r"
+        }
+      ],
+      "designWidth": 480
+    }
+  },
+  "i18n": {
+    "ru-RU": {
+      "appName": "Запись Аудио"
+    }
+  },
+  "defaultLanguage": "ru-RU"
+}
