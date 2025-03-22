@@ -69,7 +69,21 @@
       "sent": false,
       "transcriptionCost": null,
       "tokensProcessed": null
+    },
+    {
+      "filename": "ae8f84d4-78dc-4c38-afd0-ebfd74e21c80.wav",
+      "duration": 90,
+      "timestamp": "2025-03-22T20:53:30.420Z",
+      "targetUsername": "archive",
+      "senderUsername": "TestDevice-Amazfit",
+      "status": "transcribed",
+      "fileSize": 2066086,
+      "transcription": "Человек 1: Уважаемые гости, друзья и гости канала, мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать. Мы рады вас услышать.",
+      "id": 6,
+      "sent": false,
+      "transcriptionCost": null,
+      "tokensProcessed": null
     }
   ],
-  "currentId": 6
+  "currentId": 7
 }

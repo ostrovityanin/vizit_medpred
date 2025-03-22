@@ -1567,10 +1567,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (process.env.OPENAI_API_KEY) {
         log(`Запуск транскрипции для записи от Zepp с ID: ${newRecording.id}`, 'zepp');
         
+        // Полный путь к WAV файлу
+        const uploadsDir = path.join(__dirname, 'uploads');
+        const fullWavPath = path.join(uploadsDir, wavFilePath);
+        
         // Запускаем транскрипцию в отдельном процессе
         setTimeout(async () => {
           try {
-            const transcriptionResult = await transcribeAudio(wavFilePath);
+            log(`Начинаем транскрипцию файла: ${fullWavPath}`, 'zepp');
+            const transcriptionResult = await transcribeAudio(fullWavPath);
             
             if (transcriptionResult && transcriptionResult.text) {
               // Обновляем запись с транскрипцией
