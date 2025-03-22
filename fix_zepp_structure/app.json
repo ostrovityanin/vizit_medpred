@@ -1,0 +1,40 @@
+{
+  "configVersion": "v2",
+  "app": {
+    "appId": 1001,
+    "appType": "app",
+    "appName": "FixedZeppApp",
+    "version": {
+      "code": 1,
+      "name": "1.0.0"
+    },
+    "icon": "icon.png",
+    "vender": "ZeppTest",
+    "description": "Fixed Zepp App Structure"
+  },
+  "permissions": [],
+  "runtime": {
+    "apiVersion": {
+      "compatible": "1.0.0",
+      "target": "1.0.0",
+      "minVersion": "1.0.0"
+    }
+  },
+  "targets": {
+    "default": {
+      "module": {
+        "page": {
+          "pages": [
+            "page/index"
+          ]
+        }
+      }
+    }
+  },
+  "i18n": {
+    "en-US": {
+      "appName": "FixedZeppApp"
+    }
+  },
+  "defaultLanguage": "en-US"
+}

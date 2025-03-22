@@ -1,6 +1,6 @@
 {
-  "package": "com.zeppvoice.recorder",
-  "name": "AudioRecorder",
+  "package": "com.zeppvoice.minrecorder",
+  "name": "VoiceRecorderMinimal",
   "version": {
     "code": 1,
     "name": "1.0.0"
