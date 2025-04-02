@@ -1,28 +1,33 @@
 #!/bin/bash
 
-echo "Запуск GPT-4o Audio Preview микросервиса..."
+# Скрипт для запуска GPT-4o Audio Preview микросервиса
 
-# Создаем директории, если они не существуют
-mkdir -p uploads results logs
+# Переходим в директорию микросервиса
+cd "$(dirname "$0")"
 
-# Проверяем наличие .env
+# Проверяем наличие .env файла
 if [ ! -f .env ]; then
-  echo "Файл .env не найден. Копирование из примера..."
+  echo "Файл .env не найден, копируем из .env.example"
   cp .env.example .env
-  echo "ВНИМАНИЕ: Не забудьте установить ваш OPENAI_API_KEY в файле .env"
+  echo "Внимание: Необходимо настроить OPENAI_API_KEY в файле .env"
 fi
 
-# Проверяем, установлены ли зависимости
+# Проверяем наличие необходимых директорий
+mkdir -p logs
+mkdir -p temp
+
+# Устанавливаем зависимости, если их нет
 if [ ! -d "node_modules" ]; then
-  echo "Установка зависимостей..."
-  npm install
+  echo "Устанавливаем зависимости..."
+  npm install dotenv express multer cors winston @ffmpeg-installer/ffmpeg fluent-ffmpeg form-data node-fetch openai
 fi
 
-# Запускаем сервис
-echo "Запуск сервиса..."
-node src/index.js > ./logs/gpt4o-service.log 2>&1 &
+# Запускаем микросервис
+echo "Запускаем GPT-4o Audio Preview микросервис..."
+nohup node src/index.js > logs/service.log 2>&1 &
 
 # Сохраняем PID процесса
-echo $! > ./gpt4o-service.pid
-echo "GPT-4o Audio Preview микросервис запущен (PID: $!)."
-echo "Логи доступны в ./logs/gpt4o-service.log"
+echo $! > .pid
+echo "Микросервис запущен с PID: $!"
+echo "Логи доступны в файле: logs/service.log"
+echo "Для остановки сервиса выполните: ./stop.sh"

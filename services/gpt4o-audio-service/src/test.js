@@ -1,94 +1,92 @@
+/**
+ * Тестовый скрипт для GPT-4o Audio Preview микросервиса
+ * 
+ * Запускается отдельно от основного сервиса для проверки работоспособности.
+ * Использование: node test.js <путь_к_аудиофайлу>
+ */
+
+// Загружаем переменные окружения
+require('dotenv').config();
+
 const fs = require('fs');
 const path = require('path');
-const gpt4oClient = require('./gpt4o-client');
-const logger = require('./logger');
+const { log } = require('./logger');
+const GPT4oClient = require('./gpt4o-client');
 
-/**
- * Тестовый скрипт для проверки функциональности GPT-4o Audio Preview
- */
-async function testGPT4oAudio() {
-  logger.info('Запуск тестирования GPT-4o Audio Preview');
-  
-  // Проверка наличия API ключа
-  if (!gpt4oClient.isOpenAIConfigured()) {
-    logger.error('OpenAI API ключ не настроен. Прерывание теста.');
-    return;
-  }
-  
-  // Путь к тестовому аудиофайлу
-  // Вы можете заменить на путь к своему тестовому файлу
-  const testAudioPath = process.argv[2];
-  
-  if (!testAudioPath) {
-    logger.error('Путь к тестовому аудиофайлу не указан. Использование: node test.js <путь_к_аудио>');
-    return;
-  }
-  
-  if (!fs.existsSync(testAudioPath)) {
-    logger.error(`Тестовый аудиофайл не найден: ${testAudioPath}`);
-    return;
-  }
-  
+// Проверяем аргументы командной строки
+if (process.argv.length < 3) {
+  log.error('Не указан путь к аудиофайлу');
+  log.info('Использование: node test.js <путь_к_аудиофайлу>');
+  process.exit(1);
+}
+
+const audioFilePath = process.argv[2];
+
+// Проверяем существование файла
+if (!fs.existsSync(audioFilePath)) {
+  log.error(`Файл не существует: ${audioFilePath}`);
+  process.exit(1);
+}
+
+// Получаем информацию о файле
+const stats = fs.statSync(audioFilePath);
+log.info(`Тестирование транскрипции файла: ${audioFilePath} (${(stats.size / (1024 * 1024)).toFixed(2)} МБ)`);
+
+// Создаем экземпляр клиента
+const client = new GPT4oClient();
+
+// Функция для тестирования транскрипции
+async function testTranscription() {
   try {
-    logger.info(`Начало тестирования с файлом: ${testAudioPath}`);
+    log.info('Начинаем тестирование транскрипции...');
     
-    // Получаем информацию о файле
-    const stats = fs.statSync(testAudioPath);
-    logger.info(`Размер файла: ${stats.size} байт`);
-    
-    // Промпт для транскрипции
-    const prompt = 'Расшифруй аудио и выдели говорящих. Пожалуйста, верни текст в формате диалога с указанием говорящих.';
-    
-    // Запускаем транскрипцию
+    // Замеряем время выполнения
     const startTime = Date.now();
-    const result = await gpt4oClient.transcribeWithGPT4o(testAudioPath, prompt);
+    
+    // Выполняем транскрипцию
+    const result = await client.transcribeAudio(audioFilePath);
+    
+    // Вычисляем затраченное время
     const endTime = Date.now();
+    const processingTime = (endTime - startTime) / 1000;
     
-    // Вычисляем время выполнения
-    const executionTime = (endTime - startTime) / 1000; // в секундах
-    
-    // Выводим результаты
-    logger.info('====== РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ ======');
-    logger.info(`Время выполнения: ${executionTime.toFixed(2)} секунд`);
-    logger.info(`Использовано токенов: ${result.tokens.total} (ввод: ${result.tokens.input}, вывод: ${result.tokens.output})`);
-    logger.info(`Примерная стоимость: $${result.cost.total.toFixed(6)}`);
-    logger.info('====== ТРАНСКРИПЦИЯ АУДИО ======');
-    logger.info(result.text);
-    logger.info('==================================');
+    log.info(`Транскрипция успешно завершена за ${processingTime.toFixed(2)} секунд`);
+    log.info(`Стоимость: $${result.cost}, Токенов обработано: ${result.tokensProcessed}`);
+    log.info(`Результат транскрипции (первые 500 символов):`);
+    log.info('-----------------------------------------------------------');
+    log.info(result.text.substring(0, 500) + (result.text.length > 500 ? '...' : ''));
+    log.info('-----------------------------------------------------------');
     
     // Сохраняем результат в файл
-    const outputDir = path.join(__dirname, '../results');
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-    }
+    const outputFilePath = path.join(
+      path.dirname(audioFilePath),
+      `${path.basename(audioFilePath, path.extname(audioFilePath))}_gpt4o_transcription.txt`
+    );
     
-    const outputFile = path.join(outputDir, `result-${Date.now()}.txt`);
-    const outputContent = `
-====== РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ GPT-4o AUDIO PREVIEW ======
-Файл: ${testAudioPath}
-Размер: ${stats.size} байт
-Время выполнения: ${executionTime.toFixed(2)} секунд
-Использовано токенов: ${result.tokens.total} (ввод: ${result.tokens.input}, вывод: ${result.tokens.output})
-Примерная стоимость: $${result.cost.total.toFixed(6)}
-
-====== ТРАНСКРИПЦИЯ АУДИО ======
-${result.text}
-==================================
-    `;
+    fs.writeFileSync(outputFilePath, result.text);
+    log.info(`Полный текст транскрипции сохранен в файл: ${outputFilePath}`);
     
-    fs.writeFileSync(outputFile, outputContent);
-    logger.info(`Результаты сохранены в: ${outputFile}`);
-    
+    return true;
   } catch (error) {
-    logger.error(`Тест не пройден: ${error.message}`);
-    if (error.response) {
-      logger.error(`Детали ошибки API: ${JSON.stringify(error.response.data)}`);
+    log.error(`Ошибка при тестировании транскрипции: ${error.message}`);
+    if (error.stack) {
+      log.debug(error.stack);
     }
+    return false;
   }
 }
 
-// Запуск теста
-testGPT4oAudio().catch(error => {
-  logger.error(`Необработанная ошибка: ${error.message}`);
-  process.exit(1);
-});
+// Запускаем тест
+testTranscription()
+  .then(success => {
+    if (success) {
+      log.info('Тестирование успешно завершено');
+    } else {
+      log.error('Тестирование завершилось с ошибками');
+      process.exit(1);
+    }
+  })
+  .catch(error => {
+    log.error(`Необработанная ошибка: ${error.message}`);
+    process.exit(1);
+  });

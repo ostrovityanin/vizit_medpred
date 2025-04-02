@@ -274,8 +274,51 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
       return null;
     }
     
-    log(`Распознавание с помощью GPT-4o Audio Preview: ${filePath}`, 'openai');
+    log(`Распознавание с помощью GPT-4o Audio Preview микросервиса: ${filePath}`, 'openai');
     log(`Размер аудиофайла: ${(fileStats.size / (1024 * 1024)).toFixed(2)} МБ`, 'openai');
+    
+    // Пробуем использовать микросервис GPT-4o Audio Preview
+    try {
+      // Пытаемся импортировать клиентскую библиотеку микросервиса
+      let gpt4oService = null;
+      try {
+        // Динамический импорт клиентской библиотеки
+        const gpt4oServicePath = path.resolve(__dirname, '../services/gpt4o-audio-service/src/client-lib.js');
+        if (fs.existsSync(gpt4oServicePath)) {
+          gpt4oService = require(gpt4oServicePath);
+          log(`GPT-4o Audio Preview микросервис успешно загружен`, 'openai');
+        } else {
+          log(`Клиентская библиотека GPT-4o Audio Preview не найдена по пути: ${gpt4oServicePath}`, 'openai');
+        }
+      } catch (importError) {
+        log(`Ошибка при импорте GPT-4o Audio Preview микросервиса: ${importError}`, 'openai');
+      }
+      
+      // Если микросервис доступен, используем его
+      if (gpt4oService && typeof gpt4oService.transcribeAudio === 'function') {
+        log(`Вызываем GPT-4o Audio Preview микросервис для транскрибирования`, 'openai');
+        
+        // Вызываем функцию для транскрибирования
+        const serviceResult = await gpt4oService.transcribeAudio(filePath);
+        if (serviceResult && serviceResult.text) {
+          // Получаем результат транскрипции
+          log(`GPT-4o микросервис успешно распознал аудио`, 'openai');
+          log(`Результат распознавания: ${serviceResult.text.substring(0, 100)}...`, 'openai');
+          
+          return {
+            text: serviceResult.text,
+            cost: serviceResult.cost || '0.0000',
+            tokensProcessed: serviceResult.tokensProcessed || 0
+          };
+        } else {
+          log(`GPT-4o микросервис не вернул результат, переключаемся на стандартный метод`, 'openai');
+        }
+      } else {
+        log(`GPT-4o микросервис недоступен, используем стандартный метод`, 'openai');
+      }
+    } catch (serviceError) {
+      log(`Ошибка при использовании GPT-4o микросервиса: ${serviceError}, продолжаем стандартным методом`, 'openai');
+    }
     
     // Проверяем наличие API ключа
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;

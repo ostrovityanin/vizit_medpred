@@ -1,44 +1,43 @@
 #!/bin/bash
 
-echo "Остановка GPT-4o Audio Preview микросервиса..."
+# Скрипт для остановки GPT-4o Audio Preview микросервиса
+
+# Переходим в директорию микросервиса
+cd "$(dirname "$0")"
 
 # Проверяем наличие файла с PID
-if [ -f ./gpt4o-service.pid ]; then
-  PID=$(cat ./gpt4o-service.pid)
+if [ -f .pid ]; then
+  PID=$(cat .pid)
   
   # Проверяем, запущен ли процесс
   if ps -p $PID > /dev/null; then
-    echo "Завершение процесса с PID: $PID"
+    echo "Останавливаем GPT-4o Audio Preview микросервис (PID: $PID)..."
     kill $PID
     
-    # Ждем завершения процесса
+    # Даем немного времени на корректное завершение
     sleep 2
     
-    # Проверяем, завершился ли процесс
+    # Проверяем, остановился ли процесс
     if ps -p $PID > /dev/null; then
-      echo "Процесс не завершился. Принудительное завершение..."
+      echo "Процесс не остановился. Принудительное завершение..."
       kill -9 $PID
     fi
     
-    echo "GPT-4o Audio Preview микросервис остановлен."
+    echo "Микросервис остановлен"
   else
-    echo "Процесс с PID $PID не найден."
+    echo "Процесс с PID $PID не найден. Возможно, он уже остановлен."
   fi
   
   # Удаляем файл с PID
-  rm ./gpt4o-service.pid
+  rm .pid
 else
-  echo "Файл PID не найден. Сервис, возможно, не запущен."
+  echo "Файл .pid не найден. Микросервис не запущен или был остановлен некорректно."
   
-  # Попытаемся найти процесс по названию
-  PIDS=$(ps aux | grep "[n]ode src/index.js" | awk '{print $2}')
-  
-  if [ ! -z "$PIDS" ]; then
-    echo "Найдены процессы, похожие на GPT-4o Audio Preview микросервис. Завершаем..."
-    for pid in $PIDS; do
-      echo "Завершение процесса с PID: $pid"
-      kill $pid
-    done
-    echo "Процессы завершены."
+  # Пытаемся найти и остановить процесс по названию
+  PID=$(ps aux | grep "[n]ode src/index.js" | awk '{print $2}')
+  if [ ! -z "$PID" ]; then
+    echo "Найден процесс микросервиса (PID: $PID). Останавливаем..."
+    kill $PID
+    echo "Микросервис остановлен"
   fi
 fi

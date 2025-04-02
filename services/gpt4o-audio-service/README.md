@@ -1,122 +1,123 @@
 # GPT-4o Audio Preview Микросервис
 
-Микросервис для транскрипции аудио с использованием GPT-4o Audio Preview API.
+Микросервис для транскрибирования аудиофайлов с использованием GPT-4o Audio Preview API от OpenAI.
 
-## Особенности
+## Возможности
 
-- Транскрипция аудио с выделением говорящих
-- Использование нового GPT-4o Audio Preview API
-- Расчет стоимости и использования токенов
-- Обработка аудиофайлов до 25 МБ
-- REST API для интеграции с другими сервисами
+- Транскрибирование аудиофайлов на русском языке
+- Выделение разных говорящих в диалогах
+- Оптимизация аудиофайлов для лучшего качества транскрипции
+- Расчет стоимости использования API
+- Простой REST API для интеграции с другими сервисами
+- Клиентская библиотека для легкой интеграции в Node.js проекты
 
 ## Требования
 
-- Node.js 16+
-- OpenAI API ключ с доступом к GPT-4o
+- Node.js 16+ 
+- API ключ OpenAI с доступом к GPT-4o
+- ffmpeg (устанавливается автоматически через npm)
 
 ## Установка
 
-1. Установите зависимости:
+1. Клонировать репозиторий
+2. Скопировать `.env.example` в `.env` и настроить переменные окружения
+3. Установить зависимости: `npm install`
+4. Запустить сервис: `./start.sh`
+
+## Конфигурация
+
+Настройте параметры в файле `.env`:
 
 ```
-npm install
+# Ключ API для сервиса OpenAI
+OPENAI_API_KEY=your_openai_api_key
+
+# Порт для запуска сервиса 
+PORT=3400
+
+# Уровень логирования (debug, info, warn, error)
+LOG_LEVEL=info
+
+# Максимальный размер загружаемого файла в MB
+MAX_FILE_SIZE=25
+
+# Настройки аудио транскрипции
+TRANSCRIPTION_MODEL=gpt-4o
+TRANSCRIPTION_LANGUAGE=ru
+TRANSCRIPTION_TEMPERATURE=0.2
 ```
 
-2. Создайте файл .env на основе .env.example:
-
-```
-cp .env.example .env
-```
-
-3. Отредактируйте .env файл, установив свой OpenAI API ключ:
-
-```
-OPENAI_API_KEY=ваш-ключ-api
-```
-
-## Использование
+## Запуск и остановка
 
 ### Запуск сервиса
-
 ```
-npm start
+./start.sh
 ```
 
-Для разработки с автоматической перезагрузкой:
-
+### Остановка сервиса
 ```
-npm run dev
+./stop.sh
 ```
 
 ### Тестирование
-
-Для проверки работы с конкретным аудиофайлом:
-
 ```
-npm test -- путь/к/аудиофайлу.mp3
+node src/test.js path/to/audio-file.mp3
 ```
 
 ## API Endpoints
 
-### Проверка статуса
-```
-GET /health
-```
+### GET /health
+Проверка работоспособности сервиса
 
-### Транскрипция аудио
-```
-POST /transcribe
-Content-Type: multipart/form-data
+### GET /info
+Информация о сервисе и его конфигурации
 
-Параметры:
-- audio: Аудиофайл (формат wav, mp3, webm, m4a)
-- prompt (опционально): Инструкция для GPT-4o о том, как обрабатывать аудио
-```
+### POST /transcribe
+Транскрибирование загруженного аудиофайла.
+- Content-Type: multipart/form-data
+- Поле: audio (файл)
 
-Пример ответа:
-```json
-{
-  "success": true,
-  "transcription": "Говорящий 1: Привет, как дела?\nГоворящий 2: Хорошо, спасибо!",
-  "tokens": {
-    "input": 1000,
-    "output": 200,
-    "total": 1200
-  },
-  "cost": {
-    "input": 0.015,
-    "output": 0.015,
-    "total": 0.03
-  }
+### POST /transcribe/path
+Транскрибирование файла по указанному пути.
+- Content-Type: application/json
+- Параметры: `{ "filePath": "/absolute/path/to/file.mp3" }`
+
+## Интеграция с основным приложением
+
+### Через REST API
+
+```javascript
+const fs = require('fs');
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+
+async function transcribeAudio(filePath) {
+  const form = new FormData();
+  form.append('audio', fs.createReadStream(filePath));
+  
+  const response = await fetch('http://localhost:3400/transcribe', {
+    method: 'POST',
+    body: form
+  });
+  
+  const result = await response.json();
+  return result.text;
 }
 ```
 
-### Получение списка доступных моделей
-```
-GET /models
-```
-
-## Интеграция
-
-Для использования сервиса из других приложений, отправьте POST запрос с аудиофайлом:
+### Через клиентскую библиотеку
 
 ```javascript
-const formData = new FormData();
-formData.append('audio', audioFile);
-formData.append('prompt', 'Транскрибируй аудио и выдели говорящих');
+const { transcribeAudio } = require('./src/client-lib');
 
-fetch('http://localhost:3003/transcribe', {
-  method: 'POST',
-  body: formData
-})
-.then(response => response.json())
-.then(data => {
-  console.log(data.transcription);
-});
+async function main() {
+  try {
+    const result = await transcribeAudio('/path/to/audio.mp3');
+    console.log(result.text);
+  } catch (error) {
+    console.error('Ошибка:', error.message);
+  }
+}
+
+main();
 ```
-
-## Дополнительная информация
-
-- GPT-4o Audio Preview обрабатывает аудиофайлы до 25 МБ
-- Стоимость использования GPT-4o Audio: $15 за 1M токенов ввода и $75 за 1M токенов вывода

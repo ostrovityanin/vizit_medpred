@@ -1,139 +1,175 @@
+/**
+ * GPT-4o Audio Preview микросервис
+ * 
+ * Обеспечивает транскрипцию аудиофайлов с использованием GPT-4o Preview
+ */
+
+// Загружаем переменные окружения из .env файла
+require('dotenv').config();
+
 const express = require('express');
-const cors = require('cors');
 const multer = require('multer');
+const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const config = require('./config');
-const logger = require('./logger');
-const gpt4oClient = require('./gpt4o-client');
+const { log } = require('./logger');
+const GPT4oClient = require('./gpt4o-client');
+const { ensureTempDir } = require('./audio-processor');
 
-// Инициализация Express приложения
+// Создаем экземпляр Express
 const app = express();
+const PORT = process.env.PORT || 3400;
 
-// Настройка middleware
+// Настраиваем CORS для доступа с других сервисов
 app.use(cors());
 app.use(express.json());
 
-// Настройка хранилища для загружаемых файлов
+// Настраиваем multer для загрузки файлов
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '25') * 1024 * 1024; // 25 МБ по умолчанию
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: (req, file, cb) => {
-      const uploadsDir = path.join(__dirname, '../uploads');
-      if (!fs.existsSync(uploadsDir)) {
-        fs.mkdirSync(uploadsDir, { recursive: true });
-      }
-      cb(null, uploadsDir);
-    },
-    filename: (req, file, cb) => {
-      const uniquePrefix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-      const extension = path.extname(file.originalname);
-      cb(null, `${uniquePrefix}${extension}`);
-    }
-  }),
+  dest: ensureTempDir(),
   limits: {
-    fileSize: config.gpt4o.maxAudioSizeBytes
+    fileSize: MAX_FILE_SIZE
   }
 });
 
-// Проверка статуса сервиса
+// Инициализируем клиент GPT-4o
+const gpt4oClient = new GPT4oClient();
+
+// Маршрут для проверки работоспособности сервиса
 app.get('/health', (req, res) => {
-  const status = {
-    service: 'gpt4o-audio-service',
+  res.json({
     status: 'ok',
-    timestamp: new Date().toISOString(),
-    openaiConfigured: gpt4oClient.isOpenAIConfigured()
-  };
-  
-  res.json(status);
+    service: 'gpt4o-audio-service',
+    version: '1.0.0',
+    apiKeyConfigured: !!process.env.OPENAI_API_KEY
+  });
 });
 
-// Метод для транскрипции аудио
+// Маршрут для информации о сервисе
+app.get('/info', (req, res) => {
+  res.json({
+    name: 'GPT-4o Audio Preview Microservice',
+    description: 'Сервис для транскрибирования аудиофайлов с помощью GPT-4o',
+    version: '1.0.0',
+    endpoints: [
+      { path: '/health', method: 'GET', description: 'Проверка работоспособности сервиса' },
+      { path: '/info', method: 'GET', description: 'Информация о сервисе' },
+      { path: '/transcribe', method: 'POST', description: 'Транскрибирование аудиофайла (form-data с файлом)' },
+      { path: '/transcribe/path', method: 'POST', description: 'Транскрибирование аудиофайла по указанному пути' }
+    ],
+    config: {
+      maxFileSize: `${MAX_FILE_SIZE / (1024 * 1024)} МБ`,
+      transcriptionModel: process.env.TRANSCRIPTION_MODEL || 'gpt-4o',
+      transcriptionLanguage: process.env.TRANSCRIPTION_LANGUAGE || 'ru'
+    }
+  });
+});
+
+// Маршрут для транскрибирования загруженного аудиофайла
 app.post('/transcribe', upload.single('audio'), async (req, res) => {
-  // Проверяем загрузку файла
-  if (!req.file) {
-    logger.error('Аудиофайл не был загружен');
-    return res.status(400).json({ error: 'Аудиофайл не был загружен' });
-  }
-  
-  // Получаем промпт из запроса или используем дефолтный
-  const prompt = req.body.prompt || config.gpt4o.defaultPrompt;
-  
-  // Логируем информацию о файле
-  logger.info(`Получен аудиофайл: ${req.file.originalname}, размер: ${req.file.size} байт`);
-  
   try {
-    // Транскрибируем аудио
-    const result = await gpt4oClient.transcribeWithGPT4o(req.file.path, prompt);
-    
+    if (!req.file) {
+      return res.status(400).json({
+        error: 'No audio file provided',
+        message: 'Аудиофайл не был загружен. Используйте form-data с полем "audio".'
+      });
+    }
+
+    log.info(`Получен запрос на транскрибирование загруженного файла: ${req.file.originalname}`);
+    log.debug(`Временный путь файла: ${req.file.path}, Размер: ${req.file.size} байт`);
+
+    // Выполняем транскрипцию
+    const result = await gpt4oClient.transcribeAudio(req.file.path);
+
     // Удаляем временный файл после обработки
-    fs.unlinkSync(req.file.path);
-    
-    // Возвращаем результат
+    try {
+      fs.unlinkSync(req.file.path);
+      log.debug(`Временный файл ${req.file.path} удален`);
+    } catch (unlinkError) {
+      log.warn(`Ошибка при удалении временного файла: ${unlinkError.message}`);
+    }
+
     res.json({
       success: true,
-      transcription: result.text,
-      tokens: result.tokens,
-      cost: result.cost
+      text: result.text,
+      metadata: {
+        filename: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        cost: result.cost,
+        tokensProcessed: result.tokensProcessed
+      }
     });
   } catch (error) {
-    logger.error(`Ошибка при транскрипции: ${error.message}`);
-    
-    // Удаляем временный файл в случае ошибки
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    
+    log.error(`Ошибка при транскрибировании загруженного файла: ${error.message}`);
     res.status(500).json({
-      success: false,
-      error: error.message
+      error: 'Transcription failed',
+      message: error.message
     });
   }
 });
 
-// Получение доступных моделей
-app.get('/models', async (req, res) => {
+// Маршрут для транскрибирования файла по указанному пути
+app.post('/transcribe/path', async (req, res) => {
   try {
-    const models = await gpt4oClient.getAvailableModels();
-    res.json({ models });
+    const { filePath } = req.body;
+
+    if (!filePath) {
+      return res.status(400).json({
+        error: 'No file path provided',
+        message: 'Путь к аудиофайлу не указан. Отправьте JSON с полем "filePath".'
+      });
+    }
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        error: 'File not found',
+        message: `Файл не найден по указанному пути: ${filePath}`
+      });
+    }
+
+    log.info(`Получен запрос на транскрибирование файла по пути: ${filePath}`);
+
+    // Получаем информацию о файле
+    const fileStats = fs.statSync(filePath);
+    const filename = path.basename(filePath);
+
+    // Выполняем транскрипцию
+    const result = await gpt4oClient.transcribeAudio(filePath);
+
+    res.json({
+      success: true,
+      text: result.text,
+      metadata: {
+        filename: filename,
+        size: fileStats.size,
+        path: filePath,
+        cost: result.cost,
+        tokensProcessed: result.tokensProcessed
+      }
+    });
   } catch (error) {
-    logger.error(`Ошибка при получении моделей: ${error.message}`);
+    log.error(`Ошибка при транскрибировании файла по пути: ${error.message}`);
     res.status(500).json({
-      success: false,
-      error: error.message
+      error: 'Transcription failed',
+      message: error.message
     });
   }
 });
 
-// Обработка ошибок
-app.use((err, req, res, next) => {
-  logger.error(`Ошибка сервера: ${err.message}`);
-  res.status(500).json({
-    success: false,
-    error: 'Внутренняя ошибка сервера',
-    message: err.message
-  });
+// Запускаем сервер
+app.listen(PORT, () => {
+  log.info(`GPT-4o Audio Preview сервис запущен на порту ${PORT}`);
+  log.info(`Документация: http://localhost:${PORT}/info`);
+  log.info(`Проверка работоспособности: http://localhost:${PORT}/health`);
 });
 
-// Запуск сервера
-const server = app.listen(config.port, '0.0.0.0', () => {
-  logger.info(`GPT-4o Audio Preview сервис запущен на порту ${config.port}`);
+// Обработка необработанных исключений
+process.on('uncaughtException', (error) => {
+  log.error(`Необработанное исключение: ${error.message}`, error);
 });
 
-// Обработка сигналов завершения
-process.on('SIGTERM', () => {
-  logger.info('Получен сигнал SIGTERM, завершение работы...');
-  server.close(() => {
-    logger.info('Сервер остановлен');
-    process.exit(0);
-  });
+process.on('unhandledRejection', (reason, promise) => {
+  log.error(`Необработанное отклонение обещания: ${reason}`, reason);
 });
-
-process.on('SIGINT', () => {
-  logger.info('Получен сигнал SIGINT, завершение работы...');
-  server.close(() => {
-    logger.info('Сервер остановлен');
-    process.exit(0);
-  });
-});
-
-module.exports = { app, server };

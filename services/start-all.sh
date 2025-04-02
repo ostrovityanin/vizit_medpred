@@ -1,22 +1,22 @@
 #!/bin/bash
 
+# Скрипт для запуска всех микросервисов проекта
+
 echo "Запуск всех микросервисов..."
 
-# Запуск GPT-4o Audio Preview микросервиса
-echo "Запуск GPT-4o Audio Preview микросервиса..."
-cd ./gpt4o-audio-service
-./start.sh
-cd ..
+# Определяем базовую директорию
+BASE_DIR="$(dirname "$0")"
+cd "$BASE_DIR"
 
-# Здесь будут запуски других микросервисов по мере их добавления
-# echo "Запуск мониторинг-сервиса..."
-# cd ./monitoring
-# ./start.sh
-# cd ..
+# Запускаем GPT-4o Audio Preview микросервис, если он существует
+if [ -d "gpt4o-audio-service" ]; then
+  echo "Запускаем GPT-4o Audio микросервис..."
+  cd gpt4o-audio-service
+  ./start.sh
+  cd ..
+  echo "GPT-4o Audio микросервис запущен"
+fi
 
-# echo "Запуск сервиса уведомлений..."
-# cd ./audio-notifier
-# ./start.sh
-# cd ..
+# Здесь можно добавить запуск других микросервисов
 
-echo "Все микросервисы запущены!"
+echo "Все микросервисы запущены"

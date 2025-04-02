@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Тестирование GPT-4o Audio Preview для транскрипции аудио
 
@@ -9,130 +11,156 @@
 import os
 import sys
 import base64
-import requests
 import json
+import time
+from pathlib import Path
+import requests
+from dotenv import load_dotenv
 
-# Константы
-API_URL = "https://api.openai.com/v1/chat/completions"
+# Загрузка переменных окружения из .env файла
+load_dotenv()
 
 def encode_audio_to_base64(audio_file_path):
     """Кодирует аудиофайл в Base64"""
     try:
-        with open(audio_file_path, "rb") as f:
-            audio_data = f.read()
-        return base64.b64encode(audio_data).decode('utf-8')
+        with open(audio_file_path, "rb") as audio_file:
+            return base64.b64encode(audio_file.read()).decode('utf-8')
     except Exception as e:
-        print(f"Ошибка при кодировании аудио: {e}")
+        print(f"Ошибка при кодировании аудиофайла: {e}")
         return None
 
 def transcribe_with_gpt4o(audio_file_path, api_key):
     """Отправляет аудиофайл в GPT-4o Audio Preview и получает транскрипцию"""
-    
-    # Кодируем аудиофайл в Base64
-    audio_b64 = encode_audio_to_base64(audio_file_path)
-    if not audio_b64:
+    if not api_key:
+        print("Отсутствует API ключ OpenAI")
         return None
-    
-    # Определяем формат аудио на основе расширения файла
-    audio_format = os.path.splitext(audio_file_path)[1][1:].lower()
-    if not audio_format:
-        audio_format = "wav"  # по умолчанию WAV
-    
-    # Создаем запрос в формате как у LangChain
+
+    # Кодируем аудиофайл в Base64
+    print(f"Кодирование аудиофайла: {audio_file_path}")
+    audio_base64 = encode_audio_to_base64(audio_file_path)
+    if not audio_base64:
+        return None
+
+    # Формируем запрос к API
+    print("Отправка запроса в GPT-4o Audio Preview...")
     headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
     }
-    
-    # Важно: структура сообщения с аудио
+
     payload = {
         "model": "gpt-4o",
         "messages": [
-            {
-                "role": "system",
-                "content": """
-                Ты русскоязычный эксперт по транскрипции речи.
-                
-                Выполни транскрипцию аудиозаписи и выдели разных говорящих.
-                
-                Правила:
-                1. Расшифруй аудио максимально точно и полностью
-                2. Формат ответа: "Говорящий 1: [текст]", "Говорящий 2: [текст]" или "Женщина: [текст]", "Мужчина: [текст]"
-                3. Если невозможно определить разных говорящих или это монолог, используй формат "Говорящий: [текст]"
-                4. Никогда не пиши комментарии к транскрипции. Не пиши вступительных или заключительных фраз.
-                5. Выдай только распознанный текст, никаких пояснений или метаданных
-                6. Сохраняй оригинальный стиль речи, сленг, повторы и особенности произношения
-                7. Ты не должен объяснять невозможность разделить говорящих и не должен писать о проблемах с качеством аудио
-                """
-            },
             {
                 "role": "user",
                 "content": [
                     {
                         "type": "text",
-                        "text": "Распознай эту аудиозапись с выделением говорящих. Выдай только транскрипцию, без комментариев и метаданных."
+                        "text": "Транскрибируй это аудио и идентифицируй говорящих. Представь результат в виде диалога."
                     },
                     {
-                        "type": "audio",
-                        "audio_url": f"data:audio/{audio_format};base64,{audio_b64}"
+                        "type": "audio_url",
+                        "audio_url": {
+                            "url": f"data:audio/mp3;base64,{audio_base64}"
+                        }
                     }
                 ]
             }
-        ],
-        "temperature": 0.1
+        ]
     }
-    
+
     try:
-        print(f"Отправка аудиофайла {audio_file_path} на распознавание через GPT-4o Audio Preview...")
-        response = requests.post(API_URL, headers=headers, json=payload)
-        
-        if response.status_code == 200:
-            result = response.json()
-            
-            # Извлекаем результат транскрипции
-            transcription = result["choices"][0]["message"]["content"]
-            print("\nРезультат транскрипции:")
-            print("-" * 50)
-            print(transcription)
-            print("-" * 50)
-            
-            # Сохраняем результат в файл
-            output_file = f"{os.path.splitext(audio_file_path)[0]}_transcription.txt"
-            with open(output_file, "w", encoding="utf-8") as f:
-                f.write(transcription)
-            print(f"Транскрипция сохранена в файл: {output_file}")
-            
-            return transcription
-        else:
-            print(f"Ошибка API: {response.status_code}")
-            print(f"Детали: {response.text}")
+        response = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload
+        )
+
+        # Проверяем ответ
+        if response.status_code != 200:
+            print(f"Ошибка API: {response.status_code} - {response.text}")
             return None
-            
+
+        data = response.json()
+        print("Получен ответ от GPT-4o Audio Preview")
+        
+        # Возвращаем результат
+        return {
+            "text": data["choices"][0]["message"]["content"],
+            "usage": data["usage"]
+        }
     except Exception as e:
-        print(f"Ошибка при отправке запроса: {e}")
+        print(f"Ошибка при выполнении запроса: {e}")
         return None
 
 def main():
     """Основная функция"""
-    if len(sys.argv) < 2:
-        print("Использование: python gpt4o_audio_test.py <путь_к_аудиофайлу>")
-        sys.exit(1)
-    
-    audio_file_path = sys.argv[1]
-    
-    # Проверяем существование аудиофайла
-    if not os.path.exists(audio_file_path):
-        print(f"Ошибка: файл {audio_file_path} не найден")
-        sys.exit(1)
-    
-    # Получаем API ключ из переменной окружения
-    api_key = os.environ.get("OPENAI_API_KEY")
+    print("====================================")
+    print("Тестирование GPT-4o Audio Preview API")
+    print("====================================")
+
+    # Получаем ключ API из переменных окружения
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Ошибка: API ключ не найден. Установите переменную окружения OPENAI_API_KEY")
-        sys.exit(1)
-    
-    # Вызываем функцию транскрипции
-    transcribe_with_gpt4o(audio_file_path, api_key)
+        print("❌ Для запуска теста необходим OPENAI_API_KEY в переменных окружения")
+        return
+
+    # Список тестовых аудиофайлов
+    test_files = [
+        "attached_assets/35303ed6-9bbf-4df4-910f-be0193dc2a4e.jfif",
+        "temp/recording_sample.mp3",
+        "temp/recording_test.wav"
+    ]
+
+    # Создаем директорию для результатов, если не существует
+    os.makedirs("temp", exist_ok=True)
+
+    # Перебираем тестовые файлы и пытаемся их транскрибировать
+    successful_transcription = False
+    for file_path in test_files:
+        full_path = Path(file_path).resolve()
+        
+        if full_path.exists():
+            print(f"\nТестирование с файлом: {full_path}")
+            
+            start_time = time.time()
+            result = transcribe_with_gpt4o(str(full_path), api_key)
+            elapsed_time = time.time() - start_time
+            
+            if result and result["text"]:
+                successful_transcription = True
+                print(f"✅ Транскрипция успешно завершена за {elapsed_time:.2f} сек")
+                print(f"📊 Использовано токенов: {result['usage']['total_tokens']} (вход: {result['usage']['prompt_tokens']}, выход: {result['usage']['completion_tokens']})")
+                
+                # Сохраняем результат в файл
+                output_path = f"temp/transcription_{full_path.name}.txt"
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(result["text"])
+                print(f"📝 Результат сохранен в файл: {output_path}")
+                
+                # Выводим первые 300 символов результата
+                print("\nПервые 300 символов транскрипции:")
+                print("------------------------------------")
+                preview = result["text"][:300]
+                if len(result["text"]) > 300:
+                    preview += "..."
+                print(preview)
+                print("------------------------------------")
+                
+                # Прерываем цикл после первой успешной транскрипции
+                break
+            else:
+                print(f"❌ Не удалось транскрибировать файл: {full_path}")
+        else:
+            print(f"⚠️ Файл не найден: {full_path}")
+
+    if not successful_transcription:
+        print("\n❌ Не удалось выполнить транскрипцию ни одного файла")
+        print("Убедитесь, что аудиофайлы существуют и доступны для чтения")
+
+    print("\n====================================")
+    print("Тестирование GPT-4o Audio Preview API завершено")
+    print("====================================")
 
 if __name__ == "__main__":
     main()
