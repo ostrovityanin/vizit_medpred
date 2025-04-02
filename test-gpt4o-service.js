@@ -17,7 +17,7 @@ dotenv.config();
 // Путь к директории микросервиса
 const serviceDir = './services/gpt4o-audio-service';
 // URL сервиса
-const serviceUrl = 'http://localhost:3001';
+const serviceUrl = 'http://localhost:3100';
 // Путь к тестовому аудиофайлу
 const testAudioFile = './test_audio/sample.wav';
 

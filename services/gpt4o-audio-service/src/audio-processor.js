@@ -147,7 +147,8 @@ async function optimizeAudio(inputPath, options = {}) {
       
       // Применение нормализации (если требуется)
       if (normalize) {
-        command = command.audioFilters('loudnorm');
+        // Убираем сложные фильтры, которые могут вызывать проблемы
+        command = command.audioFilters('dynaudnorm');
       }
       
       command
@@ -163,6 +164,63 @@ async function optimizeAudio(inputPath, options = {}) {
     });
   } catch (error) {
     logger.error(`Ошибка при оптимизации аудио: ${error.message}`);
+    // Возвращаем исходный файл в случае ошибки
+    return inputPath;
+  }
+}
+
+/**
+ * Оптимизирует аудиофайл специально для GPT-4o
+ * @param {string} inputPath Путь к исходному файлу
+ * @param {Object} options Опции оптимизации
+ * @returns {Promise<string>} Путь к оптимизированному файлу
+ */
+async function optimizeAudioForGPT4o(inputPath, options = {}) {
+  try {
+    logger.info(`Оптимизация аудиофайла для GPT-4o: ${inputPath}`);
+    
+    // Создание директорий, если они не существуют
+    await ensureDirectoryExists(uploadsDir);
+    await ensureDirectoryExists(tempDir);
+    
+    // Параметры по умолчанию - оптимальные для GPT-4o
+    const {
+      outputFormat = 'mp3',   // MP3 хорошо работает с GPT-4o
+      sampleRate = 48000,     // Более высокий sample rate для качественной транскрипции
+      channels = 1,           // Mono для лучшего распознавания речи
+      bitrate = '128k',       // Более высокое качество для GPT-4o
+      normalize = false       // Избегаем сложной обработки для предотвращения ошибок
+    } = options;
+    
+    // Генерируем имя для оптимизированного файла
+    const fileName = path.basename(inputPath, path.extname(inputPath));
+    const optimizedFileName = `${fileName}_gpt4o.${outputFormat}`;
+    const outputPath = path.join(tempDir, optimizedFileName);
+    
+    // Применяем оптимизацию через ffmpeg с более простой конфигурацией
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath)
+        .noVideo()
+        .audioChannels(channels)
+        .audioFrequency(sampleRate)
+        .audioBitrate(bitrate)
+        .format(outputFormat);
+      
+      // Убираем все аудиофильтры для предотвращения ошибок ffmpeg
+      
+      command
+        .on('end', () => {
+          logger.info(`Аудио успешно оптимизировано для GPT-4o: ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err) => {
+          logger.error(`Ошибка при оптимизации аудио для GPT-4o: ${err.message}`);
+          reject(err);
+        })
+        .save(outputPath);
+    });
+  } catch (error) {
+    logger.error(`Ошибка при оптимизации аудио для GPT-4o: ${error.message}`);
     // Возвращаем исходный файл в случае ошибки
     return inputPath;
   }
@@ -386,6 +444,7 @@ export default {
   isSupportedFormat,
   getMediaInfo,
   optimizeAudio,
+  optimizeAudioForGPT4o,  // Добавляем новую функцию в экспорт
   convertToWav,
   convertToMp3,
   splitAudioFile,

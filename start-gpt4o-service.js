@@ -28,6 +28,22 @@ function isServiceRunning() {
   return false;
 }
 
+// Функция для создания необходимых директорий
+function ensureDirectoriesExist() {
+  const dirs = [
+    path.join(serviceDir, 'logs'),
+    path.join(serviceDir, 'uploads'),
+    path.join(serviceDir, 'uploads/temp')
+  ];
+  
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) {
+      console.log(`Создание директории: ${dir}`);
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+}
+
 // Функция для запуска сервиса
 function startService() {
   if (isServiceRunning()) {
@@ -35,19 +51,29 @@ function startService() {
     return;
   }
 
+  // Создаем необходимые директории
+  ensureDirectoriesExist();
+
   console.log('Запуск сервиса GPT-4o Audio...');
 
+  // Получаем переменные окружения из основного процесса
+  const env = { 
+    ...process.env,
+    PORT: 3100  // Устанавливаем порт 3100 для микросервиса
+  };
+  
   // Запускаем микросервис
   const service = spawn('node', ['src/index.js'], {
     cwd: serviceDir,
     stdio: 'inherit',
-    detached: true
+    detached: true,
+    env: env
   });
 
   // Записываем PID процесса в файл
   fs.writeFileSync(pidFile, service.pid.toString());
 
-  console.log(`Сервис GPT-4o Audio запущен (PID: ${service.pid})`);
+  console.log(`Сервис GPT-4o Audio запущен (PID: ${service.pid}) на порту 3100`);
   
   // Отключаем родительский процесс от дочернего
   service.unref();

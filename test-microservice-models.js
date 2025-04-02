@@ -11,7 +11,7 @@ import fetch from 'node-fetch';
 import { spawn } from 'child_process';
 
 // Конфигурация
-const SERVICE_URL = 'http://localhost:5050';
+const SERVICE_URL = 'http://localhost:3100';
 const TEST_FILES = [
   './test_audio/test_ru.mp3',
   './test_audio/privet.mp3'
@@ -100,7 +100,7 @@ async function testStandardTranscription(audioFile) {
     }
     
     const formData = new FormData();
-    formData.append('audio', fs.createReadStream(audioFile));
+    formData.append('file', fs.createReadStream(audioFile));
     formData.append('language', 'ru');
     
     console.log('📤 Отправка запроса на /api/transcribe...');
@@ -139,7 +139,7 @@ async function testComparisonEndpoint(audioFile) {
     }
     
     const formData = new FormData();
-    formData.append('audio', fs.createReadStream(audioFile));
+    formData.append('file', fs.createReadStream(audioFile));
     formData.append('language', 'ru');
     
     console.log('📤 Отправка запроса на /api/transcribe/compare...');
@@ -186,7 +186,7 @@ async function testDetailedTranscription(audioFile) {
     }
     
     const formData = new FormData();
-    formData.append('audio', fs.createReadStream(audioFile));
+    formData.append('file', fs.createReadStream(audioFile));
     formData.append('language', 'ru');
     formData.append('detailed', 'true');
     

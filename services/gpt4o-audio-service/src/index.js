@@ -31,7 +31,7 @@ const __dirname = path.dirname(__filename);
 
 // Настройка сервера Express
 const app = express();
-const PORT = process.env.PORT || 3500;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());

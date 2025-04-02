@@ -349,7 +349,77 @@
       "status": "completed",
       "id": 25,
       "sent": false
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-02T21:47:25.510Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "started",
+      "id": 26,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-02T21:47:25.517Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 27,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": "74bb4e00-2d14-4628-bc77-62b474b0dfe1.wav",
+      "duration": 32,
+      "timestamp": "2025-04-02T21:47:59.722Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1144956,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null,
+      "status": "completed",
+      "id": 28,
+      "sent": false
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-02T21:51:08.765Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 29,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": "d5c06fbf-661c-4e2e-9962-46ee1d564f2f.wav",
+      "duration": 17,
+      "timestamp": "2025-04-02T21:51:28.114Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 588558,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null,
+      "status": "completed",
+      "id": 30,
+      "sent": false
     }
   ],
-  "currentId": 26
+  "currentId": 31
 }
