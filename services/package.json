@@ -10,9 +10,14 @@
     "start:documentation": "cd documentation && npm run dev",
     "start:telegram-app": "cd telegram-app && npm run dev",
     "start:admin-panel": "cd admin-panel && npm run dev",
-    "start:all": "concurrently \"npm run start:data-storage\" \"npm run start:audio-processor\" \"npm run start:documentation\" \"npm run start:api-core\" \"npm run start:telegram-app\" \"npm run start:admin-panel\"",
-    "install:all": "concurrently \"cd data-storage && npm install\" \"cd audio-processor && npm install\" \"cd api-core && npm install\" \"cd documentation && npm install\" \"cd telegram-app && npm install\" \"cd admin-panel && npm install\"",
-    "build:all": "concurrently \"cd telegram-app && npm run build\" \"cd admin-panel && npm run build\""
+    "start:monitoring": "cd monitoring && npm run dev",
+    "start:all": "concurrently \"npm run start:data-storage\" \"npm run start:audio-processor\" \"npm run start:documentation\" \"npm run start:api-core\" \"npm run start:telegram-app\" \"npm run start:admin-panel\" \"npm run start:monitoring\"",
+    "install:all": "concurrently \"cd data-storage && npm install\" \"cd audio-processor && npm install\" \"cd api-core && npm install\" \"cd documentation && npm install\" \"cd telegram-app && npm install\" \"cd admin-panel && npm install\" \"cd monitoring && npm install\"",
+    "build:all": "concurrently \"cd telegram-app && npm run build\" \"cd admin-panel && npm run build\"",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:logs": "docker-compose logs -f",
+    "docker:build": "docker-compose build"
   },
   "keywords": [
     "microservices",

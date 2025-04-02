@@ -80,6 +80,36 @@ services:
       - PORT=3005
       - NODE_ENV=production
       - VITE_API_URL=http://localhost:3001
+      
+  monitoring:
+    build:
+      context: ./monitoring
+    ports:
+      - "3006:3006"
+    environment:
+      - PORT=3006
+      - NODE_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - HEALTH_CHECK_INTERVAL=60000
+      - REPORT_INTERVAL=3600000
+      - DATA_STORAGE_URL=http://data-storage:3002
+      - AUDIO_PROCESSOR_URL=http://audio-processor:3003
+      - DOCUMENTATION_URL=http://documentation:3004
+      - API_CORE_URL=http://api-core:3001
+      - TELEGRAM_APP_URL=http://telegram-app:3000
+      - ADMIN_PANEL_URL=http://admin-panel:3005
+      - LOG_LEVEL=info
+      - LOG_PATH=/app/logs
+    volumes:
+      - monitoring_logs:/app/logs
+    depends_on:
+      - data-storage
+      - audio-processor
+      - documentation
+      - api-core
+      - telegram-app
+      - admin-panel
 
 volumes:
   data_storage_data:
@@ -88,3 +118,4 @@ volumes:
   audio_processor_combined:
   documentation_static:
   api_core_uploads:
+  monitoring_logs:
