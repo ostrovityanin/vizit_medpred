@@ -49,9 +49,10 @@ async function transcribeWithGPT4o() {
             content: [
               { type: "text", text: "Транскрибируй это аудио." },
               {
-                type: "audio_url",
-                audio_url: {
-                  url: `data:audio/wav;base64,${audioBase64}`
+                type: "input_audio",
+                input_audio: {
+                  data: audioBase64,
+                  format: "wav"
                 }
               }
             ]
