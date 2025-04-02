@@ -23,7 +23,7 @@ dotenv.config();
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Путь к тестовому аудиофайлу
-const testAudioFile = './server/uploads/01b48ffc-9e05-4bb6-9d02-9efb4cdde96a.wav';
+const testAudioFile = './test_audio/sample.wav';
 // Директория для временных файлов
 const tempDir = './test_audio/temp';
 

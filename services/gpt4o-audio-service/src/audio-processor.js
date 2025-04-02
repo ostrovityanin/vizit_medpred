@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
-import { ffmpegPath } from '@ffmpeg-installer/ffmpeg';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { promisify } from 'util';
 import { exec } from 'child_process';
 import dotenv from 'dotenv';
@@ -15,6 +15,7 @@ import logger from './logger.js';
 dotenv.config();
 
 // Установка пути к ffmpeg
+const ffmpegPath = ffmpegInstaller.path;
 ffmpeg.setFfmpegPath(ffmpegPath);
 
 // Промисифицированные версии функций fs
