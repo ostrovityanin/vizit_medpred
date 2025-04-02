@@ -38,8 +38,16 @@ router.get('/', (req, res) => {
   <ul>
     <li><a href="/api/docs/replit-guide" target="_blank">Руководство по работе с приложением</a></li>
   </ul>
+  
+  <h2>Заархивированные компоненты</h2>
+  <ul>
+    <li><a href="/archived/README.md" target="_blank">Информация о заархивированных компонентах</a></li>
+    <li><a href="/archived/zepp_integration.tar.gz" download>Скачать архив интеграции с Zepp OS</a></li>
+  </ul>
+  
   <div class="note">
     Все эти файлы доступны по прямым ссылкам и через API.
+    Заархивированные компоненты содержат раннюю версию интеграции с умными часами на Zepp OS.
   </div>
 </body>
 </html>`;
