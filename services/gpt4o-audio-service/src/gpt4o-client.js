@@ -172,8 +172,8 @@ export async function transcribeWithGPT4o(audioFilePath) {
               text: 'Транскрибируй это аудио на языке оригинала. Выдели говорящих, если это диалог.'
             },
             {
-              type: 'audio',
-              audio_data: {
+              type: 'input_audio',
+              input_audio_data: {
                 data: audioBase64,
                 media_type: fileType
               }

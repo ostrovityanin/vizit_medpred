@@ -203,22 +203,29 @@ export async function combineAudioFiles(audioFiles, outputPath) {
   }
   
   try {
-    // Создаем список файлов для ffmpeg
-    const listFile = path.join(tempDir, 'concat_list.txt');
-    const fileContent = audioFiles.map(file => `file '${file}'`).join('\n');
-    fs.writeFileSync(listFile, fileContent);
-    
     logInfo(`Объединение ${audioFiles.length} файлов в ${outputPath}`);
     
+    // Создаем ffmpeg команду
+    let ffmpegCommand = ffmpeg();
+    
+    // Добавляем каждый файл как отдельный вход
+    audioFiles.forEach(file => {
+      ffmpegCommand = ffmpegCommand.input(file);
+    });
+    
+    // Используем фильтр для объединения
+    const filterComplex = audioFiles.map((_, index) => `[${index}:a]`).join('') + `concat=n=${audioFiles.length}:v=0:a=1[out]`;
+    
     return new Promise((resolve, reject) => {
-      ffmpeg()
-        .input(listFile)
-        .inputOptions(['-f concat', '-safe 0'])
-        .outputOptions(['-c copy'])
+      ffmpegCommand
+        .complexFilter(filterComplex)
+        .map('[out]')
+        .audioCodec('pcm_s16le')
+        .audioFrequency(16000)
+        .audioChannels(1)
         .output(outputPath)
         .on('end', () => {
           logInfo(`Файлы успешно объединены: ${outputPath}`);
-          fs.unlinkSync(listFile);
           resolve(outputPath);
         })
         .on('error', (err) => {
