@@ -78,6 +78,8 @@ async function sendAudioFile(filePath, caption = '', chatId = TELEGRAM_CHAT_ID) 
     // Если есть подпись, добавляем её (ограничена 1024 символами)
     if (caption) {
       form.append('caption', caption.length > 1024 ? caption.substring(0, 1021) + '...' : caption);
+      // Включаем HTML-разметку для подписи
+      form.append('parse_mode', 'HTML');
     }
     
     // Отправляем аудио
@@ -86,6 +88,9 @@ async function sendAudioFile(filePath, caption = '', chatId = TELEGRAM_CHAT_ID) 
     });
     
     logger.info(`Аудиофайл успешно отправлен в чат ${chatId}: ${filePath}`);
+    if (caption) {
+      logger.info(`Прикреплена подпись к аудио с транскрипцией: ${caption.substring(0, 50)}...`);
+    }
     return response.data.ok;
   } catch (error) {
     logger.error(`Ошибка отправки аудио в Telegram: ${error.message}`);
@@ -114,13 +119,49 @@ async function sendAudioWithTranscription(filePath, transcription, metadata = {}
     // Отправляем заголовок
     await sendMessage(headerText, chatId);
     
-    // Отправляем аудиофайл
-    const audioSent = await sendAudioFile(filePath, '', chatId);
+    // Проверяем размер транскрипции для подписи
+    let audioCaption = '';
+    const MAX_CAPTION_LENGTH = 1024; // Максимальная длина подписи в Telegram
     
-    // Если транскрипция есть, отправляем её
     if (transcription) {
-      const transcriptionText = `<b>Транскрипция:</b>\n\n${transcription}`;
-      await sendMessage(transcriptionText, chatId);
+      // Подготавливаем транскрипцию для подписи
+      const transcriptionPreview = transcription.length > 800 
+        ? transcription.substring(0, 790) + '...' 
+        : transcription;
+        
+      const shortTranscription = `<b>📝 Транскрипция:</b>\n\n<i>${transcriptionPreview}</i>`;
+      
+      if (shortTranscription.length <= MAX_CAPTION_LENGTH) {
+        audioCaption = shortTranscription;
+        
+        // Если транскрипция была сокращена, добавляем сообщение об этом
+        if (transcription.length > 800) {
+          audioCaption += '\n\n<i>Показана часть транскрипции. Полный текст отправлен отдельным сообщением.</i>';
+        }
+      }
+    }
+    
+    // Отправляем аудиофайл с транскрипцией в подписи, если она подходит по размеру
+    const audioSent = await sendAudioFile(filePath, audioCaption, chatId);
+    
+    // Если транскрипция длинная, всегда отправляем полную версию отдельным сообщением
+    if (transcription && transcription.length > 300) {
+      // Разбиваем транскрипцию на части, если она очень длинная
+      const transcriptionParts = chunkText(transcription, 3000);
+      
+      // Отправляем заголовок для транскрипции
+      await sendMessage(`<b>📝 Полная транскрипция аудиозаписи:</b>`, chatId);
+      
+      // Отправляем части транскрипции
+      for (let i = 0; i < transcriptionParts.length; i++) {
+        // Добавляем номер части, если частей больше одной
+        let partText = transcriptionParts[i];
+        if (transcriptionParts.length > 1) {
+          partText = `<i>Часть ${i+1}/${transcriptionParts.length}</i>\n\n${partText}`;
+        }
+        
+        await sendMessage(partText, chatId);
+      }
     }
     
     return audioSent;
@@ -142,7 +183,10 @@ function formatRecordingHeader(metadata = {}) {
     username = 'Неизвестный пользователь',
     duration = 0,
     size = 0,
-    createdAt
+    createdAt,
+    senderUsername = null,
+    targetUsername = null,
+    status = null
   } = metadata;
   
   // Форматируем дату и время
@@ -174,18 +218,46 @@ function formatRecordingHeader(metadata = {}) {
   let durationStr = 'Длительность неизвестна';
   if (duration) {
     const minutes = Math.floor(duration / 60);
-    const seconds = duration % 60;
+    const seconds = Math.floor(duration % 60);
     durationStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }
   
   // Формируем заголовок
-  return `<b>🎙️ Новая аудиозапись</b>\n\n` +
-         `<b>ID:</b> ${id || 'Не указан'}\n` +
-         `<b>Название:</b> ${title}\n` +
-         `<b>Пользователь:</b> ${username}\n` +
-         `<b>Длительность:</b> ${durationStr}\n` +
-         `<b>Размер:</b> ${sizeStr}\n` +
-         `<b>Дата записи:</b> ${dateStr}`;
+  let header = `<b>🎙️ Новая аудиозапись</b>\n\n`;
+  
+  // Добавляем основную информацию
+  header += `📟 <b>ID записи:</b> ${id || 'Не указан'}\n`;
+  header += `📌 <b>Название:</b> ${title}\n`;
+  header += `👤 <b>Пользователь:</b> ${username}\n`;
+  
+  // Добавляем информацию об отправителе и получателе, если есть
+  if (senderUsername) {
+    header += `📤 <b>Отправитель:</b> ${senderUsername}\n`;
+  }
+  if (targetUsername) {
+    header += `📥 <b>Получатель:</b> ${targetUsername}\n`;
+  }
+  
+  // Добавляем техническую информацию
+  header += `⏱️ <b>Длительность:</b> ${durationStr}\n`;
+  header += `💾 <b>Размер файла:</b> ${sizeStr}\n`;
+  header += `📅 <b>Дата записи:</b> ${dateStr}\n`;
+  
+  // Добавляем статус записи, если он указан
+  if (status) {
+    const statusEmoji = {
+      'started': '🟡',
+      'completed': '🟢',
+      'failed': '🔴',
+      'pending': '⚪',
+      'sent': '📨',
+      'error': '⚠️'
+    };
+    const emoji = statusEmoji[status] || '❓';
+    header += `${emoji} <b>Статус:</b> ${status}\n`;
+  }
+  
+  return header;
 }
 
 /**

@@ -120,7 +120,8 @@ export async function sendClientTextMessage(
 export async function sendClientAudio(
   filePath: string,
   chatId: number | string,
-  caption: string = ""
+  caption: string = "",
+  transcription: string = ""
 ): Promise<boolean> {
   try {
     if (!TELEGRAM_CLIENT_BOT_TOKEN) {
@@ -137,7 +138,26 @@ export async function sendClientAudio(
     // Создаем FormData для отправки файла
     const formData = new FormData();
     formData.append('chat_id', chatId);
-    formData.append('caption', caption);
+    
+    // Добавляем транскрипцию к подписи, если она указана и помещается в лимит
+    const MAX_CAPTION_LENGTH = 1024;
+    let finalCaption = caption;
+    
+    if (transcription) {
+      // Проверяем, поместится ли транскрипция в подпись
+      const transcriptionText = `\n\n<b>Транскрипция:</b>\n${transcription}`;
+      if (caption.length + transcriptionText.length <= MAX_CAPTION_LENGTH) {
+        finalCaption += transcriptionText;
+      }
+    }
+    
+    // Если подпись слишком длинная, обрезаем её
+    if (finalCaption.length > MAX_CAPTION_LENGTH) {
+      finalCaption = finalCaption.substring(0, MAX_CAPTION_LENGTH - 3) + '...';
+    }
+    
+    formData.append('caption', finalCaption);
+    formData.append('parse_mode', 'HTML'); // Включаем HTML-разметку в подписи
     
     // Читаем файл и добавляем его в formData
     const fileStream = fs.createReadStream(filePath);
@@ -152,6 +172,15 @@ export async function sendClientAudio(
     
     if (response.data.ok) {
       log(`Audio sent to ${chatId} via client bot`, 'client-bot');
+      
+      // Если транскрипция не поместилась в подпись, отправляем её отдельным сообщением
+      if (transcription && caption.length + `\n\n<b>Транскрипция:</b>\n${transcription}`.length > MAX_CAPTION_LENGTH) {
+        // Отправляем полную транскрипцию отдельным сообщением
+        const transcriptionMessage = `<b>Полная транскрипция аудио:</b>\n\n${transcription}`;
+        await sendClientTextMessage(chatId, transcriptionMessage);
+        log(`Full transcription sent as separate message to ${chatId}`, 'client-bot');
+      }
+      
       return true;
     } else {
       log(`Failed to send audio to ${chatId} via client bot: ${response.data}`, 'client-bot');
@@ -170,16 +199,29 @@ export async function notifyUserAboutRecording(recording: Recording, userChatId:
   try {
     // Формируем текст сообщения
     let message = `🎙️ <b>Новый аудио визит</b>\n\n`;
-    message += `⏱️ Продолжительность: ${formatDuration(recording.duration)}\n`;
-    message += `📅 Дата визита: ${new Date(recording.timestamp).toLocaleString('ru')}\n`;
+    message += `⏱️ <b>Продолжительность:</b> ${formatDuration(recording.duration)}\n`;
+    message += `📅 <b>Дата визита:</b> ${new Date(recording.timestamp).toLocaleString('ru')}\n`;
+    
+    // Добавляем имя отправителя, если есть
+    if (recording.senderUsername) {
+      message += `👤 <b>Отправитель:</b> ${recording.senderUsername}\n`;
+    }
+    
+    // Добавляем ID записи для возможности получения аудио через бота в будущем
+    message += `📟 <b>ID записи:</b> ${recording.id}\n`;
     
     if (recording.transcription) {
-      // Добавляем отрывок транскрипции (первые 150 символов)
-      const previewText = recording.transcription.length > 150 
-        ? recording.transcription.substring(0, 150) + '...' 
+      // Добавляем отрывок транскрипции (первые 200 символов)
+      const previewText = recording.transcription.length > 200 
+        ? recording.transcription.substring(0, 200) + '...' 
         : recording.transcription;
         
       message += `\n📝 <b>Содержание:</b>\n<i>${previewText}</i>`;
+      
+      // Если транскрипция длинная, добавляем сообщение о том, что полный текст доступен вместе с аудио
+      if (recording.transcription.length > 200) {
+        message += `\n\n<i>Полный текст транскрипции будет отправлен вместе с аудиофайлом</i>`;
+      }
     }
     
     // Отправляем сообщение

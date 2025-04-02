@@ -860,7 +860,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Отправка сообщения пользователю через клиентский бот
   app.post('/api/client/send-message', async (req: Request, res: Response) => {
     try {
-      const { username, message } = req.body;
+      const { username, message, senderName, isHtml } = req.body;
       
       if (!username || !message) {
         return res.status(400).json({ 
@@ -884,10 +884,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       log(`Sending text message to resolved client recipient: ${targetChatId}`, 'client-bot');
       
+      // Подготавливаем сообщение с информацией об отправителе, если она указана
+      let finalMessage = message;
+      
+      // Если указано имя отправителя, добавляем его в заголовок сообщения
+      if (senderName) {
+        // Если сообщение уже содержит HTML-разметку, встраиваем информацию об отправителе
+        if (isHtml) {
+          finalMessage = `<b>📩 Сообщение от ${senderName}</b>\n\n${message}`;
+        } else {
+          // Для обычного текста тоже добавляем разметку в заголовок
+          finalMessage = `<b>📩 Сообщение от ${senderName}</b>\n\n${message}`;
+        }
+      }
+      
       // Отправка текстового сообщения через клиентский бот
       const success = await sendClientTextMessage(
         targetChatId,
-        message
+        finalMessage
       );
       
       if (!success) {
@@ -966,16 +980,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Форматируем подпись к аудио
-      let caption = `Запись с таймера визита (${new Date(recording.timestamp).toLocaleString('ru')})`;
+      let caption = `<b>Запись с таймера визита</b> (${new Date(recording.timestamp).toLocaleString('ru')})`;
       if (recording.senderUsername) {
-        caption += `\nОтправитель: ${recording.senderUsername}`;
+        caption += `\n<b>Отправитель:</b> ${recording.senderUsername}`;
       }
       
-      // Отправка аудио через клиентский бот
+      // Добавляем информацию о продолжительности, если она есть
+      if (recording.duration) {
+        const minutes = Math.floor(recording.duration / 60);
+        const seconds = Math.floor(recording.duration % 60);
+        const formattedDuration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        caption += `\n<b>Длительность:</b> ${formattedDuration}`;
+      }
+      
+      // Отправка аудио через клиентский бот с транскрипцией (если есть)
       const success = await sendClientAudio(
         filePath,
         targetChatId,
-        caption
+        caption,
+        recording.transcription || ''
       );
       
       if (!success) {
