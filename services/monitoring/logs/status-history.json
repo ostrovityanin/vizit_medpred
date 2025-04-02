@@ -64,5 +64,41 @@
         "status": "critical"
       }
     ]
+  },
+  {
+    "time": "2025-04-02T16:39:44.107Z",
+    "service": "telegram-mini-app",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3100"
+  },
+  {
+    "time": "2025-04-02T16:39:44.113Z",
+    "service": "основной-сервис",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3000"
+  },
+  {
+    "time": "2025-04-02T16:39:44.113Z",
+    "overallStatus": "critical",
+    "servicesStatus": [
+      {
+        "name": "telegram-mini-app",
+        "status": "critical"
+      },
+      {
+        "name": "основной-сервис",
+        "status": "critical"
+      }
+    ]
+  },
+  {
+    "time": "2025-04-02T16:40:38.514Z",
+    "overallStatus": "healthy",
+    "servicesStatus": [
+      {
+        "name": "основной-сервис",
+        "status": "healthy"
+      }
+    ]
   }
 ]

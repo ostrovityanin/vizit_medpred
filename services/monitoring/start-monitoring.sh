@@ -11,9 +11,15 @@ if [ ! -f "${MONITORING_DIR}/.env" ]; then
   exit 1
 fi
 
-# Настройка экспорта переменных окружения для Telegram бота
-export TELEGRAM_BOT_TOKEN=$(grep "TELEGRAM_BOT_TOKEN" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
-export TELEGRAM_CHAT_ID=$(grep "TELEGRAM_CHAT_ID" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
+# Получаем переменные окружения из Replit
+# Если переменные не заданы в Replit, используем значения из .env файла для совместимости
+if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
+  export TELEGRAM_BOT_TOKEN=$(grep "TELEGRAM_BOT_TOKEN" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
+fi
+
+if [ -z "$TELEGRAM_CHAT_ID" ]; then
+  export TELEGRAM_CHAT_ID=$(grep "TELEGRAM_CHAT_ID" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
+fi
 
 # Создание директории для логов, если она не существует
 mkdir -p "${MONITORING_DIR}/logs"

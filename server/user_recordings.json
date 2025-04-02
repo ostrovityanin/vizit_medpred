@@ -47,7 +47,23 @@
       "timestamp": "2025-04-02T14:59:21.225Z",
       "id": 6,
       "sent": false
+    },
+    {
+      "adminRecordingId": 12,
+      "username": "archive",
+      "duration": 12,
+      "timestamp": "2025-04-02T16:38:42.195Z",
+      "id": 7,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 12,
+      "username": "ostrovityanin",
+      "duration": 12,
+      "timestamp": "2025-04-02T16:38:42.195Z",
+      "id": 8,
+      "sent": false
     }
   ],
-  "currentId": 7
+  "currentId": 9
 }

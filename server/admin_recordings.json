@@ -139,7 +139,35 @@
       "status": "completed",
       "id": 10,
       "sent": false
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-02T16:38:28.172Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 11,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": "b7302464-f155-400b-8b12-472cb00d2719.wav",
+      "duration": 12,
+      "timestamp": "2025-04-02T16:38:42.195Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 203503,
+      "transcription": "Человек 1: Мы начали после выборов в 2020 году, и с тех пор работаем по новой. Всем рады!",
+      "transcriptionCost": "0.0013",
+      "tokensProcessed": 191,
+      "status": "completed",
+      "id": 12,
+      "sent": false
     }
   ],
-  "currentId": 11
+  "currentId": 13
 }

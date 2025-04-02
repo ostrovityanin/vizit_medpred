@@ -56,6 +56,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // API для доступа к файлам
   app.use('/api/files', apiFilesRouter);
+  
+  // Эндпоинт для проверки здоровья сервера (health check)
+  app.get('/health', (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const status = {
+      status: 'ok',
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
+      memory: {
+        rss: Math.round(process.memoryUsage().rss / 1024 / 1024) + 'MB',
+        heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024) + 'MB',
+        heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+      },
+      responseTime: Date.now() - startTime + 'ms'
+    };
+    res.json(status);
+  });
   // Функция для безопасного обращения с timestamp
   const safeTimestamp = (timestamp: string | null | undefined): string => {
     return timestamp || new Date().toISOString();
