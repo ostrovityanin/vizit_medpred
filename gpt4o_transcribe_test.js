@@ -1,68 +1,24 @@
 /**
- * Оптимизированный скрипт для работы с GPT-4o Audio Preview
- * 
- * Этот скрипт демонстрирует корректную работу с GPT-4o Audio Preview
- * путем конвертирования аудиофайла в формат MP3, поддерживаемый API.
+ * Тест транскрипции аудио с использованием GPT-4o Audio Preview API.
+ * Этот скрипт отправляет аудиофайл в OpenAI API и получает транскрипцию.
  */
 
+// Импортируем необходимые модули
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
-import { FormData } from 'formdata-node';
+import { fileURLToPath } from 'url';
 import fetch from 'node-fetch';
 import dotenv from 'dotenv';
-import ffmpeg from 'fluent-ffmpeg';
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
-const ffmpegPath = ffmpegInstaller.path;
-
-// Загрузка переменных окружения
+// Загружаем переменные окружения
 dotenv.config();
 
-// Настройка ffmpeg
-ffmpeg.setFfmpegPath(ffmpegPath);
-
-// Путь к тестовому аудиофайлу
-const testAudioFile = './test_audio/sample.wav';
-// Директория для временных файлов
-const tempDir = './test_audio/temp';
+// Получаем текущую директорию для работы с относительными путями
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
- * Конвертирует аудиофайл в MP3 формат
- * @param {string} inputPath Путь к исходному файлу
- * @returns {Promise<string>} Путь к конвертированному файлу
- */
-function convertToMp3(inputPath) {
-  return new Promise((resolve, reject) => {
-    // Создаем директорию для временных файлов, если она не существует
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
-    }
-    
-    const outputFile = path.join(tempDir, path.basename(inputPath, path.extname(inputPath)) + '.mp3');
-    
-    console.log(`Конвертация ${inputPath} в MP3 формат...`);
-    
-    ffmpeg(inputPath)
-      .noVideo()
-      .audioChannels(1)            // Моно
-      .audioFrequency(16000)       // 16kHz
-      .audioBitrate('32k')         // 32kbps
-      .format('mp3')
-      .on('end', () => {
-        console.log(`Файл успешно конвертирован: ${outputFile}`);
-        resolve(outputFile);
-      })
-      .on('error', (err) => {
-        console.error(`Ошибка при конвертации файла: ${err.message}`);
-        reject(err);
-      })
-      .save(outputFile);
-  });
-}
-
-/**
- * Кодирование аудиофайла в Base64
+ * Кодирует аудиофайл в Base64
  * @param {string} audioFilePath Путь к аудиофайлу
  * @returns {string|null} Закодированные данные или null в случае ошибки
  */
@@ -78,16 +34,6 @@ function encodeAudioToBase64(audioFilePath) {
 }
 
 /**
- * Определение формата аудиофайла по расширению
- * @param {string} filePath Путь к файлу
- * @returns {string} Формат аудио ('mp3', 'wav', etc.)
- */
-function getAudioFormat(filePath) {
-  const fileExt = path.extname(filePath).substring(1).toLowerCase();
-  return fileExt;
-}
-
-/**
  * Транскрипция аудио с использованием GPT-4o через chat/completions API
  * @param {string} audioFilePath Путь к аудиофайлу
  * @returns {Promise<string>} Результат транскрипции
@@ -100,10 +46,10 @@ async function transcribeWithGPT4o(audioFilePath) {
   }
 
   try {
-    console.log(`Транскрипция через GPT-4o (chat/completions): ${audioFilePath}`);
+    console.log(`Транскрипция файла через GPT-4o (chat/completions): ${audioFilePath}`);
     
-    // Определяем формат файла
-    const format = getAudioFormat(audioFilePath);
+    // Определяем формат файла по расширению
+    const format = path.extname(audioFilePath).substring(1).toLowerCase();
     
     // Кодируем аудиофайл в base64
     const audio_b64 = encodeAudioToBase64(audioFilePath);
@@ -111,12 +57,12 @@ async function transcribeWithGPT4o(audioFilePath) {
       return 'Ошибка: не удалось закодировать аудиофайл';
     }
 
-    // Создаем структуру сообщения для отправки
+    // Создаем структуру сообщения для отправки с обновленным форматом API
     const messages = [
       {
         role: "user",
         content: [
-          { type: "text", text: "Пожалуйста, точно транскрибируй содержание данного аудиофайла. Это аудиозапись с человеческой речью, которую нужно преобразовать в текст. Выдай только текст содержания без дополнительных комментариев." },
+          { type: "text", text: "Пожалуйста, точно транскрибируй содержание данного аудиофайла." },
           { type: "input_audio", input_audio: { data: audio_b64, format } }
         ]
       }
@@ -133,7 +79,7 @@ async function transcribeWithGPT4o(audioFilePath) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-audio-preview-2024-12-17',
+        model: 'gpt-4o-mini-realtime-preview',
         messages,
         max_tokens: 4096
       })
@@ -163,6 +109,9 @@ async function transcribeWithGPT4o(audioFilePath) {
 async function runTests() {
   console.log('=== Тестирование транскрипции аудио с GPT-4o Audio Preview ===');
   
+  // Путь к тестовому аудиофайлу
+  const testAudioFile = './test_audio/sample.wav';
+  
   // Проверяем наличие API ключа
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -177,23 +126,14 @@ async function runTests() {
   }
   
   try {
-    // Конвертируем файл в MP3 формат
-    const mp3File = await convertToMp3(testAudioFile);
-    
     console.log('Тестирование транскрипции через GPT-4o Audio Preview (chat/completions API)');
-    const gpt4oResult = await transcribeWithGPT4o(mp3File);
+    const gpt4oResult = await transcribeWithGPT4o(testAudioFile);
     
     console.log('\n=== Результат транскрипции GPT-4o Audio Preview ===');
     console.log(gpt4oResult);
     console.log('===============================================\n');
     
     console.log('Тестирование завершено!');
-    
-    // Очистка временных файлов
-    if (fs.existsSync(mp3File)) {
-      fs.unlinkSync(mp3File);
-      console.log(`Удален временный файл: ${mp3File}`);
-    }
   } catch (error) {
     console.error(`Ошибка при выполнении тестов: ${error.message}`);
   }
