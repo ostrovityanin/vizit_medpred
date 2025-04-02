@@ -128,13 +128,12 @@ export async function optimizeAudioForTranscription(
       ffmpeg(inputPath)
         .noVideo()
         // Преобразуем в моно, 16 кГц, битрейт 32 кбит/с, MP3
-        .outputOptions([
-          '-ac 1',                     // Моно
-          '-ar 16000',                 // Частота дискретизации 16 кГц
-          '-b:a 32k',                  // Битрейт 32 кбит/с
-          '-acodec libmp3lame',        // Кодек MP3
-          '-af "highpass=200,lowpass=3000,volume=1.5,dynaudnorm"' // Фильтры для улучшения качества
-        ])
+        .audioChannels(1)              // Моно
+        .audioFrequency(16000)         // Частота дискретизации 16 кГц
+        .audioBitrate('32k')           // Битрейт 32 кбит/с
+        .audioCodec('libmp3lame')      // Кодек MP3
+        // Упрощаем фильтры, которые могут вызывать проблемы
+        .audioFilters('volume=1.5')
         .output(outputPath)
         .on('end', () => {
           logInfo(`Аудиофайл оптимизирован и сохранен: ${outputPath}`);
@@ -164,11 +163,9 @@ export async function convertWebmToWav(input, output) {
     
     return new Promise((resolve, reject) => {
       ffmpeg(input)
-        .outputOptions([
-          '-acodec pcm_s16le',  // 16-bit PCM
-          '-ar 16000',          // 16 кГц
-          '-ac 1'               // Моно
-        ])
+        .audioCodec('pcm_s16le')   // 16-bit PCM
+        .audioFrequency(16000)     // 16 кГц
+        .audioChannels(1)          // Моно
         .output(output)
         .on('end', () => {
           logInfo(`Файл успешно конвертирован в WAV: ${output}`);

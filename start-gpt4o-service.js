@@ -1,9 +1,14 @@
 /**
  * Скрипт для запуска микросервиса GPT-4o Audio
  */
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+import { spawn } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+// Получаем путь к текущему файлу и директории
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Путь к директории микросервиса
 const servicePath = path.join(__dirname, 'services', 'gpt4o-audio-service');

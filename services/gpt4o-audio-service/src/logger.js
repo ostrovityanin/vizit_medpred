@@ -70,15 +70,37 @@ export const logResponse = (req, res, message) => {
   });
 };
 
-export const logError = (err, req, message) => {
-  const { method, url, ip } = req;
-  logger.error(`${message}`, {
-    method,
-    url,
-    ip,
-    error: err.message,
-    stack: err.stack
-  });
+export const logError = (err, messageOrReq, optionalMessage) => {
+  // Поддержка двух вариантов вызова:
+  // 1. logError(error, "сообщение") - для общих ошибок
+  // 2. logError(error, req, "сообщение") - для ошибок HTTP запросов
+  
+  if (typeof messageOrReq === 'string') {
+    // Первый вариант: logError(error, "сообщение")
+    const message = messageOrReq;
+    logger.error(`${message}`, {
+      error: err.message,
+      stack: err.stack
+    });
+  } else if (messageOrReq && typeof messageOrReq === 'object') {
+    // Второй вариант: logError(error, req, "сообщение")
+    const req = messageOrReq;
+    const message = optionalMessage || 'Ошибка запроса';
+    const { method, url, ip } = req;
+    logger.error(`${message}`, {
+      method,
+      url,
+      ip,
+      error: err.message,
+      stack: err.stack
+    });
+  } else {
+    // Запасной вариант
+    logger.error('Ошибка', {
+      error: err.message,
+      stack: err.stack
+    });
+  }
 };
 
 export const logInfo = (message, meta = {}) => {
