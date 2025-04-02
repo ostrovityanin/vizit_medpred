@@ -1,219 +1,284 @@
 /**
- * Клиент для работы с GPT-4o Audio API
+ * Клиент для работы с GPT-4o Audio Preview API
  */
 
 import fs from 'fs';
 import path from 'path';
-import FormData from 'form-data';
+import { FormData, File } from 'formdata-node';
 import fetch from 'node-fetch';
-import { logInfo, logError, logWarning, logDebug } from './logger.js';
+import dotenv from 'dotenv';
+import logger from './logger.js';
+
+// Загрузка переменных окружения
+dotenv.config();
 
 /**
- * Проверяет, настроен ли API ключ OpenAI
- * @returns {boolean} Возвращает true, если API ключ настроен
+ * Проверка наличия API ключа OpenAI
+ * @returns {boolean} Результат проверки
  */
-export function isOpenAIConfigured() {
-  if (!process.env.OPENAI_API_KEY) {
-    logWarning('OpenAI API ключ не настроен');
+function hasOpenAIKey() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.error('OPENAI_API_KEY не установлен в переменных окружения');
     return false;
   }
   return true;
 }
 
 /**
- * Кодирует аудиофайл в Base64
+ * Кодирование аудиофайла в Base64
  * @param {string} audioFilePath Путь к аудиофайлу
- * @returns {string} Строка в формате Base64
+ * @returns {string|null} Закодированные данные или null в случае ошибки
  */
-export function encodeAudioToBase64(audioFilePath) {
+function encodeAudioToBase64(audioFilePath) {
   try {
+    logger.debug(`Кодирование файла ${audioFilePath} в Base64`);
     const audioBuffer = fs.readFileSync(audioFilePath);
     return audioBuffer.toString('base64');
   } catch (error) {
-    logError(error, 'Ошибка при кодировании аудио в Base64');
-    throw new Error(`Не удалось закодировать аудиофайл: ${error.message}`);
+    logger.error(`Ошибка при чтении файла ${audioFilePath}: ${error.message}`);
+    return null;
   }
 }
 
 /**
- * Форматирует текст транскрипции для улучшения читаемости
- * @param {string} text Исходный текст транскрипции
- * @returns {string} Отформатированный текст
+ * Определение формата аудиофайла по расширению
+ * @param {string} filePath Путь к файлу
+ * @returns {string} Формат аудио ('mp3', 'wav', etc.)
  */
-export function cleanText(text) {
-  if (!text) return '';
+function getAudioFormat(filePath) {
+  const fileExt = path.extname(filePath).substring(1).toLowerCase();
+  const supportedFormats = ['mp3', 'wav', 'm4a', 'webm', 'mp4', 'mpga', 'mpeg'];
   
-  // Удаляем лишние пробелы и переносы строк
-  let cleanedText = text.trim()
-    .replace(/\s+/g, ' ')
-    .replace(/(\r\n|\n|\r)/gm, ' ');
-  
-  // Добавляем точки в конце предложений, если их нет
-  cleanedText = cleanedText.replace(/([а-яА-Яa-zA-Z0-9])\s+([А-ЯA-Z])/g, '$1. $2');
-  
-  // Разделяем текст на параграфы
-  cleanedText = cleanedText.replace(/\.\s+/g, '.\n\n');
-  
-  return cleanedText;
+  return supportedFormats.includes(fileExt) ? fileExt : 'wav';
 }
 
 /**
- * Извлекает диалог из текста транскрипции и форматирует его
- * @param {string} text Исходный текст транскрипции
- * @returns {string} Форматированный диалог
- */
-export function parseDialogueFromText(text) {
-  if (!text) return '';
-  
-  // Простая эвристика для разделения диалога
-  const lines = text.split(/[\.\!\?]\s+/);
-  let dialogue = '';
-  let currentSpeaker = '';
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    
-    // Ищем маркеры смены говорящего (имена, "я", "говорящий" и т.д.)
-    const speakerMatch = line.match(/^([A-ZА-Я][a-zа-я]+|Я):/i);
-    
-    if (speakerMatch) {
-      // Явно указан говорящий
-      currentSpeaker = speakerMatch[1];
-      dialogue += `${currentSpeaker}: ${line.substring(speakerMatch[0].length).trim()}.\n\n`;
-    } else {
-      // Эвристика для определения смены говорящего
-      const hasFirstPerson = line.match(/\b(я|меня|мне|мой|моя|моё|мои)\b/i);
-      const hasQuestion = line.match(/\?$/);
-      
-      if (hasFirstPerson || hasQuestion) {
-        // Вероятно, сменился говорящий
-        currentSpeaker = currentSpeaker === 'Говорящий 1' ? 'Говорящий 2' : 'Говорящий 1';
-      }
-      
-      if (!currentSpeaker) currentSpeaker = 'Говорящий 1';
-      dialogue += `${currentSpeaker}: ${line}.\n\n`;
-    }
-  }
-  
-  return dialogue;
-}
-
-/**
- * Рассчитывает примерную стоимость транскрипции GPT-4o Audio
+ * Расчет примерной стоимости транскрипции аудио с использованием GPT-4o
  * @param {number} durationSeconds Длительность аудио в секундах
- * @returns {string} Строка с информацией о стоимости
+ * @returns {string} Строка с примерной стоимостью
  */
-export function calculateGPT4oTranscriptionCost(durationSeconds) {
-  // Стоимость GPT-4o Audio: $15 за 1 млн токенов ввода, $75 за 1 млн токенов вывода
-  // Аудио оценивается примерно в 50 токенов за секунду
-  const inputTokens = Math.ceil(durationSeconds * 50);
-  const outputTokens = Math.ceil(inputTokens * 0.5); // Примерная оценка
+function calculateTranscriptionCost(durationSeconds) {
+  // Примерно 50 токенов на секунду аудио
+  const estimatedTokens = durationSeconds * 50;
   
-  const inputCost = (inputTokens / 1000000) * 15;
-  const outputCost = (outputTokens / 1000000) * 75;
+  // Стоимость GPT-4o Audio: $15 за 1 млн токенов ввода, $75 за 1 млн токенов вывода
+  const inputCost = (estimatedTokens / 1000000) * 15;
+  // Предполагаем, что выходные токены составляют около 25% от входных для транскрипции
+  const outputCost = (estimatedTokens * 0.25 / 1000000) * 75;
+  
   const totalCost = inputCost + outputCost;
   
-  return `Примерная стоимость: $${totalCost.toFixed(5)} (${inputTokens} входных токенов, ${outputTokens} выходных токенов)`;
+  return `$${totalCost.toFixed(5)} (примерно ${estimatedTokens} токенов)`;
 }
 
 /**
- * Отправляет аудиофайл в GPT-4o Audio Preview и получает транскрипцию
+ * Транскрипция аудио с использованием GPT-4o через chat/completions API
  * @param {string} audioFilePath Путь к аудиофайлу
- * @returns {Object} Результат транскрипции с полями text, cost и tokensProcessed
+ * @param {Object} options Дополнительные параметры
+ * @returns {Promise<Object|null>} Результат транскрипции или null в случае ошибки
  */
-export async function transcribeWithGPT4o(audioFilePath) {
-  if (!isOpenAIConfigured()) {
-    throw new Error('OpenAI API ключ не настроен');
+async function transcribeWithChatAPI(audioFilePath, options = {}) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.error('OPENAI_API_KEY не установлен в переменных окружения');
+    return null;
   }
-  
+
+  const { prompt = 'Транскрибируй это аудио.', model = 'gpt-4o-audio-preview' } = options;
+
   try {
-    logInfo(`Начинаем транскрипцию файла: ${audioFilePath}`);
-    const fileStats = fs.statSync(audioFilePath);
-    const fileSizeMB = fileStats.size / (1024 * 1024);
-    logDebug(`Размер файла: ${fileSizeMB.toFixed(2)} MB`);
+    logger.info(`Транскрипция через chat/completions API: ${audioFilePath}`);
+    
+    // Определяем формат файла
+    const format = getAudioFormat(audioFilePath);
     
     // Кодируем аудиофайл в base64
-    const audioBase64 = encodeAudioToBase64(audioFilePath);
-    
-    // Определяем тип файла на основе расширения
-    const fileExt = path.extname(audioFilePath).toLowerCase();
-    let fileType;
-    
-    switch (fileExt) {
-      case '.mp3':
-        fileType = 'audio/mp3';
-        break;
-      case '.wav':
-        fileType = 'audio/wav';
-        break;
-      case '.ogg':
-        fileType = 'audio/ogg';
-        break;
-      case '.m4a':
-        fileType = 'audio/mp4';
-        break;
-      case '.webm':
-        fileType = 'audio/webm';
-        break;
-      default:
-        fileType = 'audio/mpeg';
+    const audio_b64 = encodeAudioToBase64(audioFilePath);
+    if (!audio_b64) {
+      return null;
     }
+
+    // Создаем структуру сообщения для отправки
+    const messages = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          { type: "input_audio", input_audio: { data: audio_b64, format } }
+        ]
+      }
+    ];
+
+    logger.debug(`Отправка запроса на транскрипцию с форматом: ${format}`);
     
-    // Создаем FormData для multipart/form-data запроса
-    const FormData = (await import('form-data')).default;
-    const formData = new FormData();
-    
-    // Добавляем параметры формы
-    formData.append('model', 'whisper-1');
-    formData.append('file', fs.createReadStream(filePath));
-    formData.append('response_format', 'json');
-    
-    // Добавляем параметр языка, если можем определить
-    if (fileExt === '.ru.wav' || fileExt === '.ru.mp3') {
-      formData.append('language', 'ru');
-    }
-    
-    // Отправляем запрос к API
-    logDebug('Отправляем запрос к Whisper API');
-    const startTime = Date.now();
-    
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    // Отправляем запрос к OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: options.maxTokens || 4096
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      logger.error(`Ошибка API: ${JSON.stringify(errorData)}`);
+      return null;
+    }
+
+    const data = await response.json();
+    logger.debug(`Получен ответ от API: ${JSON.stringify(data)}`);
+    
+    return {
+      text: data.choices[0]?.message?.content || 'Не удалось получить текст транскрипции',
+      usage: data.usage,
+      model: data.model
+    };
+  } catch (error) {
+    logger.error(`Ошибка при вызове API: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Транскрипция аудио с использованием OpenAI Audio API (/v1/audio/transcriptions)
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {Object} options Дополнительные параметры
+ * @returns {Promise<Object|null>} Результат транскрипции или null в случае ошибки
+ */
+async function transcribeWithAudioAPI(audioFilePath, options = {}) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.error('OPENAI_API_KEY не установлен в переменных окружения');
+    return null;
+  }
+
+  const { 
+    prompt = '', 
+    language = '', 
+    model = 'whisper-1' 
+  } = options;
+
+  try {
+    logger.info(`Транскрипция через Audio API: ${audioFilePath}`);
+    
+    if (!fs.existsSync(audioFilePath)) {
+      logger.error(`Файл не найден: ${audioFilePath}`);
+      return null;
+    }
+    
+    // Чтение файла и создание объекта File
+    const fileBuffer = fs.readFileSync(audioFilePath);
+    const fileBasename = path.basename(audioFilePath);
+    const fileType = 'audio/' + getAudioFormat(audioFilePath);
+    
+    const file = new File([fileBuffer], fileBasename, { type: fileType });
+    
+    // Создаем FormData для передачи аудиофайла
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('model', model);
+    
+    // Добавляем дополнительные параметры, если они указаны
+    if (prompt) {
+      formData.append('prompt', prompt);
+    }
+    
+    if (language) {
+      formData.append('language', language);
+    }
+    
+    // Отправляем запрос к OpenAI Audio API
+    const url = 'https://api.openai.com/v1/audio/transcriptions';
+    logger.debug(`Отправка запроса на: ${url}`);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
       },
       body: formData
     });
-    
-    const responseTime = Date.now() - startTime;
-    logDebug(`Получен ответ от API за ${responseTime}ms`);
-    
+
     if (!response.ok) {
-      const error = await response.text();
-      logError(new Error(error), `Ошибка API (${response.status})`);
-      throw new Error(`Ошибка OpenAI API: ${response.status} ${error}`);
+      let errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText);
+        logger.error(`Ошибка API: ${JSON.stringify(errorData)}`);
+      } catch {
+        logger.error(`Ошибка API: ${errorText}`);
+      }
+      return null;
     }
-    
+
     const data = await response.json();
-    
-    // Извлекаем текст из ответа
-    const transcribedText = data.choices[0].message.content;
-    
-    // Рассчитываем использованные токены и стоимость
-    const tokensProcessed = data.usage ? data.usage.total_tokens : 0;
-    const durationSeconds = Math.ceil(fileSizeMB * 60); // Грубая оценка длительности
-    const cost = calculateGPT4oTranscriptionCost(durationSeconds);
-    
-    logInfo(`Транскрипция завершена. Использовано ${tokensProcessed} токенов`);
+    logger.debug(`Получен ответ от API: ${JSON.stringify(data)}`);
     
     return {
-      text: transcribedText,
-      cost,
-      tokensProcessed
+      text: data.text || 'Не удалось получить текст транскрипции',
+      model: model
     };
   } catch (error) {
-    logError(error, 'Ошибка при транскрипции аудио с GPT-4o');
-    throw error;
+    logger.error(`Ошибка при вызове API: ${error.message}`);
+    return null;
   }
 }
+
+/**
+ * Единая функция для транскрипции аудио, выбирающая наиболее подходящий API
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {Object} options Дополнительные параметры
+ * @returns {Promise<Object|null>} Результат транскрипции или null в случае ошибки
+ */
+async function transcribeAudio(audioFilePath, options = {}) {
+  logger.info(`Запуск транскрипции для файла: ${audioFilePath}`);
+  
+  if (!hasOpenAIKey()) {
+    return {
+      error: 'API ключ OpenAI не найден',
+      success: false
+    };
+  }
+  
+  const { 
+    preferredMethod = 'auto', 
+    model = 'auto'
+  } = options;
+  
+  const transcriptionOptions = { ...options };
+  
+  // Автоматический выбор модели и метода транскрипции
+  if (model === 'auto') {
+    transcriptionOptions.model = 'gpt-4o-audio-preview';
+  }
+  
+  // Выбор метода транскрипции на основе предпочтений или автоматически
+  if (preferredMethod === 'chat' || 
+      (preferredMethod === 'auto' && 
+       (transcriptionOptions.model.includes('gpt-4o') || transcriptionOptions.model.includes('gpt-4')))) {
+    logger.info(`Используем метод chat/completions с моделью ${transcriptionOptions.model}`);
+    return transcribeWithChatAPI(audioFilePath, transcriptionOptions);
+  } else {
+    if (model === 'auto') {
+      transcriptionOptions.model = 'whisper-1';
+    }
+    logger.info(`Используем метод audio/transcriptions с моделью ${transcriptionOptions.model}`);
+    return transcribeWithAudioAPI(audioFilePath, transcriptionOptions);
+  }
+}
+
+export default {
+  hasOpenAIKey,
+  encodeAudioToBase64,
+  getAudioFormat,
+  transcribeWithChatAPI,
+  transcribeWithAudioAPI,
+  transcribeAudio,
+  calculateTranscriptionCost
+};

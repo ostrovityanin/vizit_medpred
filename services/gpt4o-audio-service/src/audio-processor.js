@@ -1,263 +1,331 @@
 /**
- * Модуль для обработки и оптимизации аудиофайлов
+ * Модуль обработки аудиофайлов для сервиса GPT-4o Audio
  */
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import ffmpeg from 'fluent-ffmpeg';
-import ffmpegPath from '@ffmpeg-installer/ffmpeg';
-import { logInfo, logError, logDebug } from './logger.js';
+import { ffmpegPath } from '@ffmpeg-installer/ffmpeg';
+import { promisify } from 'util';
+import { exec } from 'child_process';
+import dotenv from 'dotenv';
+import logger from './logger.js';
 
-// Настройка пути к ffmpeg
-ffmpeg.setFfmpegPath(ffmpegPath.path);
+// Загружаем конфигурацию из .env файла
+dotenv.config();
 
-// Получаем текущую директорию (для ES modules)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Установка пути к ffmpeg
+ffmpeg.setFfmpegPath(ffmpegPath);
 
-// Путь к директории для временных файлов
-const tempDir = path.join(__dirname, '../temp');
+// Промисифицированные версии функций fs
+const fsAccess = promisify(fs.access);
+const fsMkdir = promisify(fs.mkdir);
+const execAsync = promisify(exec);
+
+// Создание директории для хранения файлов, если она не существует
+const uploadsDir = process.env.UPLOADS_DIR || './uploads';
+const tempDir = path.join(uploadsDir, 'temp');
+
+// Поддерживаемые форматы аудио
+const supportedFormats = ['mp3', 'wav', 'm4a', 'webm', 'mp4', 'mpga', 'mpeg'];
 
 /**
- * Создает директорию, если она не существует
- * @param {string} dirPath Путь к директории
+ * Проверяет наличие директории и создает ее, если она не существует
+ * @param {string} dir Путь к директории
+ * @returns {Promise<boolean>} true, если директория существует или успешно создана
  */
-export function ensureDirectoryExists(dirPath) {
-  if (!fs.existsSync(dirPath)) {
-    fs.mkdirSync(dirPath, { recursive: true });
+async function ensureDirectoryExists(dir) {
+  try {
+    await fsAccess(dir, fs.constants.F_OK);
+    return true;
+  } catch (error) {
+    try {
+      await fsMkdir(dir, { recursive: true });
+      logger.info(`Создана директория ${dir}`);
+      return true;
+    } catch (mkdirError) {
+      logger.error(`Не удалось создать директорию ${dir}: ${mkdirError.message}`);
+      return false;
+    }
   }
 }
 
 /**
- * Возвращает информацию о длительности аудиофайла
- * @param {string} filePath Путь к аудиофайлу
- * @returns {Promise<number>} Длительность в секундах
+ * Проверяет, поддерживается ли формат файла
+ * @param {string} filePath Путь к файлу
+ * @returns {boolean} true, если формат поддерживается
  */
-export function getAudioDuration(filePath) {
+function isSupportedFormat(filePath) {
+  const ext = path.extname(filePath).substring(1).toLowerCase();
+  return supportedFormats.includes(ext);
+}
+
+/**
+ * Получает информацию о медиафайле с помощью ffmpeg
+ * @param {string} filePath Путь к файлу
+ * @returns {Promise<Object>} Информация о файле
+ */
+function getMediaInfo(filePath) {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err) {
-        logError(err, `Ошибка при получении информации о файле: ${filePath}`);
-        return reject(err);
+        reject(err);
+        return;
       }
-      
-      if (metadata && metadata.format && metadata.format.duration) {
-        resolve(metadata.format.duration);
-      } else {
-        reject(new Error('Не удалось определить длительность аудио'));
+
+      // Базовые метаданные
+      const info = {
+        format: metadata.format.format_name,
+        duration: metadata.format.duration, // в секундах
+        size: metadata.format.size,         // в байтах
+        bitrate: metadata.format.bit_rate,  // в бит/с
+        codec: null,
+        channels: null,
+        sampleRate: null,
+        audioStream: null
+      };
+
+      // Поиск аудио-стрима
+      const audioStream = metadata.streams.find(stream => stream.codec_type === 'audio');
+      if (audioStream) {
+        info.codec = audioStream.codec_name;
+        info.channels = audioStream.channels;
+        info.sampleRate = audioStream.sample_rate;
+        info.audioStream = audioStream;
       }
+
+      resolve(info);
     });
   });
 }
 
 /**
- * Разделяет аудиофайл на сегменты указанной длительности
+ * Оптимизирует аудиофайл для транскрипции OpenAI API
  * @param {string} inputPath Путь к исходному файлу
- * @param {string} outputDir Директория для сохранения сегментов
- * @param {number} segmentDurationSeconds Длительность каждого сегмента в секундах (по умолчанию 30)
- * @returns {Promise<string[]>} Массив путей к созданным сегментам
- */
-export async function splitAudioFile(
-  inputPath,
-  outputDir = tempDir,
-  segmentDurationSeconds = 30
-) {
-  ensureDirectoryExists(outputDir);
-  
-  try {
-    const inputFilename = path.basename(inputPath, path.extname(inputPath));
-    const outputPattern = path.join(outputDir, `${inputFilename}_segment_%03d.wav`);
-    
-    logInfo(`Разделение файла ${inputPath} на сегменты по ${segmentDurationSeconds} секунд`);
-    
-    return new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
-        .outputOptions([
-          `-f segment`,
-          `-segment_time ${segmentDurationSeconds}`,
-          `-c:a pcm_s16le`,
-          `-ar 16000`,
-          `-ac 1`
-        ])
-        .output(outputPattern)
-        .on('end', () => {
-          // Получаем список созданных файлов
-          const segmentFiles = fs.readdirSync(outputDir)
-            .filter(file => file.startsWith(`${inputFilename}_segment_`))
-            .map(file => path.join(outputDir, file))
-            .sort(); // Сортируем для правильного порядка
-          
-          logInfo(`Файл разделен на ${segmentFiles.length} сегментов`);
-          resolve(segmentFiles);
-        })
-        .on('error', (err) => {
-          logError(err, 'Ошибка при разделении аудиофайла на сегменты');
-          reject(err);
-        })
-        .run();
-    });
-  } catch (error) {
-    logError(error, 'Ошибка при разделении аудиофайла');
-    throw error;
-  }
-}
-
-/**
- * Оптимизирует аудиофайл для распознавания речи, уменьшая его размер
- * @param {string} inputPath Путь к исходному файлу
- * @param {string} outputPath Путь для сохранения оптимизированного файла (если не указан, сгенерируется автоматически)
+ * @param {Object} options Опции оптимизации
  * @returns {Promise<string>} Путь к оптимизированному файлу
  */
-export async function optimizeAudioForTranscription(
-  inputPath,
-  outputPath = ''
-) {
-  ensureDirectoryExists(tempDir);
-  
+async function optimizeAudio(inputPath, options = {}) {
   try {
-    // Если выходной путь не указан, генерируем автоматически
-    if (!outputPath) {
-      const inputFilename = path.basename(inputPath, path.extname(inputPath));
-      outputPath = path.join(tempDir, `${inputFilename}_optimized.mp3`);
+    logger.info(`Оптимизация аудиофайла: ${inputPath}`);
+    
+    // Создание директорий, если они не существуют
+    await ensureDirectoryExists(uploadsDir);
+    await ensureDirectoryExists(tempDir);
+    
+    if (!isSupportedFormat(inputPath)) {
+      throw new Error(`Неподдерживаемый формат файла: ${path.extname(inputPath)}`);
     }
     
-    logInfo(`Оптимизация аудиофайла: ${inputPath}`);
+    // Параметры по умолчанию
+    const {
+      outputFormat = 'mp3',
+      sampleRate = 16000,
+      channels = 1,
+      bitrate = '32k',
+      normalize = true
+    } = options;
     
+    // Получаем информацию о файле
+    const fileInfo = await getMediaInfo(inputPath);
+    logger.debug(`Информация о файле: ${JSON.stringify(fileInfo)}`);
+    
+    // Генерируем имя для оптимизированного файла
+    const fileName = path.basename(inputPath, path.extname(inputPath));
+    const optimizedFileName = `${fileName}_optimized.${outputFormat}`;
+    const outputPath = path.join(tempDir, optimizedFileName);
+    
+    // Применяем оптимизацию через ffmpeg
     return new Promise((resolve, reject) => {
-      ffmpeg(inputPath)
+      let command = ffmpeg(inputPath)
         .noVideo()
-        // Преобразуем в моно, 16 кГц, битрейт 32 кбит/с, MP3
-        .audioChannels(1)              // Моно
-        .audioFrequency(16000)         // Частота дискретизации 16 кГц
-        .audioBitrate('32k')           // Битрейт 32 кбит/с
-        .audioCodec('libmp3lame')      // Кодек MP3
-        // Упрощаем фильтры, которые могут вызывать проблемы
-        .audioFilters('volume=1.5')
-        .output(outputPath)
-        .on('end', () => {
-          logInfo(`Аудиофайл оптимизирован и сохранен: ${outputPath}`);
-          resolve(outputPath);
-        })
-        .on('error', (err) => {
-          logError(err, 'Ошибка при оптимизации аудиофайла');
-          reject(err);
-        })
-        .run();
-    });
-  } catch (error) {
-    logError(error, 'Необработанная ошибка при оптимизации аудиофайла');
-    throw error;
-  }
-}
-
-/**
- * Конвертирует WebM файл в WAV формат, поддерживаемый OpenAI API
- * @param {string} input Путь к входному файлу WebM
- * @param {string} output Путь к выходному файлу WAV
- * @returns {Promise<boolean>} Успешность конвертации
- */
-export async function convertWebmToWav(input, output) {
-  try {
-    logDebug(`Конвертация файла ${input} в WAV формат: ${output}`);
-    
-    return new Promise((resolve, reject) => {
-      ffmpeg(input)
-        .audioCodec('pcm_s16le')   // 16-bit PCM
-        .audioFrequency(16000)     // 16 кГц
-        .audioChannels(1)          // Моно
-        .output(output)
-        .on('end', () => {
-          logInfo(`Файл успешно конвертирован в WAV: ${output}`);
-          resolve(true);
-        })
-        .on('error', (err) => {
-          logError(err, `Ошибка при конвертации в WAV: ${err.message}`);
-          reject(err);
-        })
-        .run();
-    });
-  } catch (error) {
-    logError(error, 'Ошибка при конвертации WebM в WAV');
-    return false;
-  }
-}
-
-/**
- * Комбинирует несколько аудиофайлов в один
- * @param {string[]} audioFiles Массив путей к аудиофайлам
- * @param {string} outputPath Путь для сохранения результата
- * @returns {Promise<string>} Путь к объединенному файлу
- */
-export async function combineAudioFiles(audioFiles, outputPath) {
-  ensureDirectoryExists(path.dirname(outputPath));
-  
-  if (audioFiles.length === 0) {
-    throw new Error('Не указаны файлы для объединения');
-  }
-  
-  if (audioFiles.length === 1) {
-    // Если только один файл, просто копируем его
-    fs.copyFileSync(audioFiles[0], outputPath);
-    return outputPath;
-  }
-  
-  try {
-    logInfo(`Объединение ${audioFiles.length} файлов в ${outputPath}`);
-    
-    // Создаем ffmpeg команду
-    let ffmpegCommand = ffmpeg();
-    
-    // Добавляем каждый файл как отдельный вход
-    audioFiles.forEach(file => {
-      ffmpegCommand = ffmpegCommand.input(file);
-    });
-    
-    // Используем фильтр для объединения
-    const filterComplex = audioFiles.map((_, index) => `[${index}:a]`).join('') + `concat=n=${audioFiles.length}:v=0:a=1[out]`;
-    
-    return new Promise((resolve, reject) => {
-      ffmpegCommand
-        .complexFilter(filterComplex)
-        .map('[out]')
-        .audioCodec('pcm_s16le')
-        .audioFrequency(16000)
-        .audioChannels(1)
-        .output(outputPath)
-        .on('end', () => {
-          logInfo(`Файлы успешно объединены: ${outputPath}`);
-          resolve(outputPath);
-        })
-        .on('error', (err) => {
-          logError(err, 'Ошибка при объединении аудиофайлов');
-          reject(err);
-        })
-        .run();
-    });
-  } catch (error) {
-    logError(error, 'Ошибка при объединении аудиофайлов');
-    throw error;
-  }
-}
-
-/**
- * Очищает временную директорию от файлов с определенным префиксом
- * @param {string} prefix Префикс имени файлов для удаления
- */
-export function cleanupTempFiles(prefix = '') {
-  try {
-    const files = fs.readdirSync(tempDir);
-    
-    for (const file of files) {
-      if (!prefix || file.startsWith(prefix)) {
-        const filePath = path.join(tempDir, file);
-        fs.unlinkSync(filePath);
-        logDebug(`Удален временный файл: ${filePath}`);
+        .audioChannels(channels)
+        .audioFrequency(sampleRate)
+        .audioBitrate(bitrate)
+        .format(outputFormat);
+      
+      // Применение нормализации (если требуется)
+      if (normalize) {
+        command = command.audioFilters('loudnorm');
       }
+      
+      command
+        .on('end', () => {
+          logger.info(`Аудио успешно оптимизировано: ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err) => {
+          logger.error(`Ошибка при оптимизации аудио: ${err.message}`);
+          reject(err);
+        })
+        .save(outputPath);
+    });
+  } catch (error) {
+    logger.error(`Ошибка при оптимизации аудио: ${error.message}`);
+    // Возвращаем исходный файл в случае ошибки
+    return inputPath;
+  }
+}
+
+/**
+ * Конвертирует аудиофайл в WAV формат, поддерживаемый OpenAI API
+ * @param {string} inputPath Путь к исходному файлу
+ * @param {Object} options Опции конвертации
+ * @returns {Promise<string>} Путь к конвертированному файлу
+ */
+async function convertToWav(inputPath, options = {}) {
+  try {
+    logger.info(`Конвертация аудиофайла в WAV: ${inputPath}`);
+    
+    // Создание директорий, если они не существуют
+    await ensureDirectoryExists(uploadsDir);
+    await ensureDirectoryExists(tempDir);
+    
+    // Параметры по умолчанию
+    const {
+      sampleRate = 16000,
+      channels = 1,
+      normalize = false
+    } = options;
+    
+    // Генерируем имя для WAV файла
+    const fileName = path.basename(inputPath, path.extname(inputPath));
+    const wavFileName = `${fileName}.wav`;
+    const outputPath = path.join(tempDir, wavFileName);
+    
+    // Применяем конвертацию через ffmpeg
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath)
+        .noVideo()
+        .audioChannels(channels)
+        .audioFrequency(sampleRate)
+        .format('wav');
+      
+      // Применение нормализации (если требуется)
+      if (normalize) {
+        command = command.audioFilters('loudnorm');
+      }
+      
+      command
+        .on('end', () => {
+          logger.info(`Аудио успешно конвертировано в WAV: ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err) => {
+          logger.error(`Ошибка при конвертации аудио в WAV: ${err.message}`);
+          reject(err);
+        })
+        .save(outputPath);
+    });
+  } catch (error) {
+    logger.error(`Ошибка при конвертации аудио в WAV: ${error.message}`);
+    // Возвращаем исходный файл в случае ошибки
+    return inputPath;
+  }
+}
+
+/**
+ * Разделяет аудиофайл на сегменты указанной длительности
+ * @param {string} inputPath Путь к исходному файлу
+ * @param {Object} options Опции сегментации
+ * @returns {Promise<Array<string>>} Массив путей к созданным сегментам
+ */
+async function splitAudioFile(inputPath, options = {}) {
+  try {
+    logger.info(`Разделение аудиофайла на сегменты: ${inputPath}`);
+    
+    // Создаем директории, если они не существуют
+    await ensureDirectoryExists(uploadsDir);
+    await ensureDirectoryExists(tempDir);
+    
+    // Параметры сегментации
+    const {
+      segmentDurationSeconds = 30,
+      outputFormat = 'mp3',
+    } = options;
+    
+    // Получаем информацию о файле
+    const fileInfo = await getMediaInfo(inputPath);
+    const totalDuration = fileInfo.duration;
+    
+    // Проверяем, нужно ли разделять файл
+    if (totalDuration <= segmentDurationSeconds) {
+      logger.info(`Файл короче ${segmentDurationSeconds} секунд, разделение не требуется`);
+      return [inputPath];
     }
     
-    logInfo(`Временные файлы ${prefix ? `с префиксом ${prefix}` : ''} успешно удалены`);
+    // Определяем количество сегментов
+    const segmentCount = Math.ceil(totalDuration / segmentDurationSeconds);
+    
+    // Генерируем базовое имя для сегментов
+    const baseName = path.basename(inputPath, path.extname(inputPath));
+    const segmentPaths = [];
+    
+    // Создаем сегменты
+    for (let i = 0; i < segmentCount; i++) {
+      const startTime = i * segmentDurationSeconds;
+      const segmentFileName = `${baseName}_segment_${(i+1).toString().padStart(3, '0')}.${outputFormat}`;
+      const segmentPath = path.join(tempDir, segmentFileName);
+      segmentPaths.push(segmentPath);
+      
+      // Создаем сегмент файла
+      await new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+          .noVideo()
+          .setStartTime(startTime)
+          .setDuration(segmentDurationSeconds)
+          .output(segmentPath)
+          .on('end', () => {
+            logger.debug(`Создан сегмент ${segmentPath}`);
+            resolve();
+          })
+          .on('error', (err) => {
+            logger.error(`Ошибка при создании сегмента ${segmentPath}: ${err.message}`);
+            reject(err);
+          })
+          .run();
+      });
+    }
+    
+    logger.info(`Файл разделен на ${segmentCount} сегментов`);
+    return segmentPaths;
   } catch (error) {
-    logError(error, 'Ошибка при очистке временных файлов');
+    logger.error(`Ошибка при разделении аудиофайла: ${error.message}`);
+    // Возвращаем исходный файл в случае ошибки
+    return [inputPath];
   }
 }
+
+/**
+ * Очищает временные файлы
+ * @param {Array<string>} filePaths Массив путей к файлам
+ * @returns {Promise<number>} Количество удаленных файлов
+ */
+async function cleanupTempFiles(filePaths) {
+  let deletedCount = 0;
+  
+  for (const filePath of filePaths) {
+    try {
+      // Проверяем, является ли файл временным (находится в temp директории)
+      if (filePath.includes(tempDir)) {
+        await fs.promises.unlink(filePath);
+        deletedCount++;
+      }
+    } catch (error) {
+      logger.warn(`Не удалось удалить файл ${filePath}: ${error.message}`);
+    }
+  }
+  
+  logger.info(`Удалено ${deletedCount} временных файлов`);
+  return deletedCount;
+}
+
+export default {
+  ensureDirectoryExists,
+  isSupportedFormat,
+  getMediaInfo,
+  optimizeAudio,
+  convertToWav,
+  splitAudioFile,
+  cleanupTempFiles
+};

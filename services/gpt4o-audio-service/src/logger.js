@@ -1,118 +1,56 @@
 /**
- * Модуль для логирования событий в сервисе GPT-4o Audio
+ * Модуль логирования для сервиса GPT-4o Audio
  */
 
 import winston from 'winston';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
 
-// Получаем текущую директорию (для ES modules)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Загрузка переменных окружения
+dotenv.config();
 
-// Путь к директории логов
-const logsDir = path.join(__dirname, '../logs');
+// Определение уровней логирования
+const levels = {
+  error: 0,
+  warn: 1,
+  info: 2,
+  http: 3,
+  debug: 4,
+};
 
-// Настройка формата логов
-const logFormat = winston.format.combine(
+// Функция для определения уровня логирования на основе переменной окружения
+const level = () => {
+  const env = process.env.NODE_ENV || 'development';
+  const isDevelopment = env === 'development';
+  return isDevelopment ? 'debug' : process.env.LOG_LEVEL || 'info';
+};
+
+// Настройка форматирования логов
+const format = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.printf(({ level, message, timestamp, ...meta }) => {
-    return `${timestamp} [${level.toUpperCase()}]: ${message} ${
-      Object.keys(meta).length ? JSON.stringify(meta) : ''
-    }`;
-  })
+  winston.format.printf(
+    (info) => `${info.timestamp} [${info.level.toUpperCase()}]: ${info.message}`
+  )
 );
 
-// Создаем логгер
+// Настройка транспортов для логирования
+const transports = [
+  // Вывод в консоль
+  new winston.transports.Console(),
+  // Сохранение сообщений об ошибках в файл
+  new winston.transports.File({
+    filename: 'logs/error.log',
+    level: 'error',
+  }),
+  // Сохранение всех логов в файл
+  new winston.transports.File({ filename: 'logs/combined.log' }),
+];
+
+// Создание и экспорт логгера
 const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: logFormat,
-  transports: [
-    // Запись логов в файл
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'error.log'), 
-      level: 'error' 
-    }),
-    new winston.transports.File({ 
-      filename: path.join(logsDir, 'combined.log') 
-    }),
-    // Вывод логов в консоль
-    new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        logFormat
-      )
-    })
-  ]
+  level: level(),
+  levels,
+  format,
+  transports,
 });
-
-// Расширенные функции для логирования с контекстом
-export const logRequest = (req, message) => {
-  const { method, url, ip, body, query, params } = req;
-  logger.info(`${message}`, {
-    method,
-    url,
-    ip,
-    body: body ? JSON.stringify(body).substring(0, 500) : undefined,
-    query,
-    params
-  });
-};
-
-export const logResponse = (req, res, message) => {
-  const { method, url, ip } = req;
-  const { statusCode } = res;
-  logger.info(`${message}`, {
-    method,
-    url,
-    ip,
-    statusCode
-  });
-};
-
-export const logError = (err, messageOrReq, optionalMessage) => {
-  // Поддержка двух вариантов вызова:
-  // 1. logError(error, "сообщение") - для общих ошибок
-  // 2. logError(error, req, "сообщение") - для ошибок HTTP запросов
-  
-  if (typeof messageOrReq === 'string') {
-    // Первый вариант: logError(error, "сообщение")
-    const message = messageOrReq;
-    logger.error(`${message}`, {
-      error: err.message,
-      stack: err.stack
-    });
-  } else if (messageOrReq && typeof messageOrReq === 'object') {
-    // Второй вариант: logError(error, req, "сообщение")
-    const req = messageOrReq;
-    const message = optionalMessage || 'Ошибка запроса';
-    const { method, url, ip } = req;
-    logger.error(`${message}`, {
-      method,
-      url,
-      ip,
-      error: err.message,
-      stack: err.stack
-    });
-  } else {
-    // Запасной вариант
-    logger.error('Ошибка', {
-      error: err.message,
-      stack: err.stack
-    });
-  }
-};
-
-export const logInfo = (message, meta = {}) => {
-  logger.info(message, meta);
-};
-
-export const logWarning = (message, meta = {}) => {
-  logger.warn(message, meta);
-};
-
-export const logDebug = (message, meta = {}) => {
-  logger.debug(message, meta);
-};
 
 export default logger;
