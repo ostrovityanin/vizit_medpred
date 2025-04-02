@@ -1,143 +1,331 @@
-import TelegramBot from 'node-telegram-bot-api';
-import { createLogger } from './logger.js';
-import dotenv from 'dotenv';
+/**
+ * Модуль для отправки уведомлений в Telegram
+ */
+const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs-extra');
+const path = require('path');
+const logger = require('./logger').createLogger('telegram');
 
-// Инициализируем именованный логгер для модуля telegram
-const logger = createLogger('telegram');
+// Загрузка переменных окружения
+require('dotenv').config();
 
-dotenv.config();
+// Токен бота Telegram из переменных окружения
+const token = process.env.TELEGRAM_BOT_TOKEN;
 
-// Инициализируем бота с токеном из переменной окружения
-let bot = null;
-let chatId = null;
+// ID чата для отправки сообщений
+const chatId = process.env.TELEGRAM_CHAT_ID;
 
-// Очередь сообщений для отправки (на случай, если соединение временно недоступно)
-const messageQueue = [];
+// Максимальная длина сообщения в Telegram
+const MAX_MESSAGE_LENGTH = 4096;
+
+// Путь к файлу истории сообщений
+const MESSAGES_LOG_FILE = path.join(process.env.STATUS_LOG_PATH || './status_logs', 'telegram_messages.json');
+
+// История отправленных сообщений
+let messageHistory = [];
 
 /**
- * Инициализирует Telegram бота
+ * Инициализация бота Telegram
  */
-export const initBot = () => {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  chatId = process.env.TELEGRAM_CHAT_ID;
+let bot = null;
 
-  if (!token) {
-    logger.warn('TELEGRAM_BOT_TOKEN не установлен. Отправка уведомлений не будет работать.');
+/**
+ * Проверяет, настроен ли Telegram бот
+ * @returns {boolean} Результат проверки
+ */
+function isTelegramConfigured() {
+  return !!token && !!chatId;
+}
+
+/**
+ * Инициализирует бота Telegram
+ */
+function initializeBot() {
+  if (!isTelegramConfigured()) {
+    logger.warn('Telegram бот не настроен. Проверьте переменные окружения TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID.');
     return false;
   }
-
-  if (!chatId) {
-    logger.warn('TELEGRAM_CHAT_ID не установлен. Отправка уведомлений не будет работать.');
-    return false;
-  }
-
+  
   try {
     bot = new TelegramBot(token, { polling: false });
-    logger.info('Telegram бот успешно инициализирован');
+    logger.info('Telegram бот инициализирован');
     
-    // Отправляем сообщение о запуске сервиса
-    sendMessage('🟢 Сервис мониторинга запущен');
-    
-    // Отправляем накопившиеся сообщения
-    processMessageQueue();
+    // Загружаем историю сообщений
+    loadMessageHistory();
     
     return true;
   } catch (error) {
     logger.error(`Ошибка инициализации Telegram бота: ${error.message}`);
     return false;
   }
-};
+}
 
 /**
- * Отправляет сообщение в чат
- * @param {string} message - текст сообщения для отправки
+ * Загружает историю отправленных сообщений
  */
-export const sendMessage = async (message) => {
-  if (!bot || !chatId) {
-    // Если бот не инициализирован, добавляем сообщение в очередь
-    messageQueue.push(message);
-    return;
-  }
-
+async function loadMessageHistory() {
   try {
-    await bot.sendMessage(chatId, message, { parse_mode: 'HTML' });
-    logger.info(`Сообщение отправлено в Telegram: ${message.substring(0, 50)}...`);
+    // Создаем директорию, если она не существует
+    await fs.ensureDir(path.dirname(MESSAGES_LOG_FILE));
+    
+    // Проверяем существование файла
+    if (await fs.pathExists(MESSAGES_LOG_FILE)) {
+      messageHistory = await fs.readJson(MESSAGES_LOG_FILE);
+      logger.debug(`Загружено ${messageHistory.length} сообщений из истории`);
+    } else {
+      messageHistory = [];
+      // Создаем пустой файл
+      await fs.writeJson(MESSAGES_LOG_FILE, [], { spaces: 2 });
+      logger.debug('Создан новый файл истории сообщений');
+    }
+  } catch (error) {
+    logger.error(`Ошибка загрузки истории сообщений: ${error.message}`);
+    messageHistory = [];
+  }
+}
+
+/**
+ * Сохраняет историю отправленных сообщений
+ */
+async function saveMessageHistory() {
+  try {
+    // Ограничиваем размер истории
+    if (messageHistory.length > 100) {
+      messageHistory = messageHistory.slice(-100);
+    }
+    
+    await fs.writeJson(MESSAGES_LOG_FILE, messageHistory, { spaces: 2 });
+    logger.debug('История сообщений сохранена');
+  } catch (error) {
+    logger.error(`Ошибка сохранения истории сообщений: ${error.message}`);
+  }
+}
+
+/**
+ * Отправляет сообщение в Telegram
+ * @param {string} message Текст сообщения
+ * @param {string} type Тип сообщения (report, alert, recovery)
+ * @returns {Promise<boolean>} Результат отправки
+ */
+async function sendMessage(message, type = 'report') {
+  if (!bot) {
+    if (!initializeBot()) {
+      logger.error('Не удалось инициализировать Telegram бота для отправки сообщения');
+      return false;
+    }
+  }
+  
+  // Проверяем длину сообщения
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    message = message.substring(0, MAX_MESSAGE_LENGTH - 100) + '...\n[Сообщение сокращено из-за ограничений Telegram]';
+  }
+  
+  try {
+    // Отправляем сообщение
+    const result = await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    
+    // Сохраняем сообщение в истории
+    const messageRecord = {
+      timestamp: new Date().toISOString(),
+      content: message,
+      type,
+      messageId: result.message_id
+    };
+    
+    messageHistory.push(messageRecord);
+    await saveMessageHistory();
+    
+    logger.info(`Отправлено сообщение типа "${type}" в Telegram`);
+    return true;
   } catch (error) {
     logger.error(`Ошибка отправки сообщения в Telegram: ${error.message}`);
-    // Если не удалось отправить сообщение, добавляем в очередь
-    messageQueue.push(message);
+    
+    // Пытаемся отправить без форматирования
+    if (error.message.includes('parse_mode')) {
+      try {
+        await bot.sendMessage(chatId, message);
+        logger.info('Сообщение отправлено без форматирования');
+        return true;
+      } catch (secondError) {
+        logger.error(`Повторная ошибка отправки: ${secondError.message}`);
+      }
+    }
+    
+    return false;
   }
-};
+}
 
 /**
- * Отправляет отчет о состоянии микросервисов в Telegram
- * @param {Object} report - отчет о состоянии микросервисов
+ * Форматирует и отправляет отчет о состоянии сервисов
+ * @param {Object} status Объект статуса сервисов
+ * @returns {Promise<boolean>} Результат отправки
  */
-export const sendStatusReport = async (report) => {
-  const { serviceStatuses, systemStatus } = report;
+async function sendStatusReport(status) {
+  const { services, system, timestamp } = status;
   
-  let message = `<b>📊 Отчет о состоянии системы</b>\n`;
-  message += `<b>Время:</b> ${new Date().toLocaleString()}\n\n`;
+  // Форматируем заголовок
+  const dateStr = new Date(timestamp).toLocaleString();
+  let message = `📊 *Отчет о состоянии системы*\n`;
+  message += `🕐 ${dateStr}\n\n`;
   
-  // Добавляем информацию о системе
-  message += `<b>Система:</b>\n`;
-  message += `- Uptime: ${systemStatus.uptime}\n`;
-  message += `- Память: ${systemStatus.memory}\n`;
-  message += `- Загрузка CPU: ${systemStatus.cpuLoad}%\n`;
-  if (systemStatus.nodeVersion) {
-    message += `- Node.js: ${systemStatus.nodeVersion}\n`;
-  }
-  message += `\n`;
+  // Информация о системе
+  message += `*Система:*\n`;
+  message += `⏱ Время работы: ${formatUptime(system.uptime)}\n`;
+  message += `💾 Память: ${formatMemory(system.memoryUsed, system.memoryTotal)}\n\n`;
   
-  // Добавляем информацию о микросервисах
-  message += `<b>Статус микросервисов:</b>\n`;
+  // Статус сервисов
+  message += `*Состояние сервисов:*\n`;
   
-  for (const [service, status] of Object.entries(serviceStatuses)) {
-    const emoji = status.isActive ? '🟢' : '🔴';
-    message += `${emoji} <b>${service}:</b> ${status.isActive ? 'Активен' : 'Недоступен'}`;
+  // Подсчет активных/неактивных сервисов
+  const totalServices = Object.keys(services).length;
+  const activeServices = Object.values(services).filter(s => s.active).length;
+  message += `✅ Активно: ${activeServices}/${totalServices}\n\n`;
+  
+  // Список сервисов
+  Object.values(services).forEach(service => {
+    const statusIcon = service.active ? '🟢' : '🔴';
+    const responseTime = service.responseTime ? `${service.responseTime}ms` : 'н/д';
     
-    // Добавляем информацию о времени ответа
-    if (status.responseTime) {
-      message += ` (${status.responseTime}ms)`;
-    }
-    message += `\n`;
-    
-    // Если сервис активен и есть информация о его восстановлении
-    if (status.isActive && status.recoveryMessage) {
-      message += `   ↑ ${status.recoveryMessage}\n`;
-    }
-    
-    // Если сервис активен и есть информация о времени работы после восстановления
-    if (status.isActive && status.uptimeSinceRecoveryMessage) {
-      message += `   ⏱ ${status.uptimeSinceRecoveryMessage}\n`;
-    }
-    
-    // Если сервис неактивен и есть информация о его недоступности
-    if (!status.isActive && status.downtimeMessage) {
-      message += `   ⚠️ ${status.downtimeMessage}\n`;
-    }
-  }
-
-  await sendMessage(message);
-};
+    message += `${statusIcon} *${service.name}*: ${service.active ? 'активен' : 'недоступен'} (${responseTime})\n`;
+  });
+  
+  // Отправляем отчет
+  return await sendMessage(message, 'report');
+}
 
 /**
- * Обрабатывает накопившиеся сообщения в очереди
+ * Отправляет уведомление о недоступных сервисах
+ * @param {Array} downServices Список недоступных сервисов
+ * @returns {Promise<boolean>} Результат отправки
  */
-const processMessageQueue = async () => {
-  if (messageQueue.length > 0 && bot && chatId) {
-    logger.info(`Отправка ${messageQueue.length} накопившихся сообщений в Telegram`);
+async function sendDownServicesAlert(downServices) {
+  if (!downServices || downServices.length === 0) {
+    return false;
+  }
+  
+  // Форматируем заголовок
+  let message = `⚠️ *ПРЕДУПРЕЖДЕНИЕ: Обнаружены недоступные сервисы*\n\n`;
+  
+  // Список недоступных сервисов
+  downServices.forEach(service => {
+    const downSince = service.downSince 
+      ? `с ${new Date(service.downSince).toLocaleTimeString()}`
+      : 'время неизвестно';
     
-    // Копируем очередь и очищаем оригинал
-    const messagesToSend = [...messageQueue];
-    messageQueue.length = 0;
-    
-    for (const message of messagesToSend) {
-      await sendMessage(message);
-      // Делаем небольшую паузу между сообщениями, чтобы не превысить лимиты API Telegram
-      await new Promise(resolve => setTimeout(resolve, 200));
+    message += `🔴 *${service.name}* недоступен ${downSince}\n`;
+  });
+  
+  // Отправляем предупреждение
+  return await sendMessage(message, 'alert');
+}
+
+/**
+ * Отправляет уведомление о восстановлении сервиса
+ * @param {Object} recoveryEvent Событие восстановления
+ * @returns {Promise<boolean>} Результат отправки
+ */
+async function sendRecoveryAlert(recoveryEvent) {
+  // Форматируем заголовок
+  let message = `✅ *ВОССТАНОВЛЕНИЕ СЕРВИСА*\n\n`;
+  
+  // Информация о восстановлении
+  message += `🟢 Сервис *${recoveryEvent.service}* восстановлен\n`;
+  message += `⏱ Время простоя: ${formatDuration(recoveryEvent.downtime)}\n`;
+  message += `🕐 Восстановлен в: ${new Date(recoveryEvent.timestamp).toLocaleTimeString()}\n`;
+  
+  // Отправляем уведомление
+  return await sendMessage(message, 'recovery');
+}
+
+/**
+ * Форматирует время работы в читаемый вид
+ * @param {number} seconds Время в секундах
+ * @returns {string} Отформатированное время
+ */
+function formatUptime(seconds) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  if (days > 0) {
+    return `${days}д ${hours}ч ${minutes}м`;
+  } else if (hours > 0) {
+    return `${hours}ч ${minutes}м`;
+  } else {
+    return `${minutes}м ${Math.floor(seconds % 60)}с`;
+  }
+}
+
+/**
+ * Форматирует размер памяти в читаемый вид
+ * @param {number} used Используемая память в байтах
+ * @param {number} total Общая память в байтах
+ * @returns {string} Отформатированный размер
+ */
+function formatMemory(used, total) {
+  const usedMB = Math.round(used / 1024 / 1024);
+  const totalMB = Math.round(total / 1024 / 1024);
+  return `${usedMB}MB / ${totalMB}MB`;
+}
+
+/**
+ * Форматирует продолжительность в секундах в читаемый вид
+ * @param {number} seconds Продолжительность в секундах
+ * @returns {string} Отформатированная продолжительность
+ */
+function formatDuration(seconds) {
+  if (seconds < 60) {
+    return `${seconds} сек`;
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes} мин ${secs} сек`;
+  } else {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours} ч ${minutes} мин`;
+  }
+}
+
+/**
+ * Получает историю отправленных сообщений
+ * @returns {Array} История сообщений
+ */
+function getMessageHistory() {
+  return messageHistory;
+}
+
+/**
+ * Отправляет изображение в Telegram
+ * @param {string} imageBuffer Буфер изображения или путь к файлу
+ * @param {string} caption Подпись к изображению
+ * @returns {Promise<boolean>} Результат отправки
+ */
+async function sendImage(imageBuffer, caption = '') {
+  if (!bot) {
+    if (!initializeBot()) {
+      logger.error('Не удалось инициализировать Telegram бота для отправки изображения');
+      return false;
     }
   }
-};
+  
+  try {
+    await bot.sendPhoto(chatId, imageBuffer, { caption });
+    logger.info('Изображение отправлено в Telegram');
+    return true;
+  } catch (error) {
+    logger.error(`Ошибка отправки изображения в Telegram: ${error.message}`);
+    return false;
+  }
+}
 
-export default { initBot, sendMessage, sendStatusReport };
+module.exports = {
+  initializeBot,
+  isTelegramConfigured,
+  sendMessage,
+  sendStatusReport,
+  sendDownServicesAlert,
+  sendRecoveryAlert,
+  sendImage,
+  getMessageHistory
+};

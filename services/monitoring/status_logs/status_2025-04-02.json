@@ -1,0 +1,68 @@
+[
+  {
+    "timestamp": "2025-04-02T15:49:33.072Z",
+    "report": {
+      "timestamp": "2025-04-02T15:49:33.066Z",
+      "serviceStatuses": {
+        "Хранилище данных": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3002",
+          "failedAt": 1743608972936
+        },
+        "Аудио процессор": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3003",
+          "failedAt": 1743608972936
+        },
+        "Документация": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3004",
+          "failedAt": 1743608972936
+        },
+        "API Core": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3001",
+          "failedAt": 1743608972936
+        },
+        "Telegram App": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3000",
+          "failedAt": 1743608972936
+        },
+        "Админ-панель": {
+          "isActive": false,
+          "responseTime": null,
+          "status": 0,
+          "data": null,
+          "error": "connect ECONNREFUSED 127.0.0.1:3005",
+          "failedAt": 1743608972936
+        }
+      },
+      "systemStatus": {
+        "uptime": "3h 57m 8s",
+        "memory": "59603MB / 64313MB",
+        "cpuLoad": 41,
+        "platform": "linux",
+        "hostname": "f9ad25b8a87b",
+        "freeMemoryPercent": 7,
+        "nodeVersion": "v20.18.1"
+      },
+      "allServicesActive": false
+    }
+  }
+]
