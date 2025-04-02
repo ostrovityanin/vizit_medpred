@@ -226,6 +226,66 @@ async function convertToWav(inputPath, options = {}) {
 }
 
 /**
+ * Конвертирует аудиофайл в MP3 формат для новых моделей GPT-4o
+ * @param {string} inputPath Путь к исходному файлу
+ * @param {Object} options Опции конвертации
+ * @returns {Promise<string>} Путь к конвертированному файлу
+ */
+async function convertToMp3(inputPath, options = {}) {
+  try {
+    logger.info(`Конвертация аудиофайла в MP3: ${inputPath}`);
+    
+    // Создание директорий, если они не существуют
+    await ensureDirectoryExists(uploadsDir);
+    await ensureDirectoryExists(tempDir);
+    
+    // Параметры по умолчанию
+    const {
+      sampleRate = 48000,
+      channels = 1,
+      bitrate = '128k',
+      normalize = false
+    } = options;
+    
+    // Генерируем имя для MP3 файла
+    const fileName = path.basename(inputPath, path.extname(inputPath));
+    const mp3FileName = `${fileName}.mp3`;
+    const outputPath = path.join(tempDir, mp3FileName);
+    
+    // Применяем конвертацию через ffmpeg
+    return new Promise((resolve, reject) => {
+      let command = ffmpeg(inputPath)
+        .noVideo()
+        .audioChannels(channels)
+        .audioFrequency(sampleRate)
+        .audioBitrate(bitrate)
+        .audioCodec('libmp3lame')
+        .format('mp3');
+      
+      // Применение нормализации (если требуется)
+      if (normalize) {
+        command = command.audioFilters('loudnorm');
+      }
+      
+      command
+        .on('end', () => {
+          logger.info(`Аудио успешно конвертировано в MP3: ${outputPath}`);
+          resolve(outputPath);
+        })
+        .on('error', (err) => {
+          logger.error(`Ошибка при конвертации аудио в MP3: ${err.message}`);
+          reject(err);
+        })
+        .save(outputPath);
+    });
+  } catch (error) {
+    logger.error(`Ошибка при конвертации аудио в MP3: ${error.message}`);
+    // Возвращаем исходный файл в случае ошибки
+    return inputPath;
+  }
+}
+
+/**
  * Разделяет аудиофайл на сегменты указанной длительности
  * @param {string} inputPath Путь к исходному файлу
  * @param {Object} options Опции сегментации
@@ -327,6 +387,7 @@ export default {
   getMediaInfo,
   optimizeAudio,
   convertToWav,
+  convertToMp3,
   splitAudioFile,
   cleanupTempFiles
 };

@@ -164,6 +164,13 @@ async function transcribeWithAudioAPI(audioFilePath, options = {}) {
     language = '', 
     model = 'whisper-1' 
   } = options;
+  
+  // Список поддерживаемых моделей для audio/transcriptions
+  const supportedModels = [
+    'whisper-1', 
+    'gpt-4o-transcribe', 
+    'gpt-4o-mini-transcribe'
+  ];
 
   try {
     logger.info(`Транскрипция через Audio API: ${audioFilePath}`);
@@ -258,13 +265,25 @@ async function transcribeAudio(audioFilePath, options = {}) {
     transcriptionOptions.model = 'gpt-4o-audio-preview';
   }
   
-  // Выбор метода транскрипции на основе предпочтений или автоматически
-  if (preferredMethod === 'chat' || 
+  // Новые модели, которые должны использовать audio/transcriptions API
+  const newTranscribeModels = ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe'];
+  
+  // Проверка, используется ли новая модель транскрипции
+  const isNewTranscribeModel = newTranscribeModels.includes(transcriptionOptions.model);
+  
+  // Выбор метода транскрипции на основе предпочтений, модели или автоматически
+  if (isNewTranscribeModel) {
+    // Новые модели транскрипции должны использовать audio/transcriptions API
+    logger.info(`Используем метод audio/transcriptions с новой моделью ${transcriptionOptions.model}`);
+    return transcribeWithAudioAPI(audioFilePath, transcriptionOptions);
+  } else if (preferredMethod === 'chat' || 
       (preferredMethod === 'auto' && 
        (transcriptionOptions.model.includes('gpt-4o') || transcriptionOptions.model.includes('gpt-4')))) {
+    // Старые модели gpt-4o используют chat/completions API
     logger.info(`Используем метод chat/completions с моделью ${transcriptionOptions.model}`);
     return transcribeWithChatAPI(audioFilePath, transcriptionOptions);
   } else {
+    // По умолчанию используем Whisper API
     if (model === 'auto') {
       transcriptionOptions.model = 'whisper-1';
     }
