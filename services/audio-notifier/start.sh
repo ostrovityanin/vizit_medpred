@@ -1,38 +1,29 @@
 #!/bin/bash
 
-# Скрипт для запуска микросервиса audio-notifier
-echo "Запуск микросервиса отправки аудио в Telegram..."
+# Скрипт запуска микросервиса audio-notifier
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$DIR"
 
-# Переходим в директорию микросервиса
-cd "$(dirname "$0")"
+# Создаем необходимые директории
+mkdir -p temp data logs
 
-# Проверяем наличие узла node.js
-if ! command -v node &> /dev/null; then
-    echo "Ошибка: Node.js не установлен"
-    exit 1
+# Проверяем, запущен ли уже сервис
+PID_FILE="audio-notifier.pid"
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    if ps -p $PID > /dev/null 2>&1; then
+        echo "Микросервис audio-notifier уже запущен (PID: $PID)"
+        exit 0
+    else
+        # Удаляем старый PID файл, так как процесс уже не существует
+        rm "$PID_FILE"
+    fi
 fi
 
-# Проверяем наличие необходимых переменных окружения
-if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
-    echo "Ошибка: Не установлены переменные окружения TELEGRAM_BOT_TOKEN и/или TELEGRAM_CHAT_ID"
-    echo "Пожалуйста, установите их перед запуском микросервиса"
-    exit 1
-fi
-
-# Проверяем наличие зависимостей
-if [ ! -d "node_modules" ]; then
-    echo "Установка зависимостей..."
-    npm install
-fi
-
-# Создаем директории для данных и временных файлов
-mkdir -p data temp logs
-
-# Запускаем микросервис в фоновом режиме
-echo "Запуск сервиса..."
-node src/index.js > logs/audio-notifier-console.log 2>&1 &
-
-# Сохраняем PID процесса
-echo $! > ".pid"
-echo "Микросервис запущен с PID: $!"
-echo "Логи доступны в директории: logs/"
+# Запускаем сервис в фоновом режиме
+echo "Запуск микросервиса audio-notifier..."
+node src/index.js > logs/audio-notifier.log 2>&1 &
+PID=$!
+echo $PID > "$PID_FILE"
+echo "Микросервис audio-notifier запущен (PID: $PID)"
+echo "Логи доступны в файле logs/audio-notifier.log"

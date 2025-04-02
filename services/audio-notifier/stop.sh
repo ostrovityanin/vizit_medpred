@@ -1,39 +1,35 @@
 #!/bin/bash
 
-# Скрипт для остановки микросервиса audio-notifier
-echo "Остановка микросервиса отправки аудио в Telegram..."
+# Скрипт остановки микросервиса audio-notifier
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+cd "$DIR"
 
-# Переходим в директорию микросервиса
-cd "$(dirname "$0")"
-
-# Проверяем, существует ли файл с PID
-if [ ! -f ".pid" ]; then
-    echo "Микросервис не запущен или PID файл не найден"
+# Проверяем, запущен ли сервис
+PID_FILE="audio-notifier.pid"
+if [ ! -f "$PID_FILE" ]; then
+    echo "Микросервис audio-notifier не запущен"
     exit 0
 fi
 
-# Читаем PID из файла
-PID=$(cat ".pid")
-
-# Проверяем, существует ли процесс с этим PID
-if ! ps -p $PID > /dev/null; then
-    echo "Процесс с PID $PID не найден"
-    rm -f ".pid"
+PID=$(cat "$PID_FILE")
+if ! ps -p $PID > /dev/null 2>&1; then
+    echo "Микросервис audio-notifier не запущен (процесс $PID не существует)"
+    rm "$PID_FILE"
     exit 0
 fi
 
-# Останавливаем процесс
-echo "Остановка процесса с PID: $PID..."
+# Останавливаем сервис
+echo "Остановка микросервиса audio-notifier (PID: $PID)..."
 kill $PID
-
-# Проверяем, успешно ли остановлен процесс
 sleep 2
-if ps -p $PID > /dev/null; then
-    echo "Процесс не остановлен, принудительное завершение..."
+
+# Проверяем, остановился ли процесс
+if ps -p $PID > /dev/null 2>&1; then
+    echo "Принудительная остановка микросервиса audio-notifier (PID: $PID)..."
     kill -9 $PID
     sleep 1
 fi
 
-# Удаляем файл с PID
-rm -f ".pid"
-echo "Микросервис остановлен"
+# Удаляем PID файл
+rm "$PID_FILE"
+echo "Микросервис audio-notifier остановлен"

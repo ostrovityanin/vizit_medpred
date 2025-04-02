@@ -10,10 +10,10 @@ if ! npm list | grep -q "node-telegram-bot-api"; then
 fi
 
 # Запускаем мониторинг и перенаправляем вывод в лог-файл
-nohup node services/simple-monitor.js > services/monitoring.log 2>&1 &
+nohup node services/simple-monitor.js > monitoring.log 2>&1 &
 PID=$!
 
 echo "Мониторинг запущен с PID: $PID"
-echo $PID > services/monitoring.pid
-echo "Логи сохраняются в services/monitoring.log"
+echo $PID > monitoring.pid
+echo "Логи сохраняются в monitoring.log"
 echo "Для остановки используйте: bash services/stop-monitoring.sh"
