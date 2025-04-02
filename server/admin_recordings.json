@@ -209,7 +209,35 @@
       "status": "completed",
       "id": 15,
       "sent": false
+    },
+    {
+      "filename": "5e473ae7-7236-4c97-839c-84a5d03b151e.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T18:24:58.106Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 16,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Поскольку в представленной транскрипции нет явных указаний на разных говорящих, я предположу, что все это было сказано одним человеком.\nЧеловек 1: \"Вы видели у него дети вместе у Одессы. Она тоже умерла. Вы даже ее имени не знали. Они ничего не знали, ни о ком не знали. Люди не ада.\"",
+      "transcriptionCost": "0.0031",
+      "tokensProcessed": 464
+    },
+    {
+      "filename": "49099961-3100-4138-8df3-1d31d726700d.wav",
+      "duration": 15,
+      "timestamp": "2025-04-02T18:25:26.335Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 495438,
+      "transcription": "Извините, но в предоставленном тексте недостаточно информации для определения разных говорящих. Пожалуйста, предоставьте более подробную информацию или контекст.",
+      "transcriptionCost": "0.0031",
+      "tokensProcessed": 464,
+      "status": "completed",
+      "id": 17,
+      "sent": false
     }
   ],
-  "currentId": 16
+  "currentId": 18
 }
