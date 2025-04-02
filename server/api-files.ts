@@ -16,8 +16,6 @@ router.get('/', (req, res) => {
   try {
     const files = fs.readdirSync(clientPublicPath)
       .filter(file => 
-        file.endsWith('.zab') || 
-        file.endsWith('.deb') || 
         file.endsWith('.zip') || 
         file.endsWith('.md')
       )
@@ -53,7 +51,7 @@ router.get('/:filename', (req, res) => {
     // Для Markdown файлов - отображаем текст
     res.setHeader('Content-Type', 'text/markdown');
     res.send(fs.readFileSync(filePath, 'utf8'));
-  } else if (['.zab', '.deb', '.zip'].includes(ext)) {
+  } else if (['.zip'].includes(ext)) {
     // Для бинарных файлов - предлагаем скачать
     res.download(filePath);
   } else {

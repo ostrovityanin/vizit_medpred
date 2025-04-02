@@ -30,18 +30,13 @@ router.get('/', (req, res) => {
   </style>
 </head>
 <body>
-  <h1>Документация API Zepp OS</h1>
+  <h1>Документация API</h1>
   <ul>
-    <li><a href="/api/docs/zepp-os-docs" target="_blank">Документация по Zepp OS</a></li>
     <li><a href="/api/docs/replit-guide" target="_blank">Руководство по Replit</a></li>
   </ul>
-  <h2>Загрузка файлов</h2>
+  <h2>Полезные ресурсы</h2>
   <ul>
-    <li><a href="/api/files/zepp_all_packages.zip" download>Скачать все пакеты (ZIP)</a></li>
-    <li><a href="/api/files/basic_zepp.zab" download>Скачать basic_zepp.zab</a></li>
-    <li><a href="/api/files/pure_minimal_zepp.zab" download>Скачать pure_minimal_zepp.zab</a></li>
-    <li><a href="/api/files/minimal_fixed_zepp.zab" download>Скачать minimal_fixed_zepp.zab</a></li>
-    <li><a href="/api/files/zepp_installation_guide_updated.md" target="_blank">Руководство по установке</a></li>
+    <li><a href="/api/docs/replit-guide" target="_blank">Руководство по работе с приложением</a></li>
   </ul>
   <div class="note">
     Все эти файлы доступны по прямым ссылкам и через API.
@@ -53,16 +48,7 @@ router.get('/', (req, res) => {
   res.send(html);
 });
 
-// Маршрут для страницы документации Zepp OS
-router.get('/zepp-os-docs', (req, res) => {
-  const filePath = path.join(clientPublicPath, 'zepp-os-docs.html');
-  if (fs.existsSync(filePath)) {
-    res.setHeader('Content-Type', 'text/html');
-    res.send(fs.readFileSync(filePath, 'utf8'));
-  } else {
-    res.status(404).send('Файл документации Zepp OS не найден');
-  }
-});
+// Маршрут для страницы документации Zepp OS отключен
 
 // Маршрут для руководства по Replit
 router.get('/replit-guide', (req, res) => {
