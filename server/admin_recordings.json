@@ -174,14 +174,42 @@
       "timestamp": "2025-04-02T17:37:28.188Z",
       "targetUsername": "archive",
       "senderUsername": "ostrovityanin",
-      "status": "completed",
+      "status": "started",
       "id": 13,
       "sent": false,
       "fileSize": null,
       "transcription": "Человек 1: Тест таймера.",
       "transcriptionCost": "0.0036",
       "tokensProcessed": 536
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-02T18:16:10.969Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 14,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": "01b48ffc-9e05-4bb6-9d02-9efb4cdde96a.wav",
+      "duration": 38,
+      "timestamp": "2025-04-02T18:16:51.907Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1252764,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null,
+      "status": "completed",
+      "id": 15,
+      "sent": false
     }
   ],
-  "currentId": 14
+  "currentId": 16
 }

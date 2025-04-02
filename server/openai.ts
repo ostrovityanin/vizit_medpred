@@ -352,6 +352,67 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
     log(`Отправляем аудиофайл на распознавание: ${fileToProcess}`, 'openai');
     
     try {
+      // Проверяем существование и размер файла перед обработкой
+      if (!fs.existsSync(fileToProcess)) {
+        log(`Ошибка: файл ${fileToProcess} не найден`, 'openai');
+        return {
+          text: 'Ошибка: аудиофайл не найден',
+          cost: '0.0000',
+          tokensProcessed: 0
+        };
+      }
+      
+      const fileInfo = fs.statSync(fileToProcess);
+      if (fileInfo.size === 0) {
+        log(`Ошибка: файл ${fileToProcess} имеет нулевой размер`, 'openai');
+        return {
+          text: 'Ошибка: аудиофайл имеет нулевой размер',
+          cost: '0.0000',
+          tokensProcessed: 0
+        };
+      }
+      
+      log(`Проверка файла ${fileToProcess} перед отправкой: ${fileInfo.size} байт`, 'openai');
+      
+      // Проверяем формат файла с помощью ffprobe
+      try {
+        const ffprobePromise = new Promise<boolean>((resolve, reject) => {
+          ffmpeg.ffprobe(fileToProcess, (err, metadata) => {
+            if (err) {
+              log(`Ошибка при анализе аудиофайла: ${err.message}`, 'openai');
+              reject(err);
+              return;
+            }
+            
+            if (!metadata || !metadata.format) {
+              log('Не удалось получить информацию о формате аудиофайла', 'openai');
+              reject(new Error('Неизвестный формат аудиофайла'));
+              return;
+            }
+            
+            // Проверяем, что файл содержит аудиопотоки
+            const hasAudioStreams = metadata.streams?.some(stream => stream.codec_type === 'audio');
+            if (!hasAudioStreams) {
+              log('Аудиофайл не содержит аудиопотоков', 'openai');
+              reject(new Error('Файл не содержит аудиопотоков'));
+              return;
+            }
+            
+            log(`Формат аудиофайла: ${metadata.format.format_name}, аудиопотоки: ${metadata.streams?.filter(s => s.codec_type === 'audio').length}`, 'openai');
+            resolve(true);
+          });
+        }).catch((error) => {
+          log(`Предупреждение при проверке аудиофайла: ${error}`, 'openai');
+          // Продолжаем даже при ошибке анализа, OpenAI API может справиться
+          return true;
+        });
+        
+        await ffprobePromise;
+      } catch (ffprobeError) {
+        log(`Ошибка при выполнении ffprobe: ${ffprobeError}`, 'openai');
+        // Продолжаем выполнение, так как эта проверка не критична
+      }
+      
       // Единственный шаг: Базовое распознавание с помощью Whisper с напрямую выделенными говорящими
       const response = await openai.audio.transcriptions.create({
         file: fs.createReadStream(fileToProcess),

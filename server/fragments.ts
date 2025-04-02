@@ -253,8 +253,31 @@ class FragmentManager {
       // Объединяем буферы
       let combinedBuffer: Buffer;
       try {
-        combinedBuffer = Buffer.concat(buffers);
+        // Проверяем, что у нас есть буферы с контентом
+        let validBuffers = buffers;
+        if (buffers.some(b => b.length === 0)) {
+          log(`Предупреждение: обнаружены пустые буферы в списке фрагментов`, 'fragments');
+          // Удаляем пустые буферы
+          validBuffers = buffers.filter(b => b.length > 0);
+          log(`Отфильтровано ${buffers.length - validBuffers.length} пустых буферов`, 'fragments');
+          // Используем validBuffers дальше
+        }
+        
+        combinedBuffer = Buffer.concat(validBuffers);
         log(`Объединено ${buffers.length} буферов, общий размер: ${combinedBuffer.length} байт`, 'fragments');
+        
+        // Проверка на наличие WebM заголовка (WebM начинается с 0x1A45DFA3)
+        const hasValidHeader = combinedBuffer.length > 4 && 
+                             combinedBuffer[0] === 0x1A && 
+                             combinedBuffer[1] === 0x45 && 
+                             combinedBuffer[2] === 0xDF && 
+                             combinedBuffer[3] === 0xA3;
+        
+        if (!hasValidHeader) {
+          log(`Предупреждение: Объединенный буфер не содержит корректного WebM заголовка`, 'fragments');
+        } else {
+          log(`Объединенный буфер содержит корректный WebM заголовок`, 'fragments');
+        }
       } catch (concatError) {
         log(`Ошибка при объединении буферов: ${concatError}`, 'fragments');
         return null;
@@ -266,7 +289,13 @@ class FragmentManager {
       
       try {
         await fs.promises.writeFile(combinedPath, combinedBuffer);
-        log(`Успешно сохранен объединенный файл ${combinedFilename}`, 'fragments');
+        log(`Успешно сохранен объединенный файл ${combinedFilename}, размер: ${combinedBuffer.length} байт`, 'fragments');
+        
+        // Проверяем целостность записанного файла
+        const stats = await fs.promises.stat(combinedPath);
+        if (stats.size !== combinedBuffer.length) {
+          log(`Предупреждение: Размер записанного файла (${stats.size}) не соответствует размеру буфера (${combinedBuffer.length})`, 'fragments');
+        }
       } catch (writeError) {
         log(`Ошибка при сохранении объединенного файла: ${writeError}`, 'fragments');
         // Продолжаем выполнение, так как у нас все еще есть combinedBuffer
@@ -390,17 +419,70 @@ class FragmentManager {
     try {
       log(`Конвертация файла ${input} в формат WAV`, 'fragments');
       
-      // Используем FFmpeg для конвертации
-      const command = `ffmpeg -i "${input}" -ar 44100 -ac 1 "${output}" -y`;
+      // Проверка существования исходного файла
+      if (!fs.existsSync(input)) {
+        log(`Ошибка: Исходный файл для конвертации не существует: ${input}`, 'fragments');
+        return false;
+      }
+      
+      // Проверка размера исходного файла
+      const inputStats = await fs.promises.stat(input);
+      if (inputStats.size === 0) {
+        log(`Ошибка: Исходный файл для конвертации имеет нулевой размер: ${input}`, 'fragments');
+        return false;
+      }
+      
+      log(`Исходный файл проверен, размер: ${inputStats.size} байт`, 'fragments');
+      
+      // Используем более надежный набор параметров для FFmpeg
+      // -vn: отключаем обработку видео (если есть)
+      // -acodec pcm_s16le: используем несжатый 16-bit PCM аудиокодек
+      // -ar 16000: частота дискретизации 16kHz (рекомендуемая для OpenAI)
+      // -ac 1: монофонический звук
+      // -y: перезаписать файл, если существует
+      const command = `ffmpeg -y -i "${input}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${output}"`;
+      
+      log(`Выполняем команду конвертации: ${command}`, 'fragments');
       await execAsync(command);
       
-      const stats = await fs.promises.stat(output);
-      log(`Конвертация успешна, размер файла: ${stats.size} байт`, 'fragments');
+      // Проверка, что выходной файл создан
+      if (!fs.existsSync(output)) {
+        log(`Ошибка: Выходной WAV файл не был создан: ${output}`, 'fragments');
+        return false;
+      }
       
+      const stats = await fs.promises.stat(output);
+      if (stats.size === 0) {
+        log(`Ошибка: Созданный WAV файл имеет нулевой размер: ${output}`, 'fragments');
+        return false;
+      }
+      
+      log(`Конвертация успешна, размер файла: ${stats.size} байт`, 'fragments');
       return true;
     } catch (error) {
       log(`Ошибка при конвертации аудио: ${error}`, 'fragments');
-      return false;
+      
+      // Попробуем использовать запасной вариант конвертации
+      try {
+        log(`Попытка использовать альтернативный метод конвертации...`, 'fragments');
+        // Альтернативный вариант с минимальными параметрами
+        const fallbackCommand = `ffmpeg -y -i "${input}" "${output}"`;
+        await execAsync(fallbackCommand);
+        
+        if (fs.existsSync(output)) {
+          const stats = await fs.promises.stat(output);
+          if (stats.size > 0) {
+            log(`Альтернативный метод конвертации успешен, размер файла: ${stats.size} байт`, 'fragments');
+            return true;
+          }
+        }
+        
+        log(`Альтернативный метод конвертации также не удался`, 'fragments');
+        return false;
+      } catch (fallbackError) {
+        log(`Ошибка при альтернативной конвертации: ${fallbackError}`, 'fragments');
+        return false;
+      }
     }
   }
 
