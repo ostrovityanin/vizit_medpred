@@ -1,0 +1,90 @@
+version: '3'
+
+services:
+  data-storage:
+    build:
+      context: ./data-storage
+    ports:
+      - "3002:3002"
+    environment:
+      - PORT=3002
+      - NODE_ENV=production
+    volumes:
+      - data_storage_data:/app/data
+
+  audio-processor:
+    build:
+      context: ./audio-processor
+    ports:
+      - "3003:3003"
+    environment:
+      - PORT=3003
+      - NODE_ENV=production
+      - DATA_STORAGE_URL=http://data-storage:3002
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - audio_processor_uploads:/app/uploads
+      - audio_processor_fragments:/app/fragments
+      - audio_processor_combined:/app/combined
+    depends_on:
+      - data-storage
+
+  documentation:
+    build:
+      context: ./documentation
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - NODE_ENV=production
+    volumes:
+      - documentation_static:/app/static
+      - ../:/app/repo:ro
+
+  api-core:
+    build:
+      context: ./api-core
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - NODE_ENV=production
+      - DATA_STORAGE_URL=http://data-storage:3002
+      - AUDIO_PROCESSOR_URL=http://audio-processor:3003
+      - DOCUMENTATION_URL=http://documentation:3004
+      - CORS_ORIGIN=*
+      - SESSION_SECRET=${SESSION_SECRET}
+    volumes:
+      - api_core_uploads:/app/uploads
+    depends_on:
+      - data-storage
+      - audio-processor
+      - documentation
+
+  telegram-app:
+    build:
+      context: ./telegram-app
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - VITE_API_URL=http://localhost:3001
+
+  admin-panel:
+    build:
+      context: ./admin-panel
+    ports:
+      - "3005:3005"
+    environment:
+      - PORT=3005
+      - NODE_ENV=production
+      - VITE_API_URL=http://localhost:3001
+
+volumes:
+  data_storage_data:
+  audio_processor_uploads:
+  audio_processor_fragments:
+  audio_processor_combined:
+  documentation_static:
+  api_core_uploads:

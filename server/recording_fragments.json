@@ -29,7 +29,27 @@
       "size": 45523,
       "processed": true,
       "id": 3
+    },
+    {
+      "recordingId": 7,
+      "filename": "fragment-session-1743605939707-135-00000.webm",
+      "index": 0,
+      "timestamp": 1743605944383,
+      "sessionId": "session-1743605939707-135",
+      "size": 75840,
+      "processed": true,
+      "id": 4
+    },
+    {
+      "recordingId": 8,
+      "filename": "fragment-session-1743605949613-509-00000.webm",
+      "index": 0,
+      "timestamp": 1743605955072,
+      "sessionId": "session-1743605949613-509",
+      "size": 82847,
+      "processed": true,
+      "id": 5
     }
   ],
-  "currentId": 4
+  "currentId": 6
 }

@@ -1,0 +1,29 @@
+{
+  "name": "telegram-audio-recorder-microservices",
+  "version": "1.0.0",
+  "description": "Микросервисная архитектура для Telegram Mini App Audio Recorder",
+  "main": "index.js",
+  "scripts": {
+    "start:data-storage": "cd data-storage && npm run dev",
+    "start:audio-processor": "cd audio-processor && npm run dev",
+    "start:api-core": "cd api-core && npm run dev",
+    "start:documentation": "cd documentation && npm run dev",
+    "start:telegram-app": "cd telegram-app && npm run dev",
+    "start:admin-panel": "cd admin-panel && npm run dev",
+    "start:all": "concurrently \"npm run start:data-storage\" \"npm run start:audio-processor\" \"npm run start:documentation\" \"npm run start:api-core\" \"npm run start:telegram-app\" \"npm run start:admin-panel\"",
+    "install:all": "concurrently \"cd data-storage && npm install\" \"cd audio-processor && npm install\" \"cd api-core && npm install\" \"cd documentation && npm install\" \"cd telegram-app && npm install\" \"cd admin-panel && npm install\"",
+    "build:all": "concurrently \"cd telegram-app && npm run build\" \"cd admin-panel && npm run build\""
+  },
+  "keywords": [
+    "microservices",
+    "telegram",
+    "audio",
+    "recorder",
+    "zepp"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -83,7 +83,63 @@
       "sent": false,
       "transcriptionCost": null,
       "tokensProcessed": null
+    },
+    {
+      "filename": "6c45e084-138a-49cb-96cf-5d877024382b.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T14:58:58.883Z",
+      "targetUsername": "archive",
+      "senderUsername": "Пользователь",
+      "status": "completed",
+      "id": 7,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Человек 1: У-у-у.",
+      "transcriptionCost": "0.0026",
+      "tokensProcessed": 387
+    },
+    {
+      "filename": "7252ce0d-04ac-47e1-b431-dab4469caa37.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T14:59:09.757Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 8,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Извините, но в предоставленном вами тексте нет диалога или разных говорящих, которых можно было бы определить и отформатировать. Пожалуйста, предоставьте полный текст для анализа.",
+      "transcriptionCost": "0.0029",
+      "tokensProcessed": 432
+    },
+    {
+      "filename": "0e9b7c9c-1780-43ef-b749-9bc912be5be3.wav",
+      "duration": 4,
+      "timestamp": "2025-04-02T14:59:09.599Z",
+      "targetUsername": "archive",
+      "senderUsername": "Пользователь",
+      "fileSize": 412854,
+      "transcription": "Человек 1: У-у-у.",
+      "transcriptionCost": "0.0026",
+      "tokensProcessed": 387,
+      "status": "completed",
+      "id": 9,
+      "sent": false
+    },
+    {
+      "filename": "341037cc-fa57-4606-9810-e77c1720ffa0.wav",
+      "duration": 4,
+      "timestamp": "2025-04-02T14:59:21.225Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 460482,
+      "transcription": "Извините, но вы не предоставили текст для анализа и форматирования. Пожалуйста, предоставьте текст, и я с удовольствием помогу вам с этим.",
+      "transcriptionCost": "0.0029",
+      "tokensProcessed": 432,
+      "status": "completed",
+      "id": 10,
+      "sent": false
     }
   ],
-  "currentId": 7
+  "currentId": 11
 }
