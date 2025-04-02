@@ -3,31 +3,30 @@
  * 
  * Этот скрипт запускает микросервис, тестирует его функциональность и затем останавливает
  */
-import fetch from 'node-fetch';
-import FormData from 'form-data';
+
+import { spawn, exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+import dotenv from 'dotenv';
 
-// Получаем путь к текущему файлу и директории
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Загрузка переменных окружения
+dotenv.config();
 
-// Путь к тестовому аудиофайлу
-// Используем реальный записанный с микрофона файл
-const sampleAudioPath = path.join(__dirname, 'server', 'uploads', 'dbbdcdc0-3e44-49d8-96c4-07afe0f3943d.wav');
-// URL микросервиса
-const serviceUrl = 'http://localhost:3200';
 // Путь к директории микросервиса
-const servicePath = path.join(__dirname, 'services', 'gpt4o-audio-service');
-// PID файл
-const pidFile = path.join(__dirname, 'gpt4o-service.pid');
+const serviceDir = './services/gpt4o-audio-service';
+// URL сервиса
+const serviceUrl = 'http://localhost:3001';
+// Путь к тестовому аудиофайлу
+const testAudioFile = './test_audio/sample.wav';
 
 /**
  * Задержка выполнения
  */
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Запуск микросервиса
@@ -35,54 +34,43 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 async function startService() {
   console.log('Запуск микросервиса GPT-4o Audio...');
   
-  const child = spawn('node', ['src/index.js'], {
-    cwd: servicePath,
-    detached: true,
-    stdio: 'inherit'
+  return new Promise((resolve, reject) => {
+    const start = spawn('node', ['start-gpt4o-service.js'], {
+      stdio: 'inherit'
+    });
+    
+    start.on('exit', (code) => {
+      if (code === 0) {
+        console.log('Скрипт запуска выполнен успешно');
+        // Даем время на запуск сервиса
+        setTimeout(resolve, 2000);
+      } else {
+        reject(new Error(`Ошибка запуска сервиса, код: ${code}`));
+      }
+    });
   });
-  
-  // Сохранение PID процесса
-  fs.writeFileSync(pidFile, child.pid.toString());
-  
-  console.log(`Микросервис запущен с PID: ${child.pid}`);
-  
-  // Освобождаем процесс от родительского
-  child.unref();
-  
-  // Ждем несколько секунд для запуска сервиса
-  await delay(5000);
 }
 
 /**
  * Остановка микросервиса
  */
 async function stopService() {
-  // Проверка существования PID файла
-  if (!fs.existsSync(pidFile)) {
-    console.error('Файл PID не найден. Возможно, сервис не запущен.');
-    return;
-  }
-
-  // Чтение PID из файла
-  const pid = fs.readFileSync(pidFile, 'utf-8').trim();
-
-  try {
-    // Отправка сигнала завершения процессу
-    process.kill(parseInt(pid), 'SIGTERM');
-    console.log(`Отправлен сигнал завершения процессу с PID: ${pid}`);
+  console.log('Остановка микросервиса GPT-4o Audio...');
+  
+  return new Promise((resolve, reject) => {
+    const stop = spawn('node', ['stop-gpt4o-service.js'], {
+      stdio: 'inherit'
+    });
     
-    // Удаление PID файла
-    fs.unlinkSync(pidFile);
-    console.log('Микросервис GPT-4o Audio успешно остановлен.');
-  } catch (err) {
-    console.error(`Ошибка при остановке микросервиса: ${err.message}`);
-    
-    // Если процесс не существует, удаляем PID файл
-    if (err.code === 'ESRCH') {
-      fs.unlinkSync(pidFile);
-      console.log('PID файл удален.');
-    }
-  }
+    stop.on('exit', (code) => {
+      if (code === 0) {
+        console.log('Скрипт остановки выполнен успешно');
+        resolve();
+      } else {
+        reject(new Error(`Ошибка остановки сервиса, код: ${code}`));
+      }
+    });
+  });
 }
 
 /**
@@ -90,19 +78,23 @@ async function stopService() {
  */
 async function checkHealth() {
   try {
-    console.log('Проверка доступности сервиса...');
-    const response = await fetch(`${serviceUrl}/health`);
+    console.log('Проверка работоспособности сервиса...');
     
-    if (response.ok) {
-      const data = await response.json();
-      console.log('Сервис доступен:', data);
-      return true;
-    } else {
-      console.error(`Сервис недоступен. Статус: ${response.status}`);
-      return false;
+    const response = await fetch(`${serviceUrl}/health`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    const data = await response.json();
+    console.log('Статус сервиса:', data);
+    
+    if (!data.apiAvailable) {
+      console.warn('⚠️ ВНИМАНИЕ: API OpenAI недоступен. Убедитесь, что API ключ установлен в переменной окружения OPENAI_API_KEY');
+    }
+    
+    return data.status === 'ok';
   } catch (error) {
-    console.error('Ошибка при проверке сервиса:', error.message);
+    console.error(`Ошибка при проверке сервиса: ${error.message}`);
     return false;
   }
 }
@@ -112,38 +104,87 @@ async function checkHealth() {
  */
 async function testTranscription() {
   try {
-    console.log('Тестирование транскрипции аудио...');
+    console.log(`Тестирование транскрипции аудиофайла: ${testAudioFile}`);
     
-    // Проверка существования тестового файла
-    if (!fs.existsSync(sampleAudioPath)) {
-      console.error(`Тестовый файл не найден: ${sampleAudioPath}`);
-      return false;
+    // Проверяем наличие тестового файла
+    if (!fs.existsSync(testAudioFile)) {
+      // Если тестовый файл не существует, используем другой аудиофайл из директории
+      const testDir = path.dirname(testAudioFile);
+      if (fs.existsSync(testDir)) {
+        const files = fs.readdirSync(testDir);
+        const audioFiles = files.filter(file => 
+          ['.mp3', '.wav', '.m4a', '.webm'].includes(path.extname(file).toLowerCase())
+        );
+        
+        if (audioFiles.length > 0) {
+          const alternativeFile = path.join(testDir, audioFiles[0]);
+          console.log(`Используем альтернативный файл: ${alternativeFile}`);
+          testTranscriptionWithFile(alternativeFile);
+          return;
+        }
+      }
+      
+      console.error('Тестовый аудиофайл не найден!');
+      return;
+    }
+    
+    testTranscriptionWithFile(testAudioFile);
+  } catch (error) {
+    console.error(`Ошибка при тестировании транскрипции: ${error.message}`);
+  }
+}
+
+/**
+ * Тестирование транскрипции конкретного аудиофайла
+ */
+async function testTranscriptionWithFile(filePath) {
+  try {
+    // Проверяем доступность API ключа OpenAI
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('API ключ OpenAI не установлен в переменных окружения!');
+      console.log('Для тестирования необходимо установить переменную окружения OPENAI_API_KEY');
+      return;
     }
     
     // Создаем FormData для отправки файла
     const formData = new FormData();
-    formData.append('audioFile', fs.createReadStream(sampleAudioPath));
-    formData.append('optimize', 'false'); // Отключаем оптимизацию для тестирования
+    formData.append('file', fs.createReadStream(filePath));
+    formData.append('optimize', 'true');
+    formData.append('model', 'auto'); // auto = gpt-4o-audio-preview
+    formData.append('preferredMethod', 'auto');
+    formData.append('splitLargeFiles', 'true');
     
-    // Отправляем запрос на транскрипцию
+    console.log('Отправка запроса на транскрипцию...');
+    
+    // Отправляем запрос к сервису
     const response = await fetch(`${serviceUrl}/api/transcribe`, {
       method: 'POST',
-      body: formData,
-      headers: formData.getHeaders()
+      body: formData
     });
     
-    if (response.ok) {
-      const result = await response.json();
-      console.log('Результат транскрипции:', result);
-      return true;
-    } else {
-      const error = await response.text();
-      console.error(`Ошибка при транскрипции. Статус: ${response.status}`, error);
-      return false;
+    if (!response.ok) {
+      let errorText = await response.text();
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(`Ошибка при транскрипции: ${JSON.stringify(errorData)}`);
+      } catch {
+        throw new Error(`Ошибка при транскрипции: ${errorText}`);
+      }
     }
+    
+    const result = await response.json();
+    
+    console.log('\n========== Результат транскрипции ==========');
+    console.log(`Модель: ${result.model}`);
+    console.log(`Длительность: ${result.duration ? Math.round(result.duration) + ' сек' : 'Неизвестно'}`);
+    console.log(`Время обработки: ${result.processingTime}`);
+    console.log(`Примерная стоимость: ${result.estimatedCost}`);
+    console.log('-------------------------------------------');
+    console.log('Транскрипция:');
+    console.log(result.transcription);
+    console.log('===========================================\n');
   } catch (error) {
-    console.error('Ошибка при тестировании транскрипции:', error.message);
-    return false;
+    console.error(`Ошибка при тестировании транскрипции: ${error.message}`);
   }
 }
 
@@ -155,16 +196,32 @@ async function runTest() {
     // Запуск сервиса
     await startService();
     
-    // Проверка доступности
-    if (await checkHealth()) {
+    // Ожидание запуска сервиса
+    await sleep(2000);
+    
+    // Проверка работоспособности
+    const isHealthy = await checkHealth();
+    
+    if (isHealthy) {
       // Тестирование транскрипции
       await testTranscription();
+    } else {
+      console.error('Сервис недоступен, тестирование транскрипции пропущено');
     }
-  } catch (error) {
-    console.error('Ошибка при тестировании:', error.message);
-  } finally {
+    
     // Остановка сервиса
     await stopService();
+    
+    console.log('Тестирование завершено');
+  } catch (error) {
+    console.error(`Ошибка при тестировании: ${error.message}`);
+    
+    // Попытка остановить сервис в случае ошибки
+    try {
+      await stopService();
+    } catch (e) {
+      console.error(`Не удалось остановить сервис: ${e.message}`);
+    }
   }
 }
 

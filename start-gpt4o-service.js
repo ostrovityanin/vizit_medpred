@@ -1,38 +1,57 @@
 /**
  * Скрипт для запуска микросервиса GPT-4o Audio
  */
-import { spawn } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-// Получаем путь к текущему файлу и директории
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
 
 // Путь к директории микросервиса
-const servicePath = path.join(__dirname, 'services', 'gpt4o-audio-service');
-const pidFile = path.join(__dirname, 'gpt4o-service.pid');
+const serviceDir = './services/gpt4o-audio-service';
+// PID файл для отслеживания процесса
+const pidFile = path.join(serviceDir, 'service.pid');
 
-// Проверка существования директории
-if (!fs.existsSync(servicePath)) {
-  console.error(`Директория микросервиса не найдена: ${servicePath}`);
-  process.exit(1);
+// Функция для проверки, запущен ли уже сервис
+function isServiceRunning() {
+  if (fs.existsSync(pidFile)) {
+    try {
+      const pid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
+      // Проверяем, существует ли процесс с таким PID
+      process.kill(pid, 0);
+      return true;
+    } catch (e) {
+      // Если процесс не существует, удаляем PID файл
+      fs.unlinkSync(pidFile);
+      return false;
+    }
+  }
+  return false;
 }
 
-// Запуск микросервиса
-console.log('Запуск микросервиса GPT-4o Audio...');
-const child = spawn('node', ['src/index.js'], {
-  cwd: servicePath,
-  detached: true,
-  stdio: 'inherit'
-});
+// Функция для запуска сервиса
+function startService() {
+  if (isServiceRunning()) {
+    console.log('Сервис GPT-4o Audio уже запущен');
+    return;
+  }
 
-// Сохранение PID процесса
-fs.writeFileSync(pidFile, child.pid.toString());
+  console.log('Запуск сервиса GPT-4o Audio...');
 
-console.log(`Микросервис запущен с PID: ${child.pid}`);
-console.log(`Для остановки выполните: node stop-gpt4o-service.js`);
+  // Запускаем микросервис
+  const service = spawn('node', ['src/index.js'], {
+    cwd: serviceDir,
+    stdio: 'inherit',
+    detached: true
+  });
 
-// Освобождаем процесс от родительского
-child.unref();
+  // Записываем PID процесса в файл
+  fs.writeFileSync(pidFile, service.pid.toString());
+
+  console.log(`Сервис GPT-4o Audio запущен (PID: ${service.pid})`);
+  
+  // Отключаем родительский процесс от дочернего
+  service.unref();
+}
+
+// Запуск сервиса
+startService();

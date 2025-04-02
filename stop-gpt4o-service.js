@@ -1,39 +1,44 @@
 /**
  * Скрипт для остановки микросервиса GPT-4o Audio
  */
+
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-// Получаем путь к текущему файлу и директории
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Путь к директории микросервиса
+const serviceDir = './services/gpt4o-audio-service';
+// PID файл для отслеживания процесса
+const pidFile = path.join(serviceDir, 'service.pid');
 
-const pidFile = path.join(__dirname, 'gpt4o-service.pid');
+// Функция для остановки сервиса
+function stopService() {
+  if (!fs.existsSync(pidFile)) {
+    console.log('Сервис GPT-4o Audio не запущен');
+    return;
+  }
 
-// Проверка существования PID файла
-if (!fs.existsSync(pidFile)) {
-  console.error('Файл PID не найден. Возможно, сервис не запущен.');
-  process.exit(1);
-}
-
-// Чтение PID из файла
-const pid = fs.readFileSync(pidFile, 'utf-8').trim();
-
-try {
-  // Отправка сигнала завершения процессу
-  process.kill(parseInt(pid), 'SIGTERM');
-  console.log(`Отправлен сигнал завершения процессу с PID: ${pid}`);
-  
-  // Удаление PID файла
-  fs.unlinkSync(pidFile);
-  console.log('Микросервис GPT-4o Audio успешно остановлен.');
-} catch (err) {
-  console.error(`Ошибка при остановке микросервиса: ${err.message}`);
-  
-  // Если процесс не существует, удаляем PID файл
-  if (err.code === 'ESRCH') {
+  try {
+    // Читаем PID из файла
+    const pid = parseInt(fs.readFileSync(pidFile, 'utf8').trim());
+    
+    // Отправляем сигнал SIGTERM процессу
+    process.kill(pid, 'SIGTERM');
+    console.log(`Отправлен сигнал SIGTERM процессу с PID: ${pid}`);
+    
+    // Удаляем PID файл
     fs.unlinkSync(pidFile);
-    console.log('PID файл удален.');
+    console.log('Сервис GPT-4o Audio остановлен');
+  } catch (error) {
+    console.error(`Ошибка при остановке сервиса: ${error.message}`);
+    
+    // Удаляем PID файл в любом случае
+    try {
+      fs.unlinkSync(pidFile);
+    } catch (e) {
+      // Игнорируем ошибку при удалении файла
+    }
   }
 }
+
+// Остановка сервиса
+stopService();

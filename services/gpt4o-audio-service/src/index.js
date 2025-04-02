@@ -1,321 +1,246 @@
 /**
- * Микросервис GPT-4o Audio для транскрипции аудиозаписей
+ * Главный файл микросервиса GPT-4o Audio
+ * 
+ * Микросервис предоставляет REST API для транскрипции аудиофайлов 
+ * с использованием OpenAI GPT-4o Audio Preview и Whisper API
  */
 
-import 'dotenv/config';
 import express from 'express';
-import multer from 'multer';
 import cors from 'cors';
+import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-import { 
-  logInfo, 
-  logError, 
-  logWarning, 
-  logRequest, 
-  logResponse 
-} from './logger.js';
-import { 
-  transcribeWithGPT4o, 
-  isOpenAIConfigured,
-  cleanText,
-  parseDialogueFromText,
-  calculateGPT4oTranscriptionCost
-} from './gpt4o-client.js';
-import {
-  optimizeAudioForTranscription,
-  convertWebmToWav,
-  getAudioDuration,
-  splitAudioFile,
-  cleanupTempFiles,
-  ensureDirectoryExists
-} from './audio-processor.js';
+import dotenv from 'dotenv';
+import gpt4oClient from './gpt4o-client.js';
+import audioProcessor from './audio-processor.js';
+import logger from './logger.js';
 
-// Получаем текущую директорию (для ES modules)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Загрузка переменных окружения
+dotenv.config();
 
-// Директории для хранения файлов
-const uploadsDir = path.join(__dirname, '../uploads');
-const tempDir = path.join(__dirname, '../temp');
+// Настройка Express
+const app = express();
+const PORT = process.env.PORT || 3001;
 
-// Создаем директории, если они не существуют
-ensureDirectoryExists(uploadsDir);
-ensureDirectoryExists(tempDir);
+// Директории для загрузки файлов
+const uploadsDir = process.env.UPLOADS_DIR || './uploads';
+const tempDir = path.join(uploadsDir, 'temp');
 
-// Конфигурация сервиса
-const config = {
-  port: process.env.PORT || 3200,
-  maxFileSize: process.env.MAX_FILE_SIZE || 100 * 1024 * 1024, // 100MB по умолчанию
-  apiToken: process.env.API_TOKEN,
-  version: '1.0.0',
-  serviceName: 'GPT-4o Audio Service'
-};
+// Максимальный размер загружаемого файла
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || '20971520'); // 20MB по умолчанию
 
-// Настройка multer для загрузки файлов
+// Настройка CORS
+app.use(cors());
+app.use(express.json());
+
+// Настройка хранилища для загруженных файлов
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+  destination: async (req, file, cb) => {
+    // Создаем директории, если они не существуют
+    await audioProcessor.ensureDirectoryExists(uploadsDir);
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname) || '.webm';
-    cb(null, uniqueSuffix + ext);
+    // Генерируем уникальное имя файла
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
+    const filename = `${timestamp}_${file.originalname}`;
+    cb(null, filename);
   }
 });
 
+// Настройка загрузчика файлов
 const upload = multer({
   storage,
   limits: {
-    fileSize: config.maxFileSize
+    fileSize: MAX_FILE_SIZE
+  },
+  fileFilter: (req, file, cb) => {
+    // Проверяем тип файла
+    const allowedMimeTypes = [
+      'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 
+      'audio/x-wav', 'audio/webm', 'audio/mp4', 'audio/x-m4a'
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Неподдерживаемый тип файла: ${file.mimetype}`));
+    }
   }
 });
 
-// Middleware для проверки API-токена
-const authenticateToken = (req, res, next) => {
-  if (!config.apiToken) {
-    return next(); // Если токен не настроен, пропускаем проверку
-  }
-  
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Отсутствует токен авторизации' });
-  }
-  
-  if (token !== config.apiToken) {
-    return res.status(403).json({ error: 'Недействительный токен авторизации' });
-  }
-  
-  next();
-};
-
-// Создаем сервер Express
-const app = express();
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Обработчик ошибок
-app.use((err, req, res, next) => {
-  logError(err, req, 'Ошибка сервера');
-  res.status(500).json({
-    error: 'Ошибка сервера',
-    message: err.message
-  });
-});
-
-// Маршруты
+// Маршрут для проверки работоспособности сервиса
 app.get('/health', (req, res) => {
-  const openaiConfigured = isOpenAIConfigured();
-  res.json({
+  const healthCheck = {
     status: 'ok',
-    version: config.version,
-    serviceName: config.serviceName,
-    openaiConfigured
-  });
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+    apiAvailable: gpt4oClient.hasOpenAIKey(),
+    service: 'gpt4o-audio-service'
+  };
+  
+  res.json(healthCheck);
 });
 
-app.get('/api/info', authenticateToken, (req, res) => {
-  const openaiConfigured = isOpenAIConfigured();
-  res.json({
-    version: config.version,
-    serviceName: config.serviceName,
-    openaiConfigured,
-    maxFileSize: config.maxFileSize,
-    uploadsDir,
-    tempDir
-  });
-});
-
-// API для транскрипции
-app.post('/api/transcribe', authenticateToken, upload.single('audioFile'), async (req, res) => {
+// Маршрут для транскрипции аудио
+app.post('/api/transcribe', upload.single('file'), async (req, res) => {
   try {
-    logRequest(req, 'Получен запрос на транскрипцию');
+    const startTime = Date.now();
     
     if (!req.file) {
-      return res.status(400).json({ error: 'Аудиофайл не загружен' });
+      logger.error('Файл не загружен');
+      return res.status(400).json({ error: 'Файл не загружен' });
     }
     
-    const filepath = req.file.path;
-    let processedFilePath = filepath;
+    logger.info(`Файл загружен: ${req.file.path} (${req.file.size} байт)`);
     
-    // Проверяем, нужно ли оптимизировать аудио
-    const optimize = req.body.optimize !== 'false';
+    // Получение параметров запроса
+    const { 
+      optimize = 'true', 
+      model = 'auto',
+      preferredMethod = 'auto',
+      prompt = '',
+      language = '',
+      splitLargeFiles = 'true'
+    } = req.body;
     
-    if (optimize) {
+    // Путь к загруженному файлу
+    let audioFilePath = req.file.path;
+    let tempFiles = [];
+    
+    // Оптимизация аудиофайла (если требуется)
+    if (optimize === 'true') {
       try {
-        processedFilePath = await optimizeAudioForTranscription(filepath);
-      } catch (optimizeError) {
-        logWarning(`Ошибка оптимизации, продолжаем с оригинальным файлом: ${optimizeError.message}`);
+        const optimizedPath = await audioProcessor.optimizeAudio(audioFilePath, {
+          outputFormat: 'mp3',
+          sampleRate: 16000,
+          channels: 1,
+          bitrate: '32k'
+        });
+        
+        if (optimizedPath !== audioFilePath) {
+          tempFiles.push(optimizedPath);
+          audioFilePath = optimizedPath;
+          logger.info(`Файл оптимизирован: ${audioFilePath}`);
+        }
+      } catch (error) {
+        logger.warn(`Ошибка при оптимизации аудио: ${error.message}. Используем оригинальный файл.`);
       }
     }
     
-    // Получаем длительность аудио для расчета примерной стоимости
-    let duration = 0;
+    // Получение информации о файле для расчета стоимости
+    let fileInfo;
     try {
-      duration = await getAudioDuration(processedFilePath);
-      logInfo(`Длительность аудио: ${duration} секунд`);
-    } catch (durationError) {
-      logWarning(`Не удалось определить длительность: ${durationError.message}`);
+      fileInfo = await audioProcessor.getMediaInfo(audioFilePath);
+    } catch (error) {
+      logger.error(`Ошибка при получении информации о файле: ${error.message}`);
     }
     
-    // Выполняем транскрипцию
-    const transcriptionResult = await transcribeWithGPT4o(processedFilePath);
+    // Расчет примерной стоимости (если доступна информация о длительности)
+    let estimatedCost = 'Неизвестно';
+    if (fileInfo && fileInfo.duration) {
+      estimatedCost = gpt4oClient.calculateTranscriptionCost(fileInfo.duration);
+    }
     
-    // Очищаем временные файлы
-    if (optimize && processedFilePath !== filepath) {
+    // Разбиение больших файлов на сегменты (опционально)
+    let segments = [];
+    let transcriptions = [];
+    
+    if (splitLargeFiles === 'true' && fileInfo && fileInfo.duration > 60) {
       try {
-        fs.unlinkSync(processedFilePath);
-      } catch (e) {
-        logWarning(`Не удалось удалить временный файл: ${e.message}`);
+        logger.info('Разбиение файла на сегменты...');
+        segments = await audioProcessor.splitAudioFile(audioFilePath, {
+          segmentDurationSeconds: 60,
+          outputFormat: 'mp3'
+        });
+        
+        tempFiles.push(...segments.filter(s => s !== audioFilePath));
+        
+        // Транскрипция каждого сегмента
+        for (let i = 0; i < segments.length; i++) {
+          logger.info(`Транскрипция сегмента ${i+1}/${segments.length}`);
+          const segmentResult = await gpt4oClient.transcribeAudio(segments[i], {
+            model,
+            preferredMethod,
+            prompt: i === 0 ? prompt : '', // Промпт только для первого сегмента
+            language
+          });
+          
+          if (segmentResult) {
+            transcriptions.push(segmentResult.text || '');
+          }
+        }
+        
+        // Объединение результатов транскрипции
+        const transcriptionText = transcriptions.join(' ');
+        
+        const response = {
+          status: 'success',
+          transcription: transcriptionText,
+          duration: fileInfo ? fileInfo.duration : null,
+          segments: segments.length,
+          estimatedCost,
+          model: model === 'auto' ? 'gpt-4o-audio-preview' : model,
+          processingTime: `${(Date.now() - startTime) / 1000} сек`
+        };
+        
+        res.json(response);
+      } catch (error) {
+        logger.error(`Ошибка при обработке сегментов: ${error.message}`);
+        // В случае ошибки, пробуем обработать файл целиком
+        segments = [];
       }
     }
     
-    // Форматируем текст, если нужно
-    const rawText = transcriptionResult.text;
-    const formattedText = req.body.format === 'dialogue' 
-      ? parseDialogueFromText(rawText)
-      : cleanText(rawText);
-    
-    const response = {
-      transcription: {
-        raw: rawText,
-        formatted: formattedText
-      },
-      metadata: {
-        filename: req.file.originalname,
-        filesize: req.file.size,
-        mimetype: req.file.mimetype,
-        duration,
-        cost: transcriptionResult.cost,
-        tokensProcessed: transcriptionResult.tokensProcessed,
-        optimized: optimize && processedFilePath !== filepath
+    // Если сегментация не требуется или произошла ошибка - обрабатываем файл целиком
+    if (segments.length === 0) {
+      // Транскрипция аудио
+      const result = await gpt4oClient.transcribeAudio(audioFilePath, {
+        model,
+        preferredMethod,
+        prompt,
+        language
+      });
+      
+      if (!result) {
+        throw new Error('Не удалось выполнить транскрипцию');
       }
-    };
+      
+      const response = {
+        status: 'success',
+        transcription: result.text,
+        duration: fileInfo ? fileInfo.duration : null,
+        estimatedCost,
+        model: result.model || (model === 'auto' ? 'gpt-4o-audio-preview' : model),
+        processingTime: `${(Date.now() - startTime) / 1000} сек`
+      };
+      
+      res.json(response);
+    }
     
-    logResponse(req, res, 'Транскрипция успешно выполнена');
-    res.json(response);
+    // Очистка временных файлов
+    if (tempFiles.length > 0) {
+      await audioProcessor.cleanupTempFiles(tempFiles);
+    }
   } catch (error) {
-    logError(error, req, 'Ошибка при выполнении транскрипции');
-    
-    // Очищаем загруженный файл в случае ошибки
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (e) {
-        logWarning(`Не удалось удалить загруженный файл: ${e.message}`);
-      }
-    }
-    
-    res.status(500).json({
-      error: 'Ошибка транскрипции',
-      message: error.message
-    });
-  }
-});
-
-// API для оптимизации аудио
-app.post('/api/optimize', authenticateToken, upload.single('audioFile'), async (req, res) => {
-  try {
-    logRequest(req, 'Получен запрос на оптимизацию аудио');
-    
-    if (!req.file) {
-      return res.status(400).json({ error: 'Аудиофайл не загружен' });
-    }
-    
-    const filepath = req.file.path;
-    const outputPath = req.body.outputPath || path.join(
-      tempDir, 
-      `optimized_${Date.now()}${path.extname(filepath) || '.mp3'}`
-    );
-    
-    // Оптимизируем аудио
-    const optimizedPath = await optimizeAudioForTranscription(filepath, outputPath);
-    
-    // Получаем информацию о файлах
-    const originalStats = fs.statSync(filepath);
-    const optimizedStats = fs.statSync(optimizedPath);
-    const compressionRatio = (originalStats.size / optimizedStats.size).toFixed(2);
-    
-    const response = {
-      originalPath: filepath,
-      outputPath: optimizedPath,
-      originalSize: originalStats.size,
-      optimizedSize: optimizedStats.size,
-      compressionRatio,
-      metadata: {
-        filename: req.file.originalname,
-        mimetype: req.file.mimetype
-      }
-    };
-    
-    logResponse(req, res, 'Аудио успешно оптимизировано');
-    res.json(response);
-  } catch (error) {
-    logError(error, req, 'Ошибка при оптимизации аудио');
-    
-    // Очищаем загруженный файл в случае ошибки
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (e) {
-        logWarning(`Не удалось удалить загруженный файл: ${e.message}`);
-      }
-    }
-    
-    res.status(500).json({
-      error: 'Ошибка оптимизации',
-      message: error.message
-    });
-  }
-});
-
-// API для расчета стоимости транскрипции
-app.post('/api/calculate-cost', authenticateToken, async (req, res) => {
-  try {
-    const { durationSeconds } = req.body;
-    
-    if (!durationSeconds || isNaN(durationSeconds)) {
-      return res.status(400).json({ error: 'Необходимо указать длительность в секундах' });
-    }
-    
-    const cost = calculateGPT4oTranscriptionCost(durationSeconds);
-    
-    res.json({ cost });
-  } catch (error) {
-    logError(error, req, 'Ошибка при расчете стоимости');
-    res.status(500).json({
-      error: 'Ошибка расчета стоимости',
-      message: error.message
-    });
+    logger.error(`Ошибка при обработке запроса: ${error.message}`);
+    res.status(500).json({ error: error.message });
   }
 });
 
 // Запуск сервера
-app.listen(config.port, '0.0.0.0', () => {
-  logInfo(`${config.serviceName} запущен на порту ${config.port}`);
-  logInfo(`Версия: ${config.version}`);
-  
-  if (!isOpenAIConfigured()) {
-    logWarning('OpenAI API ключ не настроен! Функции транскрипции недоступны.');
-  }
+app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`GPT-4o Audio Service запущен на порту ${PORT}`);
 });
 
 // Обработка сигналов завершения
-process.on('SIGINT', () => {
-  logInfo('Получен сигнал SIGINT. Завершение работы...');
-  cleanupTempFiles();
+process.on('SIGINT', async () => {
+  logger.info('Сервис останавливается...');
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  logInfo('Получен сигнал SIGTERM. Завершение работы...');
-  cleanupTempFiles();
+process.on('SIGTERM', async () => {
+  logger.info('Сервис останавливается...');
   process.exit(0);
 });
 
