@@ -321,7 +321,35 @@
       "status": "completed",
       "id": 23,
       "sent": false
+    },
+    {
+      "filename": "dc185d4f-46af-482d-af58-d11bb042021d.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T19:17:58.851Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 24,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий 1: Что происходит? Помоги.\nГоворящий 2: Я же сказала, Джеймс, я не готова к разговору.\nГоворящий 1: Зало Джеймс, Левс. Отвезти Дженджера в клинику, чтобы ты её осмотрела.\nГоворящий 2: Нет, я уже закрыла всё на выходные. Это тяжело.",
+      "transcriptionCost": "0.0047",
+      "tokensProcessed": 698
+    },
+    {
+      "filename": "d4db4ebb-89da-4948-ab49-8fb09ebe1c3f.wav",
+      "duration": 22,
+      "timestamp": "2025-04-02T19:18:38.993Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 745038,
+      "transcription": "Говорящий 1: Я же сказала, Джеймс, я не готова к разговору.\nГоворящий 2: Зало Джеймс, Лев. Отвезти Джен-Джера в клинику, чтобы ты её осмотрела.\nГоворящий 1: Нет, я уже закрыла всё на выходные. Это тяжело.",
+      "transcriptionCost": "0.0047",
+      "tokensProcessed": 698,
+      "status": "completed",
+      "id": 25,
+      "sent": false
     }
   ],
-  "currentId": 24
+  "currentId": 26
 }

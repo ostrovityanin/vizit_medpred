@@ -335,40 +335,26 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
         audioFile = mp3FilePath;
       }
       
-      // 2. Читаем аудиофайл как бинарные данные
-      const audioBuffer = fs.readFileSync(audioFile);
+      // 2. Используем напрямую OpenAI SDK для отправки аудио файла
+      log(`Отправляем аудио в GPT-4o через OpenAI SDK`, 'openai');
       
-      // 3. Создаем форму для отправки файла напрямую, без использования Base64
-      const formData = new FormData();
-      formData.append('file', await fileFromPath(audioFile));
-      formData.append('model', 'gpt-4o-audio-preview');
-      formData.append('prompt', 'Выполни транскрипцию аудиозаписи с выделением говорящих. Используй формат "Говорящий N: текст"');
+      // Читаем аудиофайл
+      const audioFileStream = fs.createReadStream(audioFile);
       
-      // 4. Отправляем запрос напрямую в OpenAI API
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
-        },
-        // @ts-ignore - игнорируем ошибку типизации для formData
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        log(`Ошибка при вызове GPT-4o API: ${response.status} ${response.statusText} - ${errorText}`, 'openai');
-        return null;
-      }
-      
-      const result = await response.json() as any;
-      const transcribedText = result.text || '';
-      
-      // 5. Форматируем результат через API чата для выделения говорящих,
-      // если транскрипция не содержит разделения на говорящих
-      if (!transcribedText.includes('Говорящий') && !transcribedText.includes('Мужчина:') && !transcribedText.includes('Женщина:')) {
-        log('Транскрипция не содержит выделения говорящих, применяем постобработку с gpt-4o', 'openai');
+      try {
+        // Используем стандартный Whisper API для транскрипции
+        const whisperResponse = await openai.audio.transcriptions.create({
+          file: fs.createReadStream(audioFile),
+          model: "whisper-1",  // Используем whisper-1, а потом обработаем через GPT-4o
+          language: "ru",
+          temperature: 0.2,
+          prompt: "Это аудио запись диалога с несколькими говорящими. Распознай текст полностью."
+        });
         
-        const completion = await openai.chat.completions.create({
+        const rawTranscription = whisperResponse.text;
+        
+        // Теперь используем GPT-4o для форматирования транскрипции с выделением говорящих
+        const response = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
             {
@@ -376,14 +362,15 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
               content: systemPrompt
             },
             {
-              role: "user", 
-              content: `Разбей этот текст на диалог с выделением говорящих: ${transcribedText}`
+              role: "user",
+              content: `Проанализируй и форматируй эту транскрипцию с выделением говорящих: "${rawTranscription}"`
             }
           ],
-          temperature: 0.1,
+          temperature: 0.1
         });
         
-        const formattedText = completion.choices[0].message.content || transcribedText;
+        // Получаем результат
+        const transcribedText = response.choices[0].message.content || '';
         
         // Рассчитываем длительность аудиофайла на основе размера (приблизительно)
         const durationSeconds = fileStats.size / 16000; // для WAV ~16 КБ на секунду при 16 кГц, моно
@@ -391,24 +378,6 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
         // Рассчитываем стоимость и токены
         const cost = calculateGPT4oTranscriptionCost(durationSeconds);
         const tokensProcessed = Math.round(durationSeconds * 50); // примерно 50 токенов на секунду
-        
-        // Время распознавания
-        const endTime = Date.now();
-        const processingTime = (endTime - startTime) / 1000;
-        
-        log(`GPT-4o успешно распознал аудио за ${processingTime.toFixed(2)} секунд с постобработкой`, 'openai');
-        log(`Результат распознавания: ${formattedText.substring(0, 100)}...`, 'openai');
-        
-        return {
-          text: formattedText,
-          cost,
-          tokensProcessed
-        };
-      } else {
-        // Длительность аудиофайла и стоимость
-        const durationSeconds = fileStats.size / 16000;
-        const cost = calculateGPT4oTranscriptionCost(durationSeconds);
-        const tokensProcessed = Math.round(durationSeconds * 50);
         
         // Время распознавания
         const endTime = Date.now();
@@ -422,6 +391,58 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
           cost,
           tokensProcessed
         };
+      } catch (gptError) {
+        log(`GPT-4o не смог обработать аудио: ${gptError}`, 'openai');
+        
+        // Как резервный вариант, используем Whisper API
+        try {
+          log(`Пробуем использовать Whisper API как резервный вариант`, 'openai');
+          
+          const whisperResponse = await openai.audio.transcriptions.create({
+            file: fs.createReadStream(audioFile),
+            model: "whisper-1",
+            language: "ru",
+            temperature: 0.2,
+            prompt: "Это запись диалога, распознай всю речь полностью."
+          });
+          
+          const rawText = whisperResponse.text;
+          
+          // Используем GPT-4 для форматирования с говорящими
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt
+              },
+              {
+                role: "user", 
+                content: `Разбей этот текст на диалог с выделением говорящих: ${rawText}`
+              }
+            ],
+            temperature: 0.1,
+          });
+          
+          const formattedText = completion.choices[0].message.content || rawText;
+          
+          // Рассчитываем длительность, стоимость и токены
+          const durationSeconds = fileStats.size / 16000;
+          const cost = calculateTranscriptionCost(durationSeconds);
+          const tokensProcessed = Math.round(durationSeconds * 15);
+          
+          log(`Whisper успешно распознал аудио с пост-обработкой GPT-4`, 'openai');
+          log(`Результат распознавания: ${formattedText.substring(0, 100)}...`, 'openai');
+          
+          return {
+            text: formattedText,
+            cost,
+            tokensProcessed
+          };
+        } catch (whisperError) {
+          log(`Whisper тоже не смог обработать аудио: ${whisperError}`, 'openai');
+          return null;
+        }
       }
     } catch (error) {
       log(`Ошибка при вызове GPT-4o Audio Preview API: ${error}`, 'openai');
