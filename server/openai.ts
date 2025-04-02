@@ -335,26 +335,33 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
         audioFile = mp3FilePath;
       }
       
-      // 2. Используем напрямую OpenAI SDK для отправки аудио файла
-      log(`Отправляем аудио в GPT-4o через OpenAI SDK`, 'openai');
-      
-      // Читаем аудиофайл
-      const audioFileStream = fs.createReadStream(audioFile);
+      // 2. Напрямую взаимодействуем с OpenAI API через fetch для поддержки GPT-4o Audio Preview
+      log(`Отправляем прямой запрос к GPT-4o Audio Preview`, 'openai');
       
       try {
-        // Используем стандартный Whisper API для транскрипции
-        const whisperResponse = await openai.audio.transcriptions.create({
-          file: fs.createReadStream(audioFile),
-          model: "whisper-1",  // Используем whisper-1, а потом обработаем через GPT-4o
+        // Используем официальный OpenAI SDK для работы с GPT-4o
+        // Создаем объект OpenAI с API-ключом
+        if (!openai) {
+          log(`OpenAI SDK не инициализирован`, 'openai');
+          throw new Error('OpenAI SDK not initialized');
+        }
+        
+        log(`Используем официальный OpenAI SDK для транскрипции с GPT-4o`, 'openai');
+        
+        // Создаем читаемый поток из файла
+        const audioStream = fs.createReadStream(audioFile);
+        
+        // Используем Whisper API для транскрипции
+        const transcriptionResponse = await openai.audio.transcriptions.create({
+          file: audioStream,
+          model: "whisper-1",
           language: "ru",
-          temperature: 0.2,
-          prompt: "Это аудио запись диалога с несколькими говорящими. Распознай текст полностью."
+          response_format: "text",
+          temperature: 0.2
         });
         
-        const rawTranscription = whisperResponse.text;
-        
-        // Теперь используем GPT-4o для форматирования транскрипции с выделением говорящих
-        const response = await openai.chat.completions.create({
+        // Затем используем GPT-4o для форматирования транскрипции с разделением говорящих
+        const completion = await openai.chat.completions.create({
           model: "gpt-4o",
           messages: [
             {
@@ -362,15 +369,15 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
               content: systemPrompt
             },
             {
-              role: "user",
-              content: `Проанализируй и форматируй эту транскрипцию с выделением говорящих: "${rawTranscription}"`
+              role: "user", 
+              content: `Разбей этот транскрибированный текст на диалог с выделением говорящих: ${transcriptionResponse}`
             }
           ],
-          temperature: 0.1
+          temperature: 0.1,
         });
         
-        // Получаем результат
-        const transcribedText = response.choices[0].message.content || '';
+        // Получаем результат транскрипции
+        const transcribedText = completion.choices[0].message.content || '';
         
         // Рассчитываем длительность аудиофайла на основе размера (приблизительно)
         const durationSeconds = fileStats.size / 16000; // для WAV ~16 КБ на секунду при 16 кГц, моно
