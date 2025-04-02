@@ -167,7 +167,21 @@
       "status": "completed",
       "id": 12,
       "sent": false
+    },
+    {
+      "filename": "8f42447c-a036-4bf1-91a0-b9ca5bf54e37.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T17:37:28.188Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 13,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Человек 1: Тест таймера.",
+      "transcriptionCost": "0.0036",
+      "tokensProcessed": 536
     }
   ],
-  "currentId": 13
+  "currentId": 14
 }
