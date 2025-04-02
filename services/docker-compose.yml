@@ -1,49 +1,58 @@
-version: '3'
+version: '3.8'
 
 services:
+  # 1. Сервис хранения данных
   data-storage:
     build:
       context: ./data-storage
+    container_name: data-storage
+    restart: unless-stopped
     ports:
       - "3002:3002"
     environment:
       - PORT=3002
       - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
     volumes:
-      - data_storage_data:/app/data
+      - data-storage-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
 
+  # 2. Сервис обработки аудио
   audio-processor:
     build:
       context: ./audio-processor
+    container_name: audio-processor
+    restart: unless-stopped
     ports:
       - "3003:3003"
     environment:
       - PORT=3003
       - NODE_ENV=production
-      - DATA_STORAGE_URL=http://data-storage:3002
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - audio_processor_uploads:/app/uploads
-      - audio_processor_fragments:/app/fragments
-      - audio_processor_combined:/app/combined
+      - audio-processor-data:/app/uploads
     depends_on:
       - data-storage
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
 
-  documentation:
-    build:
-      context: ./documentation
-    ports:
-      - "3004:3004"
-    environment:
-      - PORT=3004
-      - NODE_ENV=production
-    volumes:
-      - documentation_static:/app/static
-      - ../:/app/repo:ro
-
+  # 3. API Core сервис
   api-core:
     build:
       context: ./api-core
+    container_name: api-core
+    restart: unless-stopped
     ports:
       - "3001:3001"
     environment:
@@ -52,38 +61,88 @@ services:
       - DATA_STORAGE_URL=http://data-storage:3002
       - AUDIO_PROCESSOR_URL=http://audio-processor:3003
       - DOCUMENTATION_URL=http://documentation:3004
-      - CORS_ORIGIN=*
-      - SESSION_SECRET=${SESSION_SECRET}
-    volumes:
-      - api_core_uploads:/app/uploads
     depends_on:
       - data-storage
       - audio-processor
-      - documentation
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
 
+  # 4. Сервис документации
+  documentation:
+    build:
+      context: ./documentation
+    container_name: documentation
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      - PORT=3004
+      - NODE_ENV=production
+    volumes:
+      - documentation-data:/app/docs
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  # 5. Telegram Mini App
   telegram-app:
     build:
       context: ./telegram-app
+    container_name: telegram-app
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
       - PORT=3000
       - NODE_ENV=production
-      - VITE_API_URL=http://localhost:3001
+      - API_URL=http://api-core:3001
+    depends_on:
+      - api-core
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
 
+  # 6. Админ-панель
   admin-panel:
     build:
       context: ./admin-panel
+    container_name: admin-panel
+    restart: unless-stopped
     ports:
       - "3005:3005"
     environment:
       - PORT=3005
       - NODE_ENV=production
-      - VITE_API_URL=http://localhost:3001
-      
+      - API_URL=http://api-core:3001
+    depends_on:
+      - api-core
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
+
+  # 7. Сервис мониторинга
   monitoring:
     build:
       context: ./monitoring
+    container_name: monitoring
+    restart: unless-stopped
     ports:
       - "3006:3006"
     environment:
@@ -91,31 +150,31 @@ services:
       - NODE_ENV=production
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - HEALTH_CHECK_INTERVAL=60000
-      - REPORT_INTERVAL=3600000
       - DATA_STORAGE_URL=http://data-storage:3002
       - AUDIO_PROCESSOR_URL=http://audio-processor:3003
       - DOCUMENTATION_URL=http://documentation:3004
       - API_CORE_URL=http://api-core:3001
       - TELEGRAM_APP_URL=http://telegram-app:3000
       - ADMIN_PANEL_URL=http://admin-panel:3005
-      - LOG_LEVEL=info
-      - LOG_PATH=/app/logs
+      - HEALTH_CHECK_INTERVAL=60000
     volumes:
-      - monitoring_logs:/app/logs
-    depends_on:
-      - data-storage
-      - audio-processor
-      - documentation
-      - api-core
-      - telegram-app
-      - admin-panel
+      - monitoring-logs:/app/logs
+      - monitoring-status:/app/status_logs
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - app-network
 
 volumes:
-  data_storage_data:
-  audio_processor_uploads:
-  audio_processor_fragments:
-  audio_processor_combined:
-  documentation_static:
-  api_core_uploads:
-  monitoring_logs:
+  data-storage-data:
+  audio-processor-data:
+  documentation-data:
+  monitoring-logs:
+  monitoring-status:
+
+networks:
+  app-network:
+    driver: bridge

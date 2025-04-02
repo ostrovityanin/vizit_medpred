@@ -1,603 +1,423 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Сервис мониторинга - Telegram Mini App Audio Recorder</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      padding-top: 20px;
-      background-color: #f8f9fa;
-    }
-    .service-card {
-      border-radius: 10px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      transition: transform 0.2s;
-    }
-    .service-card:hover {
-      transform: translateY(-5px);
-    }
-    .service-card.active {
-      border-left: 5px solid #28a745;
-    }
-    .service-card.inactive {
-      border-left: 5px solid #dc3545;
-    }
-    .status-indicator {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-right: 5px;
-    }
-    .status-indicator.active {
-      background-color: #28a745;
-    }
-    .status-indicator.inactive {
-      background-color: #dc3545;
-    }
-    .dashboard-header {
-      background: linear-gradient(135deg, #0d6efd, #0dcaf0);
-      color: white;
-      padding: 20px;
-      border-radius: 10px;
-      margin-bottom: 30px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .chart-container {
-      background: white;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      height: 300px;
-    }
-    .metrics-card {
-      border-radius: 10px;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .telegram-log {
-      max-height: 500px;
-      overflow-y: auto;
-    }
-    .recovery-log {
-      max-height: 300px;
-      overflow-y: auto;
-    }
-    #serviceStatusTable th, #serviceStatusTable td {
-      vertical-align: middle;
-    }
-    .response-time {
-      font-size: 0.9rem;
-      color: #6c757d;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель мониторинга</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #e2e8f0;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --error-color: #ef4444;
+            --border-color: #334155;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        h1, h2, h3 {
+            margin-top: 0;
+            font-weight: 600;
+        }
+        
+        .status-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-card {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .service-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+        
+        .status-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+        
+        .status-healthy {
+            background-color: rgba(16, 185, 129, 0.2);
+            color: var(--success-color);
+        }
+        
+        .status-warning {
+            background-color: rgba(245, 158, 11, 0.2);
+            color: var(--warning-color);
+        }
+        
+        .status-critical {
+            background-color: rgba(239, 68, 68, 0.2);
+            color: var(--error-color);
+        }
+        
+        .status-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .status-message {
+            margin-top: 10px;
+            font-style: italic;
+            color: #94a3b8;
+        }
+        
+        .error-log {
+            margin-top: 30px;
+        }
+        
+        .log-entry {
+            background-color: rgba(0, 0, 0, 0.2);
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        
+        .history-section {
+            margin-top: 30px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        th {
+            background-color: rgba(0, 0, 0, 0.2);
+            font-weight: 500;
+        }
+        
+        tr:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .refresh-button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .refresh-button:hover {
+            background-color: #2563eb;
+        }
+        
+        .refresh-time {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+        
+        .system-status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .healthy-indicator {
+            background-color: var(--success-color);
+        }
+        
+        .warning-indicator {
+            background-color: var(--warning-color);
+        }
+        
+        .critical-indicator {
+            background-color: var(--error-color);
+        }
+        
+        @media (max-width: 768px) {
+            .status-overview {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <div class="dashboard-header text-center">
-      <h1>Telegram Mini App Audio Recorder</h1>
-      <h3>Панель мониторинга микросервисов</h3>
-      <p class="mb-0">Отслеживание состояния и производительности сервисов в реальном времени</p>
-    </div>
-
-    <div class="row mb-4">
-      <div class="col-md-6">
-        <div class="metrics-card bg-white p-4">
-          <h4 class="mb-3">Общая статистика</h4>
-          <div class="row">
-            <div class="col-6">
-              <div class="card bg-light mb-3">
-                <div class="card-body text-center">
-                  <h5 class="card-title">Сервисы активны</h5>
-                  <h2 id="activeServicesCount" class="text-success">0/0</h2>
-                </div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="card bg-light mb-3">
-                <div class="card-body text-center">
-                  <h5 class="card-title">Статус системы</h5>
-                  <h2 id="systemStatus" class="text-primary">-</h2>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="row">
-            <div class="col-6">
-              <div class="card bg-light mb-0">
-                <div class="card-body text-center">
-                  <h5 class="card-title">Время работы</h5>
-                  <h2 id="uptimeDisplay" class="text-primary">-</h2>
-                </div>
-              </div>
-            </div>
-            <div class="col-6">
-              <div class="card bg-light mb-0">
-                <div class="card-body text-center">
-                  <h5 class="card-title">Использование ОЗУ</h5>
-                  <h2 id="memoryUsage" class="text-primary">-</h2>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div class="container">
+        <header>
+            <h1>Панель мониторинга</h1>
+            <button id="refresh-button" class="refresh-button">Обновить</button>
+        </header>
+        
+        <div id="system-status" class="system-status">
+            <div class="status-indicator healthy-indicator" id="status-indicator"></div>
+            <h2>Статус системы: <span id="overall-status">Здоровая</span></h2>
         </div>
-      </div>
-      <div class="col-md-6">
-        <div class="chart-container">
-          <h4 class="mb-3">Время отклика сервисов (мс)</h4>
-          <canvas id="responseTimeChart"></canvas>
+        
+        <div class="refresh-time">Последнее обновление: <span id="refresh-time">-</span></div>
+        
+        <div id="status-overview" class="status-overview">
+            <!-- Карточки статуса сервисов будут добавлены здесь -->
         </div>
-      </div>
-    </div>
-
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">Статус микросервисов</h4>
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              <table id="serviceStatusTable" class="table table-striped table-hover">
+        
+        <div class="history-section card">
+            <h3>История изменений статуса</h3>
+            <table id="history-table">
                 <thead>
-                  <tr>
-                    <th>Сервис</th>
-                    <th>Статус</th>
-                    <th>Время отклика</th>
-                    <th>URL</th>
-                    <th>Последняя проверка</th>
-                  </tr>
+                    <tr>
+                        <th>Время</th>
+                        <th>Событие</th>
+                        <th>Сервис</th>
+                        <th>Статус</th>
+                    </tr>
                 </thead>
-                <tbody id="serviceStatusBody">
-                  <!-- Данные будут добавлены через JavaScript -->
+                <tbody id="history-body">
+                    <!-- История изменений статуса будет добавлена здесь -->
                 </tbody>
-              </table>
-            </div>
-          </div>
+            </table>
         </div>
-      </div>
+        
+        <div class="error-log card">
+            <h3>Последние ошибки</h3>
+            <div id="error-log">
+                <!-- Логи ошибок будут добавлены здесь -->
+            </div>
+        </div>
     </div>
-
-    <div class="row mb-4">
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">Последние уведомления Telegram</h4>
-          </div>
-          <div class="card-body telegram-log">
-            <div id="telegramMessages" class="list-group">
-              <!-- Данные будут добавлены через JavaScript -->
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="card">
-          <div class="card-header bg-primary text-white">
-            <h4 class="mb-0">Восстановление после сбоев</h4>
-          </div>
-          <div class="card-body recovery-log">
-            <div id="recoveryLog" class="list-group">
-              <!-- Данные будут добавлены через JavaScript -->
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card">
-          <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Управление</h4>
-            <button id="sendReportBtn" class="btn btn-sm btn-light">Отправить отчет в Telegram</button>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-4">
-                <div class="mb-3">
-                  <label for="healthCheckInterval" class="form-label">Интервал проверки (мс)</label>
-                  <input type="number" class="form-control" id="healthCheckInterval" value="60000">
-                </div>
-              </div>
-              <div class="col-md-4">
-                <div class="mb-3">
-                  <label for="alertThreshold" class="form-label">Порог оповещения (мс)</label>
-                  <input type="number" class="form-control" id="alertThreshold" value="2000">
-                </div>
-              </div>
-              <div class="col-md-4">
-                <div class="mb-3">
-                  <label for="refreshRate" class="form-label">Частота обновления UI (мс)</label>
-                  <input type="number" class="form-control" id="refreshRate" value="5000">
-                </div>
-              </div>
-            </div>
-            <div class="row mt-3">
-              <div class="col-12">
-                <button id="saveSettingsBtn" class="btn btn-primary">Сохранить настройки</button>
-                <button id="refreshDataBtn" class="btn btn-outline-primary ms-2">Обновить данные</button>
-                <button id="clearRecoveryLogBtn" class="btn btn-outline-secondary ms-2">Очистить лог восстановлений</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // Определение сервисов для мониторинга
-    const services = [
-      { id: 'data-storage', name: 'Сервис хранения данных', url: 'http://localhost:3002/health' },
-      { id: 'audio-processor', name: 'Сервис обработки аудио', url: 'http://localhost:3003/health' },
-      { id: 'api-core', name: 'API Core сервис', url: 'http://localhost:3001/health' },
-      { id: 'documentation', name: 'Сервис документации', url: 'http://localhost:3004/health' },
-      { id: 'telegram-app', name: 'Telegram Mini App', url: 'http://localhost:3000/health' },
-      { id: 'admin-panel', name: 'Админ-панель', url: 'http://localhost:3005/health' }
-    ];
-
-    // Глобальные переменные
-    let responseTimeChart;
-    let servicesStatus = {};
-    let telegramMessages = [];
-    let recoveryEvents = [];
-
-    // Инициализация страницы
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeResponseTimeChart();
-      populateServiceTable();
-      fetchInitialData();
-      setupEventListeners();
-      
-      // Регулярное обновление данных
-      setInterval(fetchStatusData, 5000); // Обновление каждые 5 секунд
-    });
-
-    // Инициализация графика времени отклика
-    function initializeResponseTimeChart() {
-      const ctx = document.getElementById('responseTimeChart').getContext('2d');
-      responseTimeChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: [], // Будет заполнено данными о времени
-          datasets: services.map((service, index) => ({
-            label: service.name,
-            data: [],
-            borderColor: getServiceColor(index),
-            backgroundColor: 'transparent',
-            borderWidth: 2,
-            tension: 0.3,
-            pointRadius: 3
-          }))
-        },
-        options: {
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              grid: {
-                display: false
-              }
-            },
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: 'Время отклика (мс)'
-              }
+    
+    <script>
+        // Функция получения данных о статусе сервисов
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Ошибка получения статуса:', error);
+                return null;
             }
-          },
-          plugins: {
-            legend: {
-              position: 'bottom'
+        }
+        
+        // Функция получения истории статусов
+        async function fetchHistory() {
+            try {
+                const response = await fetch('/api/history');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Ошибка получения истории:', error);
+                return [];
             }
-          }
         }
-      });
-    }
-
-    // Цвета для сервисов на графике
-    function getServiceColor(index) {
-      const colors = [
-        '#0d6efd', '#dc3545', '#28a745', '#fd7e14', '#6f42c1', '#20c997'
-      ];
-      return colors[index % colors.length];
-    }
-
-    // Заполнение таблицы сервисов
-    function populateServiceTable() {
-      const table = document.getElementById('serviceStatusBody');
-      table.innerHTML = '';
-      
-      services.forEach(service => {
-        const row = document.createElement('tr');
-        row.id = `service-row-${service.id}`;
-        row.innerHTML = `
-          <td>${service.name}</td>
-          <td><span class="status-indicator inactive"></span><span id="status-${service.id}">Проверка...</span></td>
-          <td id="response-time-${service.id}">-</td>
-          <td><small>${service.url}</small></td>
-          <td id="last-check-${service.id}">-</td>
-        `;
-        table.appendChild(row);
-      });
-    }
-
-    // Получение начальных данных
-    function fetchInitialData() {
-      fetchStatusData();
-      fetchTelegramMessages();
-      fetchRecoveryLog();
-    }
-
-    // Получение данных о статусе сервисов
-    function fetchStatusData() {
-      fetch('/api/status')
-        .then(response => response.json())
-        .then(data => {
-          updateServicesStatus(data);
-          updateSystemMetrics(data.system);
-          updateResponseTimeChart(data.timestamp, data.services);
-        })
-        .catch(error => {
-          console.error('Ошибка при получении данных о статусе:', error);
-        });
-    }
-
-    // Получение истории сообщений Telegram
-    function fetchTelegramMessages() {
-      fetch('/api/telegram/messages')
-        .then(response => response.json())
-        .then(data => {
-          telegramMessages = data;
-          updateTelegramMessages();
-        })
-        .catch(error => {
-          console.error('Ошибка при получении сообщений Telegram:', error);
-        });
-    }
-
-    // Получение лога восстановлений
-    function fetchRecoveryLog() {
-      fetch('/api/recovery-log')
-        .then(response => response.json())
-        .then(data => {
-          recoveryEvents = data;
-          updateRecoveryLog();
-        })
-        .catch(error => {
-          console.error('Ошибка при получении лога восстановлений:', error);
-        });
-    }
-
-    // Обновление таблицы статуса сервисов
-    function updateServicesStatus(data) {
-      servicesStatus = data.services;
-      
-      // Подсчет активных сервисов
-      const totalServices = services.length;
-      const activeServices = Object.values(servicesStatus).filter(s => s.active).length;
-      document.getElementById('activeServicesCount').textContent = `${activeServices}/${totalServices}`;
-      
-      // Определение статуса системы
-      const systemStatus = activeServices === totalServices ? 'Исправна' : 'Проблема';
-      document.getElementById('systemStatus').textContent = systemStatus;
-      document.getElementById('systemStatus').className = activeServices === totalServices ? 'text-success' : 'text-danger';
-      
-      // Обновление строк таблицы
-      services.forEach(service => {
-        const serviceId = service.id;
-        const statusElement = document.getElementById(`status-${serviceId}`);
-        const indicatorElement = statusElement.previousElementSibling;
-        const responseTimeElement = document.getElementById(`response-time-${serviceId}`);
-        const lastCheckElement = document.getElementById(`last-check-${serviceId}`);
-        const rowElement = document.getElementById(`service-row-${serviceId}`);
         
-        if (servicesStatus[serviceId]) {
-          const active = servicesStatus[serviceId].active;
-          const responseTime = servicesStatus[serviceId].responseTime;
-          const lastCheck = new Date(servicesStatus[serviceId].lastCheck).toLocaleTimeString();
-          
-          statusElement.textContent = active ? 'Активен' : 'Недоступен';
-          indicatorElement.className = `status-indicator ${active ? 'active' : 'inactive'}`;
-          responseTimeElement.textContent = responseTime ? `${responseTime} мс` : '-';
-          lastCheckElement.textContent = lastCheck;
-          
-          rowElement.className = active ? '' : 'table-danger';
+        // Функция получения логов ошибок
+        async function fetchErrors() {
+            try {
+                const response = await fetch('/api/logs/errors');
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Ошибка получения логов:', error);
+                return { latestErrors: [] };
+            }
         }
-      });
-    }
-
-    // Обновление метрик системы
-    function updateSystemMetrics(systemData) {
-      if (systemData) {
-        document.getElementById('uptimeDisplay').textContent = formatUptime(systemData.uptime);
-        document.getElementById('memoryUsage').textContent = formatMemory(systemData.memoryUsed, systemData.memoryTotal);
-      }
-    }
-
-    // Форматирование времени работы
-    function formatUptime(seconds) {
-      const days = Math.floor(seconds / 86400);
-      const hours = Math.floor((seconds % 86400) / 3600);
-      const minutes = Math.floor((seconds % 3600) / 60);
-      
-      if (days > 0) {
-        return `${days}д ${hours}ч ${minutes}м`;
-      } else if (hours > 0) {
-        return `${hours}ч ${minutes}м`;
-      } else {
-        return `${minutes}м ${seconds % 60}с`;
-      }
-    }
-
-    // Форматирование использования памяти
-    function formatMemory(used, total) {
-      const usedMB = Math.round(used / 1024 / 1024);
-      const totalMB = Math.round(total / 1024 / 1024);
-      return `${usedMB}MB / ${totalMB}MB`;
-    }
-
-    // Обновление графика времени отклика
-    function updateResponseTimeChart(timestamp, servicesData) {
-      const timeLabel = new Date(timestamp).toLocaleTimeString();
-      
-      // Ограничение количества точек на графике
-      if (responseTimeChart.data.labels.length > 20) {
-        responseTimeChart.data.labels.shift();
-        responseTimeChart.data.datasets.forEach(dataset => {
-          dataset.data.shift();
-        });
-      }
-      
-      responseTimeChart.data.labels.push(timeLabel);
-      
-      services.forEach((service, index) => {
-        const responseTime = servicesData[service.id]?.responseTime || null;
-        responseTimeChart.data.datasets[index].data.push(responseTime);
-      });
-      
-      responseTimeChart.update();
-    }
-
-    // Обновление списка сообщений Telegram
-    function updateTelegramMessages() {
-      const container = document.getElementById('telegramMessages');
-      container.innerHTML = '';
-      
-      telegramMessages.slice(0, 10).forEach(message => {
-        const item = document.createElement('div');
-        item.className = 'list-group-item';
         
-        const timestamp = new Date(message.timestamp).toLocaleString();
-        const content = message.content.replace(/\n/g, '<br>');
+        // Функция обновления интерфейса
+        async function updateUI() {
+            const status = await fetchStatus();
+            const history = await fetchHistory();
+            const errorLogs = await fetchErrors();
+            
+            if (status) {
+                // Обновляем общий статус системы
+                const overallStatusEl = document.getElementById('overall-status');
+                const statusIndicator = document.getElementById('status-indicator');
+                
+                let statusText = 'Здоровая';
+                let statusClass = 'healthy-indicator';
+                
+                if (status.overallStatus === 'warning') {
+                    statusText = 'Предупреждение';
+                    statusClass = 'warning-indicator';
+                } else if (status.overallStatus === 'critical') {
+                    statusText = 'Критическая';
+                    statusClass = 'critical-indicator';
+                }
+                
+                overallStatusEl.textContent = statusText;
+                statusIndicator.className = 'status-indicator ' + statusClass;
+                
+                // Обновляем карточки статуса сервисов
+                const container = document.getElementById('status-overview');
+                container.innerHTML = '';
+                
+                status.services.forEach(service => {
+                    const card = document.createElement('div');
+                    card.className = 'card status-card';
+                    
+                    let statusClass = 'status-healthy';
+                    if (service.status === 'warning') {
+                        statusClass = 'status-warning';
+                    } else if (service.status === 'critical') {
+                        statusClass = 'status-critical';
+                    }
+                    
+                    card.innerHTML = `
+                        <div class="status-header">
+                            <span class="service-name">${service.name}</span>
+                            <span class="status-badge ${statusClass}">${service.status}</span>
+                        </div>
+                        <div class="status-detail">
+                            <span>Время отклика:</span>
+                            <span>${service.responseTime} мс</span>
+                        </div>
+                        ${service.downtime ? `
+                        <div class="status-detail">
+                            <span>Время простоя:</span>
+                            <span>${service.downtime}</span>
+                        </div>
+                        ` : ''}
+                        ${service.message ? `
+                        <div class="status-message">${service.message}</div>
+                        ` : ''}
+                    `;
+                    
+                    container.appendChild(card);
+                });
+                
+                // Обновляем время последнего обновления
+                document.getElementById('refresh-time').textContent = new Date().toLocaleString();
+            }
+            
+            // Обновляем историю изменений
+            if (history && history.length > 0) {
+                const historyBody = document.getElementById('history-body');
+                historyBody.innerHTML = '';
+                
+                // Отображаем только последние 20 событий
+                const recentHistory = history.slice(-20).reverse();
+                
+                recentHistory.forEach(item => {
+                    const row = document.createElement('tr');
+                    
+                    const time = new Date(item.time).toLocaleString();
+                    
+                    // Определяем тип события
+                    let event = 'Изменение статуса';
+                    let service = '';
+                    let status = item.overallStatus || '';
+                    
+                    if (item.event === 'failure') {
+                        event = 'Сбой';
+                        service = item.service || '';
+                        status = 'critical';
+                    } else if (item.event === 'recovery') {
+                        event = 'Восстановление';
+                        service = item.service || '';
+                        status = 'healthy';
+                    }
+                    
+                    let statusClass = '';
+                    if (status === 'healthy') statusClass = 'status-healthy';
+                    if (status === 'warning') statusClass = 'status-warning';
+                    if (status === 'critical') statusClass = 'status-critical';
+                    
+                    row.innerHTML = `
+                        <td>${time}</td>
+                        <td>${event}</td>
+                        <td>${service}</td>
+                        <td><span class="status-badge ${statusClass}">${status}</span></td>
+                    `;
+                    
+                    historyBody.appendChild(row);
+                });
+            }
+            
+            // Обновляем логи ошибок
+            if (errorLogs && errorLogs.latestErrors) {
+                const errorLogEl = document.getElementById('error-log');
+                errorLogEl.innerHTML = '';
+                
+                if (errorLogs.latestErrors.length === 0) {
+                    errorLogEl.innerHTML = '<p>Ошибок не обнаружено</p>';
+                } else {
+                    errorLogs.latestErrors.forEach(error => {
+                        const logEntry = document.createElement('div');
+                        logEntry.className = 'log-entry';
+                        logEntry.textContent = `[${error.file}] ${error.message}`;
+                        errorLogEl.appendChild(logEntry);
+                    });
+                }
+            }
+        }
         
-        item.innerHTML = `
-          <div class="d-flex w-100 justify-content-between">
-            <h6 class="mb-1">${message.type || 'Сообщение'}</h6>
-            <small>${timestamp}</small>
-          </div>
-          <p class="mb-1">${content}</p>
-        `;
+        // Функция для обновления данных по кнопке
+        document.getElementById('refresh-button').addEventListener('click', updateUI);
         
-        container.appendChild(item);
-      });
-      
-      if (telegramMessages.length === 0) {
-        container.innerHTML = '<div class="list-group-item">Нет сообщений</div>';
-      }
-    }
-
-    // Обновление лога восстановлений
-    function updateRecoveryLog() {
-      const container = document.getElementById('recoveryLog');
-      container.innerHTML = '';
-      
-      recoveryEvents.forEach(event => {
-        const item = document.createElement('div');
-        item.className = 'list-group-item';
+        // Обновляем данные при загрузке страницы
+        document.addEventListener('DOMContentLoaded', updateUI);
         
-        const timestamp = new Date(event.timestamp).toLocaleString();
-        const downtime = formatDuration(event.downtime);
-        
-        item.innerHTML = `
-          <div class="d-flex w-100 justify-content-between">
-            <h6 class="mb-1">${event.service}</h6>
-            <small>${timestamp}</small>
-          </div>
-          <p class="mb-1">Время простоя: ${downtime}</p>
-        `;
-        
-        container.appendChild(item);
-      });
-      
-      if (recoveryEvents.length === 0) {
-        container.innerHTML = '<div class="list-group-item">Нет записей о восстановлении</div>';
-      }
-    }
-
-    // Форматирование продолжительности
-    function formatDuration(seconds) {
-      if (seconds < 60) {
-        return `${seconds} сек`;
-      } else if (seconds < 3600) {
-        return `${Math.floor(seconds / 60)} мин ${seconds % 60} сек`;
-      } else {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        return `${hours} ч ${minutes} мин`;
-      }
-    }
-
-    // Настройка обработчиков событий
-    function setupEventListeners() {
-      // Кнопка отправки отчета
-      document.getElementById('sendReportBtn').addEventListener('click', () => {
-        fetch('/api/send-report', { method: 'POST' })
-          .then(response => response.json())
-          .then(data => {
-            alert(data.message || 'Отчет отправлен');
-            fetchTelegramMessages();
-          })
-          .catch(error => {
-            console.error('Ошибка при отправке отчета:', error);
-            alert('Ошибка при отправке отчета');
-          });
-      });
-      
-      // Кнопка сохранения настроек
-      document.getElementById('saveSettingsBtn').addEventListener('click', () => {
-        const settings = {
-          healthCheckInterval: parseInt(document.getElementById('healthCheckInterval').value),
-          alertThreshold: parseInt(document.getElementById('alertThreshold').value),
-          refreshRate: parseInt(document.getElementById('refreshRate').value)
-        };
-        
-        fetch('/api/settings', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(settings)
-        })
-          .then(response => response.json())
-          .then(data => {
-            alert(data.message || 'Настройки сохранены');
-          })
-          .catch(error => {
-            console.error('Ошибка при сохранении настроек:', error);
-            alert('Ошибка при сохранении настроек');
-          });
-      });
-      
-      // Кнопка обновления данных
-      document.getElementById('refreshDataBtn').addEventListener('click', () => {
-        fetchStatusData();
-        fetchTelegramMessages();
-        fetchRecoveryLog();
-      });
-      
-      // Кнопка очистки лога восстановлений
-      document.getElementById('clearRecoveryLogBtn').addEventListener('click', () => {
-        fetch('/api/recovery-log/clear', { method: 'POST' })
-          .then(response => response.json())
-          .then(data => {
-            alert(data.message || 'Лог очищен');
-            recoveryEvents = [];
-            updateRecoveryLog();
-          })
-          .catch(error => {
-            console.error('Ошибка при очистке лога:', error);
-            alert('Ошибка при очистке лога');
-          });
-      });
-    }
-  </script>
+        // Устанавливаем автоматическое обновление каждые 30 секунд
+        setInterval(updateUI, 30000);
+    </script>
 </body>
 </html>

@@ -1,248 +1,169 @@
-import express from 'express';
-import dotenv from 'dotenv';
-import { CronJob } from 'cron';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import fs from 'fs-extra';
+/**
+ * Основной файл сервиса мониторинга
+ * Отвечает за проверку состояния микросервисов и отправку уведомлений
+ */
+const express = require('express');
+const path = require('path');
+const fs = require('fs-extra');
+const { CronJob } = require('cron');
+const { logger } = require('../utils/logger');
+const { checkAllServices, getStatusHistory, getCurrentStatus } = require('../utils/health-check');
+const { sendStatusReport, sendErrorAlert, sendRecoveryAlert } = require('../utils/telegram');
+const { getLogsSummary } = require('../utils/log-analyzer');
 
-// Импортируем утилиты
-import logger from '../utils/logger.js';
-import { initBot, sendMessage, sendStatusReport } from '../utils/telegram.js';
-import { checkAllServices, getSystemStatus, generateStatusReport } from '../utils/health-check.js';
-import { analyzeLogs } from '../utils/log-analyzer.js';
+// Загружаем переменные окружения
+require('dotenv').config();
 
-// Инициализируем переменные окружения
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Настройки сервера
-const PORT = process.env.PORT || 3006;
+// Создаем приложение Express
 const app = express();
+const PORT = process.env.PORT || 3200;
 
-// Переменные для хранения последнего статуса
-let lastReport = null;
-let healthCheckInterval = null;
-let reportInterval = null;
+// Путь к статическим файлам
+const publicPath = path.join(__dirname, '../public');
 
-// Настраиваем middleware
+// Интервал проверки сервисов в миллисекундах
+const HEALTH_CHECK_INTERVAL = parseInt(process.env.HEALTH_CHECK_INTERVAL || 60000);
+
+// Служебные переменные
+let lastStatusReport = null;
+let lastNotificationTime = Date.now();
+let minuteReportJob = null;
+let lastHealthCheck = Date.now();
+
+// Middleware для логирования запросов
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`);
+  next();
+});
+
+// Статические файлы
+app.use(express.static(publicPath));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Маршрут для проверки состояния самого сервиса мониторинга
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString()
-  });
+// API маршруты
+app.get('/api/status', (req, res) => {
+  const status = getCurrentStatus();
+  res.json(status);
 });
 
-// Маршрут для получения статуса всех микросервисов
-app.get('/api/status', async (req, res) => {
-  try {
-    const report = await generateStatusReport();
-    res.status(200).json(report);
-  } catch (error) {
-    logger.error(`Ошибка при получении статуса: ${error.message}`);
-    res.status(500).json({ error: error.message });
-  }
+app.get('/api/history', (req, res) => {
+  const history = getStatusHistory();
+  res.json(history);
 });
 
-// Маршрут для получения результатов анализа логов
-app.get('/api/logs', async (req, res) => {
-  try {
-    const logAnalysis = await analyzeLogs();
-    res.status(200).json(logAnalysis);
-  } catch (error) {
-    logger.error(`Ошибка при анализе логов: ${error.message}`);
-    res.status(500).json({ error: error.message });
-  }
+app.get('/api/logs/errors', (req, res) => {
+  const logsSummary = getLogsSummary();
+  res.json(logsSummary);
 });
 
-// Маршрут для принудительной отправки отчета в Telegram
-app.post('/api/send-report', async (req, res) => {
-  try {
-    const report = await generateStatusReport();
-    await sendStatusReport(report);
-    res.status(200).json({ success: true, message: 'Отчет отправлен в Telegram' });
-  } catch (error) {
-    logger.error(`Ошибка при отправке отчета: ${error.message}`);
-    res.status(500).json({ error: error.message });
-  }
+// Домашняя страница (веб-интерфейс)
+app.get('/', (req, res) => {
+  res.sendFile(path.join(publicPath, 'index.html'));
 });
 
-// Запуск проверки состояния всех микросервисов по интервалу
-const startHealthCheck = () => {
-  const interval = parseInt(process.env.HEALTH_CHECK_INTERVAL || '60000', 10);
-  
-  // Проверяем состояние сервисов при запуске
-  runHealthCheck();
-  
-  // Устанавливаем интервал для последующих проверок
-  healthCheckInterval = setInterval(runHealthCheck, interval);
-  logger.info(`Проверка состояния запущена с интервалом ${interval / 1000} секунд`);
-};
-
-// Запуск отправки регулярных отчетов в Telegram
-const startReportSchedule = () => {
-  // Запускаем отправку отчетов в Telegram каждую минуту
-  const job = new CronJob('* * * * *', async () => {
-    logger.info('Отправка минутного отчета в Telegram...');
-    const report = await generateStatusReport();
-    await sendStatusReport(report);
-  });
-  
-  job.start();
-  logger.info('Отправка отчетов в Telegram запланирована каждую минуту');
-};
-
-// Функция для сохранения данных о состоянии в файл
-const saveServiceStatusLog = async (report) => {
+// Функция для выполнения проверки сервисов
+async function performHealthCheck() {
   try {
-    // Создаем директорию для хранения логов статуса
-    const statusLogDir = process.env.STATUS_LOG_PATH || path.join(__dirname, '..', 'status_logs');
-    fs.ensureDirSync(statusLogDir);
+    lastHealthCheck = Date.now();
+    const statusReport = await checkAllServices();
     
-    // Создаем имя файла на основе даты
-    const date = new Date();
-    const dateStr = date.toISOString().split('T')[0];
-    const logFilePath = path.join(statusLogDir, `status_${dateStr}.json`);
+    // Сохраняем отчет для использования в других местах
+    lastStatusReport = statusReport;
     
-    // Проверяем, существует ли файл
-    let logs = [];
-    if (fs.existsSync(logFilePath)) {
-      const fileContent = await fs.readFile(logFilePath, 'utf8');
-      logs = JSON.parse(fileContent);
+    // Если статус изменился на критический, отправляем уведомление
+    if (statusReport.overallStatus === 'critical') {
+      // Находим критические сервисы
+      const criticalServices = statusReport.services
+        .filter(service => service.status === 'critical')
+        .map(service => `${service.name}: ${service.message}`);
+      
+      // Отправляем уведомление, если прошло достаточно времени с последнего уведомления
+      const now = Date.now();
+      if (now - lastNotificationTime > 300000) { // 5 минут
+        await sendErrorAlert('Мониторинг', `Обнаружены проблемы в работе сервисов:\n${criticalServices.join('\n')}`);
+        lastNotificationTime = now;
+      }
     }
     
-    // Добавляем новую запись
-    logs.push({
-      timestamp: new Date().toISOString(),
-      report
-    });
-    
-    // Записываем обновленные данные в файл
-    await fs.writeFile(logFilePath, JSON.stringify(logs, null, 2), 'utf8');
-    
-    // Очищаем старые логи (оставляем логи за последние 7 дней)
-    await cleanupOldLogs(statusLogDir, 7);
-    
-    logger.info(`Данные о состоянии сохранены в ${logFilePath}`);
+    logger.info(`Проверка здоровья выполнена. Общий статус: ${statusReport.overallStatus}`);
+    return statusReport;
   } catch (error) {
-    logger.error(`Ошибка при сохранении данных о состоянии: ${error.message}`);
+    logger.error(`Ошибка выполнения проверки здоровья: ${error.message}`);
+    return null;
   }
-};
+}
 
-// Функция для очистки старых логов
-const cleanupOldLogs = async (logDir, daysToKeep) => {
+// Функция для отправки отчета о состоянии в Telegram
+async function sendStatusReportToTelegram() {
   try {
-    const files = await fs.readdir(logDir);
-    const now = Date.now();
-    const maxAge = daysToKeep * 24 * 60 * 60 * 1000; // в миллисекундах
-    
-    for (const file of files) {
-      if (file.startsWith('status_') && file.endsWith('.json')) {
-        const filePath = path.join(logDir, file);
-        const stats = await fs.stat(filePath);
-        const age = now - stats.mtimeMs;
-        
-        if (age > maxAge) {
-          await fs.unlink(filePath);
-          logger.info(`Удален устаревший лог: ${file}`);
-        }
+    if (lastStatusReport) {
+      await sendStatusReport(lastStatusReport);
+      logger.info('Отчет о состоянии отправлен в Telegram');
+    } else {
+      logger.warn('Отчет о состоянии не отправлен: отсутствуют данные');
+      // Выполняем проверку здоровья, если нет данных
+      const report = await performHealthCheck();
+      if (report) {
+        await sendStatusReport(report);
+        logger.info('Отчет о состоянии отправлен в Telegram после проверки');
       }
     }
   } catch (error) {
-    logger.error(`Ошибка при очистке старых логов: ${error.message}`);
+    logger.error(`Ошибка отправки отчета в Telegram: ${error.message}`);
   }
-};
+}
 
-// Функция для выполнения проверки состояния сервисов
-const runHealthCheck = async () => {
-  try {
-    // Генерируем отчет о состоянии
-    const report = await generateStatusReport();
-    lastReport = report;
-    
-    // Сохраняем отчет в логи
-    await saveServiceStatusLog(report);
-    
-    // Если есть неактивные сервисы, отправляем уведомление в Telegram
-    const inactiveServices = Object.entries(report.serviceStatuses)
-      .filter(([_, status]) => !status.isActive)
-      .map(([service, _]) => service);
-    
-    if (inactiveServices.length > 0) {
-      const message = `🔴 ВНИМАНИЕ! Недоступны следующие сервисы: ${inactiveServices.join(', ')}`;
-      await sendMessage(message);
-    }
-    
-    // Логируем состояние системы
-    const { systemStatus } = report;
-    logger.info(`Server Status:
-      Uptime: ${systemStatus.uptime}
-      Memory: ${systemStatus.memory}
-      Active: ${report.allServicesActive ? 'Yes' : 'No'}`);
-    
-    return report;
-  } catch (error) {
-    logger.error(`Ошибка при проверке состояния: ${error.message}`);
-    return null;
+// Функция для запуска задач мониторинга
+function startMonitoringTasks() {
+  // Выполняем первоначальную проверку
+  logger.info('Запуск первоначальной проверки...');
+  performHealthCheck();
+  
+  // Настраиваем периодическую проверку
+  logger.info(`Настройка периодической проверки каждые ${HEALTH_CHECK_INTERVAL / 1000} секунд`);
+  setInterval(performHealthCheck, HEALTH_CHECK_INTERVAL);
+  
+  // Настраиваем ежеминутный отчет в Telegram
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
+    logger.info('Настройка ежеминутного отчета в Telegram');
+    // Каждую минуту в 0 секунд
+    minuteReportJob = new CronJob('0 * * * * *', sendStatusReportToTelegram);
+    minuteReportJob.start();
+  } else {
+    logger.warn('Отсутствуют настройки Telegram. Отчеты отключены.');
   }
-};
+}
 
-// Инициализация сервиса
-const init = async () => {
-  try {
-    // Создаем необходимые директории
-    await fs.ensureDir(process.env.LOG_PATH || path.join(__dirname, '..', 'logs'));
-    
-    // Инициализируем Telegram бота
-    initBot();
-    
-    // Запускаем проверку состояния
-    startHealthCheck();
-    
-    // Запускаем отправку отчетов
-    startReportSchedule();
-    
-    // Запускаем веб-сервер
-    app.listen(PORT, () => {
-      logger.info(`Сервис мониторинга запущен на порту ${PORT}`);
-    });
-  } catch (error) {
-    logger.error(`Ошибка инициализации сервиса: ${error.message}`);
-    process.exit(1);
-  }
-};
+// Запускаем сервер
+const server = app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`Сервис мониторинга запущен на порту ${PORT}`);
+  startMonitoringTasks();
+});
 
 // Обработка сигналов завершения
-process.on('SIGINT', async () => {
-  logger.info('Получен сигнал SIGINT, завершаем работу...');
-  await cleanup();
-  process.exit(0);
+process.on('SIGINT', () => {
+  logger.info('Получен сигнал завершения SIGINT');
+  server.close(() => {
+    logger.info('Сервер мониторинга остановлен');
+    process.exit(0);
+  });
 });
 
-process.on('SIGTERM', async () => {
-  logger.info('Получен сигнал SIGTERM, завершаем работу...');
-  await cleanup();
-  process.exit(0);
+process.on('SIGTERM', () => {
+  logger.info('Получен сигнал завершения SIGTERM');
+  server.close(() => {
+    logger.info('Сервер мониторинга остановлен');
+    process.exit(0);
+  });
 });
 
-// Функция очистки ресурсов перед завершением
-const cleanup = async () => {
-  // Очищаем интервалы
-  if (healthCheckInterval) clearInterval(healthCheckInterval);
-  if (reportInterval) clearInterval(reportInterval);
-  
-  // Отправляем сообщение о завершении работы
-  await sendMessage('🔴 Сервис мониторинга остановлен');
-  
-  // Даем время на отправку последних сообщений
-  await new Promise(resolve => setTimeout(resolve, 1000));
-};
+// Обработка необработанных исключений
+process.on('uncaughtException', (error) => {
+  logger.error(`Необработанное исключение: ${error.message}`);
+  logger.error(error.stack);
+});
 
-// Запускаем инициализацию
-init();
+// Обработка необработанных rejected promises
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error(`Необработанный rejected promise: ${reason}`);
+});

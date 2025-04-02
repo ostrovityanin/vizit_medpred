@@ -1,22 +1,35 @@
-FROM node:18-alpine
+FROM node:18-slim
 
-# Создаем рабочую директорию
+# Создаем директорию приложения
 WORKDIR /app
 
-# Копируем package.json и package-lock.json
+# Копируем package.json и package-lock.json для установки зависимостей
 COPY package*.json ./
 
 # Устанавливаем зависимости
 RUN npm ci --only=production
 
-# Копируем исходный код
+# Устанавливаем wget для healthcheck
+RUN apt-get update && apt-get install -y wget && apt-get clean
+
+# Копируем исходный код приложения
 COPY . .
 
-# Создаем директорию для логов
-RUN mkdir -p logs
+# Создаем директории для логов и статусов
+RUN mkdir -p logs status_logs
 
-# Экспортируем порт
+# Делаем скрипты исполняемыми
+RUN chmod +x *.sh
+
+# Порт, который будет прослушивать приложение
 EXPOSE 3006
 
-# Команда запуска
+# Устанавливаем время начала работы сервиса
+ENV SERVICE_START_TIME=$SERVICE_START_TIME
+
+# Запускаем приложение
 CMD ["node", "src/index.js"]
+
+# Проверка работоспособности
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --spider -q http://localhost:3006/health || exit 1

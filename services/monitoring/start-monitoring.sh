@@ -1,58 +1,36 @@
 #!/bin/bash
 
-# Скрипт для запуска сервиса мониторинга в фоновом режиме
+# Скрипт для запуска сервиса мониторинга
 
-# Директория, в которой находится скрипт
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-cd "$SCRIPT_DIR"
+# Путь к директории мониторинга
+MONITORING_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Текущее время для лога
-TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
-
-# Создаем директории для логов, если не существуют
-mkdir -p logs
-mkdir -p status_logs
-
-# Проверяем, установлены ли зависимости
-if [ ! -d "node_modules" ]; then
-  echo "$TIMESTAMP - Установка зависимостей..."
-  npm install
-fi
-
-# Проверяем, запущен ли уже сервис
-PID_FILE="./monitor.pid"
-if [ -f "$PID_FILE" ]; then
-  PID=$(cat $PID_FILE)
-  if ps -p $PID > /dev/null; then
-    echo "$TIMESTAMP - Сервис мониторинга уже запущен с PID $PID"
-    exit 1
-  else
-    echo "$TIMESTAMP - Обнаружен устаревший PID файл, удаляем..."
-    rm $PID_FILE
-  fi
-fi
-
-# Время начала работы сервиса
-export SERVICE_START_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# Запускаем сервис в фоновом режиме
-echo "$TIMESTAMP - Запуск сервиса мониторинга..."
-nohup node src/index.js > logs/monitor.log 2>&1 &
-
-# Сохраняем PID процесса
-echo $! > $PID_FILE
-
-# Проверяем успешность запуска через 2 секунды
-sleep 2
-if ps -p $(cat $PID_FILE) > /dev/null; then
-  echo "$TIMESTAMP - Сервис мониторинга успешно запущен с PID $(cat $PID_FILE)"
-  echo "$TIMESTAMP - Лог доступен в файле: logs/monitor.log"
-  echo "$TIMESTAMP - Веб-интерфейс доступен по адресу: http://localhost:3006"
-else
-  echo "$TIMESTAMP - Ошибка при запуске сервиса мониторинга"
-  rm $PID_FILE
+# Проверка наличия .env файла
+if [ ! -f "${MONITORING_DIR}/.env" ]; then
+  echo "Ошибка: .env файл не найден. Проверьте наличие файла ${MONITORING_DIR}/.env"
   exit 1
 fi
 
-# Успешное завершение
-exit 0
+# Создание директории для логов, если она не существует
+mkdir -p "${MONITORING_DIR}/logs"
+
+# Проверка настроек Telegram
+TELEGRAM_BOT_TOKEN=$(grep "TELEGRAM_BOT_TOKEN" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
+TELEGRAM_CHAT_ID=$(grep "TELEGRAM_CHAT_ID" "${MONITORING_DIR}/.env" | cut -d '=' -f2)
+
+if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+  echo "Предупреждение: Настройки Telegram бота не найдены в .env файле"
+  echo "Уведомления через Telegram будут недоступны"
+fi
+
+# Запуск сервиса мониторинга
+echo "Запуск сервиса мониторинга..."
+cd "$MONITORING_DIR" && node src/index.js > "${MONITORING_DIR}/logs/monitoring.log" 2>&1 &
+PID=$!
+
+# Сохранение PID процесса
+echo $PID > "${MONITORING_DIR}/monitoring.pid"
+echo "Сервис мониторинга запущен (PID: $PID)"
+echo "Логи доступны в файле: ${MONITORING_DIR}/logs/monitoring.log"
+echo "Для просмотра логов используйте: ./view-logs.sh"
+echo "Для остановки сервиса используйте: ./stop-monitoring.sh"

@@ -1,392 +1,286 @@
 /**
- * Модуль для проверки работоспособности микросервисов
+ * Модуль для проверки состояния сервисов
  */
 const axios = require('axios');
 const fs = require('fs-extra');
 const path = require('path');
-const logger = require('./logger');
-
-// Загрузка переменных окружения
+const { logger, getServiceLogger } = require('./logger');
 require('dotenv').config();
 
+// Настройки для хранения истории статусов
+const HISTORY_FILE = path.join(process.env.LOG_PATH || './logs', 'status-history.json');
+const MAX_HISTORY_ITEMS = 1000; // Максимальное количество записей в истории
+
 // Список сервисов для мониторинга
-const services = [
-  {
-    id: 'data-storage',
-    name: 'Сервис хранения данных',
-    url: process.env.DATA_STORAGE_URL || 'http://localhost:3002',
-    healthEndpoint: '/health'
-  },
-  {
-    id: 'audio-processor',
-    name: 'Сервис обработки аудио',
-    url: process.env.AUDIO_PROCESSOR_URL || 'http://localhost:3003',
-    healthEndpoint: '/health'
-  },
-  {
-    id: 'api-core',
-    name: 'API Core сервис',
-    url: process.env.API_CORE_URL || 'http://localhost:3001',
-    healthEndpoint: '/health'
-  },
-  {
-    id: 'documentation',
-    name: 'Сервис документации',
-    url: process.env.DOCUMENTATION_URL || 'http://localhost:3004',
-    healthEndpoint: '/health'
-  },
-  {
-    id: 'telegram-app',
-    name: 'Telegram Mini App',
-    url: process.env.TELEGRAM_APP_URL || 'http://localhost:3000',
-    healthEndpoint: '/health'
-  },
-  {
-    id: 'admin-panel',
-    name: 'Админ-панель',
-    url: process.env.ADMIN_PANEL_URL || 'http://localhost:3005',
-    healthEndpoint: '/health'
-  }
-];
+const services = (process.env.SERVICES || '').split(',').filter(Boolean);
+const serviceUrls = (process.env.SERVICE_URLS || '').split(',').filter(Boolean);
 
-// Статус сервисов
-let servicesStatus = {};
+// Статусы сервисов
+const serviceStatus = {};
+// История изменения статусов
+let statusHistory = [];
 
-// История статусов сервисов для отслеживания восстановления
-let serviceHistory = {};
+// Порог времени ответа (мс) для предупреждений
+const WARNING_THRESHOLD = 1000;
+const CRITICAL_THRESHOLD = 3000;
 
-// Путь к файлу журнала статуса
-const STATUS_LOG_PATH = process.env.STATUS_LOG_PATH || './status_logs';
-const STATUS_LOG_FILE = path.join(STATUS_LOG_PATH, 'status_history.json');
-
-// События восстановления
-let recoveryEvents = [];
-const RECOVERY_LOG_FILE = path.join(STATUS_LOG_PATH, 'recovery_events.json');
-
-/**
- * Инициализация модуля проверки здоровья
- */
-async function initialize() {
-  logger.info('Инициализация модуля проверки работоспособности');
-  
-  // Создаем директорию для логов статуса, если она не существует
-  await fs.ensureDir(STATUS_LOG_PATH);
-  
-  // Загружаем историю статусов, если файл существует
+// Загрузка истории статусов
+function loadStatusHistory() {
   try {
-    if (await fs.pathExists(STATUS_LOG_FILE)) {
-      const historyData = await fs.readJson(STATUS_LOG_FILE);
-      serviceHistory = historyData;
-      logger.info(`Загружена история статусов для ${Object.keys(serviceHistory).length} сервисов`);
+    if (fs.existsSync(HISTORY_FILE)) {
+      statusHistory = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8')) || [];
+      logger.info(`Загружена история статусов: ${statusHistory.length} записей`);
+    } else {
+      statusHistory = [];
+      logger.info('Файл истории статусов не найден, создана новая история');
+      saveStatusHistory();
     }
   } catch (error) {
     logger.error(`Ошибка загрузки истории статусов: ${error.message}`);
+    statusHistory = [];
   }
-  
-  // Загружаем события восстановления, если файл существует
+}
+
+// Сохранение истории статусов
+function saveStatusHistory() {
   try {
-    if (await fs.pathExists(RECOVERY_LOG_FILE)) {
-      recoveryEvents = await fs.readJson(RECOVERY_LOG_FILE);
-      logger.info(`Загружены ${recoveryEvents.length} событий восстановления`);
+    // Оставляем только последние MAX_HISTORY_ITEMS записей
+    if (statusHistory.length > MAX_HISTORY_ITEMS) {
+      statusHistory = statusHistory.slice(-MAX_HISTORY_ITEMS);
     }
-  } catch (error) {
-    logger.error(`Ошибка загрузки событий восстановления: ${error.message}`);
-  }
-  
-  // Инициализируем статус сервисов
-  services.forEach(service => {
-    servicesStatus[service.id] = {
-      id: service.id,
-      name: service.name,
-      url: service.url,
-      active: false,
-      responseTime: null,
-      lastCheck: new Date(),
-      downSince: null,
-      upSince: null
-    };
     
-    // Инициализируем историю для сервиса, если она не существует
-    if (!serviceHistory[service.id]) {
-      serviceHistory[service.id] = {
-        statusChanges: [],
-        lastStatus: false,
-        downtime: 0
-      };
-    }
-  });
-  
-  logger.info('Модуль проверки работоспособности инициализирован');
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(statusHistory, null, 2));
+  } catch (error) {
+    logger.error(`Ошибка сохранения истории статусов: ${error.message}`);
+  }
 }
 
 /**
- * Проверка работоспособности всех сервисов
- * @returns {Object} Статус всех сервисов
+ * Получение форматированного времени простоя
+ * @param {number} downtime - Время простоя в миллисекундах
+ * @returns {string} - Отформатированное время
+ */
+function formatDowntime(downtime) {
+  const seconds = Math.floor((downtime / 1000) % 60);
+  const minutes = Math.floor((downtime / (1000 * 60)) % 60);
+  const hours = Math.floor((downtime / (1000 * 60 * 60)) % 24);
+  const days = Math.floor(downtime / (1000 * 60 * 60 * 24));
+  
+  const parts = [];
+  if (days > 0) parts.push(`${days}д`);
+  if (hours > 0) parts.push(`${hours}ч`);
+  if (minutes > 0) parts.push(`${minutes}м`);
+  if (seconds > 0 || parts.length === 0) parts.push(`${seconds}с`);
+  
+  return parts.join(' ');
+}
+
+/**
+ * Проверка одного сервиса
+ * @param {string} serviceName - Имя сервиса
+ * @param {string} url - URL для проверки
+ * @returns {Object} - Результат проверки
+ */
+async function checkService(serviceName, url) {
+  const serviceLogger = getServiceLogger(serviceName);
+  
+  // Получаем текущий статус сервиса или создаем новый
+  const currentStatus = serviceStatus[serviceName] || {
+    name: serviceName,
+    status: 'unknown',
+    lastCheck: Date.now(),
+    downSince: null,
+    responseTime: 0,
+    consecutiveFailures: 0
+  };
+  
+  try {
+    const startTime = Date.now();
+    const response = await axios.get(url, { timeout: 5000 });
+    const responseTime = Date.now() - startTime;
+    
+    // Определяем статус на основе времени ответа
+    let status = 'healthy';
+    let message = '';
+    
+    if (responseTime > CRITICAL_THRESHOLD) {
+      status = 'warning';
+      message = `Высокое время отклика: ${responseTime}ms`;
+    } else if (responseTime > WARNING_THRESHOLD) {
+      status = 'warning';
+      message = `Повышенное время отклика: ${responseTime}ms`;
+    }
+    
+    // Если сервис был недоступен, но теперь работает, отмечаем восстановление
+    if (currentStatus.status === 'critical' && status !== 'critical') {
+      const downtime = Date.now() - (currentStatus.downSince || Date.now());
+      serviceLogger.info(`Сервис восстановлен после ${formatDowntime(downtime)} простоя`);
+      
+      // Отметка о восстановлении в истории
+      statusHistory.push({
+        time: new Date().toISOString(),
+        service: serviceName,
+        event: 'recovery',
+        downtime: formatDowntime(downtime)
+      });
+    }
+    
+    // Обновляем статус
+    serviceStatus[serviceName] = {
+      name: serviceName,
+      url,
+      status,
+      message,
+      responseTime,
+      lastCheck: Date.now(),
+      downSince: status === 'critical' ? (currentStatus.downSince || Date.now()) : null,
+      consecutiveFailures: 0
+    };
+    
+    return {
+      name: serviceName,
+      status,
+      message,
+      responseTime,
+      downtime: currentStatus.downSince ? formatDowntime(Date.now() - currentStatus.downSince) : null
+    };
+  } catch (error) {
+    // Увеличиваем счетчик последовательных ошибок
+    const consecutiveFailures = (currentStatus.consecutiveFailures || 0) + 1;
+    const errorMessage = error.message || 'Неизвестная ошибка';
+    
+    // Если это первая ошибка, отмечаем время начала простоя
+    const downSince = currentStatus.downSince || Date.now();
+    const downtime = Date.now() - downSince;
+    
+    // Если это первая ошибка после рабочего состояния, логируем
+    if (currentStatus.status !== 'critical') {
+      serviceLogger.error(`Сервис недоступен: ${errorMessage}`);
+      
+      // Запись в историю
+      statusHistory.push({
+        time: new Date().toISOString(),
+        service: serviceName,
+        event: 'failure',
+        error: errorMessage
+      });
+    }
+    
+    // Обновляем статус
+    serviceStatus[serviceName] = {
+      name: serviceName,
+      url,
+      status: 'critical',
+      message: errorMessage,
+      responseTime: 0,
+      lastCheck: Date.now(),
+      downSince,
+      consecutiveFailures
+    };
+    
+    return {
+      name: serviceName,
+      status: 'critical',
+      message: errorMessage,
+      responseTime: 0,
+      downtime: formatDowntime(downtime)
+    };
+  }
+}
+
+/**
+ * Проверка всех сервисов
+ * @returns {Object} - Отчет о статусе всех сервисов
  */
 async function checkAllServices() {
-  const timestamp = new Date();
-  logger.debug('Запуск проверки работоспособности всех сервисов');
+  const results = [];
   
-  // Проверяем каждый сервис
-  const checkPromises = services.map(service => checkService(service, timestamp));
-  await Promise.all(checkPromises);
-  
-  // Сохраняем историю статусов
-  await saveStatusHistory();
-  
-  return {
-    timestamp,
-    services: servicesStatus,
-    system: getSystemStatus()
-  };
-}
-
-/**
- * Проверка работоспособности отдельного сервиса
- * @param {Object} service Информация о сервисе
- * @param {Date} timestamp Временная метка проверки
- * @returns {Object} Обновленный статус сервиса
- */
-async function checkService(service, timestamp) {
-  const serviceId = service.id;
-  const healthUrl = `${service.url}${service.healthEndpoint}`;
-  const startTime = Date.now();
-  let responseTime = null;
-  let active = false;
-  
-  try {
-    logger.debug(`Проверка сервиса ${service.name} по URL: ${healthUrl}`);
-    const response = await axios.get(healthUrl, { timeout: 5000 });
-    responseTime = Date.now() - startTime;
-    active = response.status === 200;
-    
-    logger.debug(`Сервис ${service.name} ${active ? 'активен' : 'недоступен'}, время отклика: ${responseTime}ms`);
-  } catch (error) {
-    logger.warn(`Ошибка при проверке сервиса ${service.name}: ${error.message}`);
-    active = false;
-  }
-  
-  // Обновляем статус сервиса
-  const previousStatus = servicesStatus[serviceId].active;
-  servicesStatus[serviceId] = {
-    ...servicesStatus[serviceId],
-    active,
-    responseTime,
-    lastCheck: timestamp,
-  };
-  
-  // Если статус изменился, обновляем информацию о времени
-  if (active !== previousStatus) {
-    handleStatusChange(serviceId, active, timestamp);
-  }
-  
-  return servicesStatus[serviceId];
-}
-
-/**
- * Обработка изменения статуса сервиса
- * @param {string} serviceId Идентификатор сервиса
- * @param {boolean} active Новый статус сервиса
- * @param {Date} timestamp Временная метка изменения
- */
-function handleStatusChange(serviceId, active, timestamp) {
-  const service = services.find(s => s.id === serviceId);
-  const serviceName = service ? service.name : serviceId;
-  
-  // Добавляем запись в историю статусов
-  if (!serviceHistory[serviceId]) {
-    serviceHistory[serviceId] = {
-      statusChanges: [],
-      lastStatus: active,
-      downtime: 0
-    };
-  }
-  
-  serviceHistory[serviceId].statusChanges.push({
-    timestamp,
-    status: active
-  });
-  
-  // Ограничиваем размер истории
-  if (serviceHistory[serviceId].statusChanges.length > 100) {
-    serviceHistory[serviceId].statusChanges.shift();
-  }
-  
-  // Обновляем время простоя/активности
-  if (active) {
-    // Сервис стал активным после простоя
-    logger.info(`Сервис ${serviceName} ВОССТАНОВЛЕН`);
-    servicesStatus[serviceId].upSince = timestamp;
-    servicesStatus[serviceId].downSince = null;
-    
-    // Рассчитываем время простоя, если сервис был недоступен
-    if (serviceHistory[serviceId].lastStatus === false) {
-      const lastDowntime = calculateDowntime(serviceId, timestamp);
-      
-      // Добавляем событие восстановления
-      const recoveryEvent = {
-        service: serviceName,
-        serviceId,
-        timestamp: timestamp.toISOString(),
-        downtime: Math.round(lastDowntime / 1000) // в секундах
-      };
-      
-      recoveryEvents.push(recoveryEvent);
-      saveRecoveryEvents();
-      
-      logger.info(`Сервис ${serviceName} был недоступен ${Math.round(lastDowntime / 1000)} секунд`);
-    }
-  } else {
-    // Сервис стал недоступен
-    logger.warn(`Сервис ${serviceName} НЕДОСТУПЕН`);
-    servicesStatus[serviceId].downSince = timestamp;
-    servicesStatus[serviceId].upSince = null;
-  }
-  
-  serviceHistory[serviceId].lastStatus = active;
-}
-
-/**
- * Рассчитывает время простоя сервиса в миллисекундах
- * @param {string} serviceId Идентификатор сервиса
- * @param {Date} currentTime Текущее время
- * @returns {number} Время простоя в миллисекундах
- */
-function calculateDowntime(serviceId, currentTime) {
-  const changes = serviceHistory[serviceId].statusChanges;
-  
-  // Находим последнюю запись о недоступности сервиса
-  for (let i = changes.length - 1; i >= 0; i--) {
-    if (changes[i].status === false) {
-      const downTimestamp = new Date(changes[i].timestamp);
-      return currentTime - downTimestamp;
+  // Проверяем все сервисы
+  for (let i = 0; i < services.length; i++) {
+    if (services[i] && serviceUrls[i]) {
+      const result = await checkService(services[i], serviceUrls[i]);
+      results.push(result);
     }
   }
   
-  return 0;
-}
-
-/**
- * Получение статуса системы (памяти, процессора и т.д.)
- * @returns {Object} Статус системы
- */
-function getSystemStatus() {
-  const uptime = process.uptime();
-  const memoryUsage = process.memoryUsage();
-  
-  return {
-    uptime,
-    memoryUsed: memoryUsage.rss,
-    memoryTotal: memoryUsage.heapTotal,
-    cpuUsage: null, // Заполняется в другом модуле
-    startTime: process.env.SERVICE_START_TIME || new Date().toISOString()
-  };
-}
-
-/**
- * Сохранение истории статусов в файл
- */
-async function saveStatusHistory() {
-  try {
-    await fs.writeJson(STATUS_LOG_FILE, serviceHistory, { spaces: 2 });
-    logger.debug('История статусов сохранена');
-  } catch (error) {
-    logger.error(`Ошибка при сохранении истории статусов: ${error.message}`);
-  }
-}
-
-/**
- * Сохранение событий восстановления в файл
- */
-async function saveRecoveryEvents() {
-  try {
-    // Ограничиваем количество сохраняемых событий
-    if (recoveryEvents.length > 100) {
-      recoveryEvents = recoveryEvents.slice(-100);
+  // Определяем общий статус системы
+  let overallStatus = 'healthy';
+  for (const result of results) {
+    if (result.status === 'critical') {
+      overallStatus = 'critical';
+      break;
+    } else if (result.status === 'warning' && overallStatus !== 'critical') {
+      overallStatus = 'warning';
     }
-    
-    await fs.writeJson(RECOVERY_LOG_FILE, recoveryEvents, { spaces: 2 });
-    logger.debug('События восстановления сохранены');
-  } catch (error) {
-    logger.error(`Ошибка при сохранении событий восстановления: ${error.message}`);
   }
+  
+  // Формируем отчет
+  const statusReport = {
+    time: new Date().toLocaleString(),
+    overallStatus,
+    services: results
+  };
+  
+  // Сохраняем историю статусов, если есть изменения
+  const lastHistoryItem = statusHistory[statusHistory.length - 1];
+  if (!lastHistoryItem || lastHistoryItem.overallStatus !== overallStatus) {
+    statusHistory.push({
+      time: new Date().toISOString(),
+      overallStatus,
+      servicesStatus: results.map(r => ({ name: r.name, status: r.status }))
+    });
+    saveStatusHistory();
+  }
+  
+  return statusReport;
 }
 
 /**
- * Получение текущего статуса всех сервисов
- * @returns {Object} Статус всех сервисов
+ * Получение истории статусов
+ * @returns {Array} - История статусов
+ */
+function getStatusHistory() {
+  return statusHistory;
+}
+
+/**
+ * Получение текущего статуса сервисов
+ * @returns {Object} - Текущий статус
  */
 function getCurrentStatus() {
+  const results = Object.values(serviceStatus).map(service => ({
+    name: service.name,
+    status: service.status,
+    message: service.message,
+    responseTime: service.responseTime,
+    downtime: service.downSince ? formatDowntime(Date.now() - service.downSince) : null
+  }));
+  
+  // Определяем общий статус системы
+  let overallStatus = 'healthy';
+  for (const result of results) {
+    if (result.status === 'critical') {
+      overallStatus = 'critical';
+      break;
+    } else if (result.status === 'warning' && overallStatus !== 'critical') {
+      overallStatus = 'warning';
+    }
+  }
+  
   return {
-    timestamp: new Date(),
-    services: servicesStatus,
-    system: getSystemStatus()
+    time: new Date().toLocaleString(),
+    overallStatus,
+    services: results
   };
 }
 
-/**
- * Получение списка недоступных сервисов
- * @returns {Array} Массив недоступных сервисов
- */
-function getDownServices() {
-  return services
-    .filter(service => !servicesStatus[service.id].active)
-    .map(service => ({
-      id: service.id,
-      name: service.name,
-      downSince: servicesStatus[service.id].downSince
-    }));
-}
-
-/**
- * Получение списка сервисов с высоким временем отклика
- * @param {number} threshold Порог времени отклика в миллисекундах
- * @returns {Array} Массив сервисов с высоким временем отклика
- */
-function getSlowServices(threshold = 2000) {
-  return services
-    .filter(service => 
-      servicesStatus[service.id].active && 
-      servicesStatus[service.id].responseTime > threshold
-    )
-    .map(service => ({
-      id: service.id,
-      name: service.name,
-      responseTime: servicesStatus[service.id].responseTime
-    }));
-}
-
-/**
- * Получение списка событий восстановления
- * @returns {Array} События восстановления
- */
-function getRecoveryEvents() {
-  return recoveryEvents;
-}
-
-/**
- * Очистка списка событий восстановления
- */
-async function clearRecoveryEvents() {
-  recoveryEvents = [];
-  await saveRecoveryEvents();
-  logger.info('События восстановления очищены');
-}
-
-/**
- * Список сервисов для мониторинга
- */
-function getServicesList() {
-  return services;
-}
+// Инициализация при импорте модуля
+loadStatusHistory();
 
 module.exports = {
-  initialize,
   checkAllServices,
+  checkService,
+  getStatusHistory,
   getCurrentStatus,
-  getDownServices,
-  getSlowServices,
-  getRecoveryEvents,
-  clearRecoveryEvents,
-  getServicesList
+  formatDowntime
 };

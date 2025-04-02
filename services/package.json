@@ -1,34 +1,24 @@
 {
-  "name": "telegram-audio-recorder-microservices",
+  "name": "telegram-mini-app-microservices",
   "version": "1.0.0",
   "description": "Микросервисная архитектура для Telegram Mini App Audio Recorder",
-  "main": "index.js",
   "scripts": {
-    "start:data-storage": "cd data-storage && npm run dev",
-    "start:audio-processor": "cd audio-processor && npm run dev",
-    "start:api-core": "cd api-core && npm run dev",
-    "start:documentation": "cd documentation && npm run dev",
-    "start:telegram-app": "cd telegram-app && npm run dev",
-    "start:admin-panel": "cd admin-panel && npm run dev",
-    "start:monitoring": "cd monitoring && npm run dev",
-    "start:all": "concurrently \"npm run start:data-storage\" \"npm run start:audio-processor\" \"npm run start:documentation\" \"npm run start:api-core\" \"npm run start:telegram-app\" \"npm run start:admin-panel\" \"npm run start:monitoring\"",
-    "install:all": "concurrently \"cd data-storage && npm install\" \"cd audio-processor && npm install\" \"cd api-core && npm install\" \"cd documentation && npm install\" \"cd telegram-app && npm install\" \"cd admin-panel && npm install\" \"cd monitoring && npm install\"",
-    "build:all": "concurrently \"cd telegram-app && npm run build\" \"cd admin-panel && npm run build\"",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "docker:build": "docker-compose build"
+    "start": "./start-all.sh",
+    "start:docker": "./start-all.sh --docker",
+    "stop": "./stop-all.sh",
+    "stop:docker": "./stop-all.sh --docker",
+    "monitoring:start": "cd monitoring && ./start-monitoring.sh",
+    "monitoring:stop": "cd monitoring && ./stop-monitoring.sh",
+    "monitoring:logs": "cd monitoring && ./view-logs.sh",
+    "monitoring:logs:follow": "cd monitoring && ./view-logs.sh -f",
+    "monitoring:logs:errors": "cd monitoring && ./view-logs.sh -e"
   },
   "keywords": [
     "microservices",
+    "monitoring",
     "telegram",
-    "audio",
-    "recorder",
-    "zepp"
+    "audio-recorder"
   ],
   "author": "",
-  "license": "ISC",
-  "devDependencies": {
-    "concurrently": "^8.2.2"
-  }
+  "license": "ISC"
 }
