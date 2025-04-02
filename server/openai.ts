@@ -277,6 +277,13 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
     log(`Распознавание с помощью GPT-4o Audio Preview: ${filePath}`, 'openai');
     log(`Размер аудиофайла: ${(fileStats.size / (1024 * 1024)).toFixed(2)} МБ`, 'openai');
     
+    // Проверяем наличие API ключа
+    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    if (!OPENAI_API_KEY) {
+      log(`OPENAI_API_KEY отсутствует, GPT-4o не может быть использован`, 'openai');
+      return null;
+    }
+    
     // Инструкция для GPT-4o
     const systemPrompt = `
     Ты русскоязычный эксперт по транскрипции речи.
@@ -293,103 +300,131 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
     7. Ты не должен объяснять невозможность разделить говорящих и не должен писать о проблемах с качеством аудио
     `;
     
+    // Замер времени начала распознавания
+    const startTime = Date.now();
+    
     try {
-      // Получаем API ключ (уже должен быть настроен)
-      const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+      // 1. Сначала преобразуем аудио в нужный формат (mp3), если это необходимо
+      let audioFile = filePath;
+      const fileExt = path.extname(filePath).toLowerCase();
       
-      if (!OPENAI_API_KEY) {
-        log(`OPENAI_API_KEY отсутствует, GPT-4o не может быть использован`, 'openai');
+      if (fileExt !== '.mp3') {
+        const mp3FilePath = filePath.replace(fileExt, '.mp3');
+        log(`Конвертируем аудио в MP3 формат для GPT-4o: ${filePath} -> ${mp3FilePath}`, 'openai');
+        
+        await new Promise<void>((resolve, reject) => {
+          ffmpeg(filePath)
+            .outputOptions([
+              '-ac 1',          // Моно (1 канал)
+              '-ar 16000',      // Частота дискретизации 16 кГц
+              '-b:a 32k',       // Битрейт 32 Кбит/с
+              '-f mp3'          // Формат MP3
+            ])
+            .output(mp3FilePath)
+            .on('error', (err) => {
+              log(`Ошибка при конвертации в MP3: ${err.message}`, 'openai');
+              reject(err);
+            })
+            .on('end', () => {
+              log(`Аудио успешно конвертировано в MP3`, 'openai');
+              resolve();
+            })
+            .run();
+        });
+        
+        audioFile = mp3FilePath;
+      }
+      
+      // 2. Читаем аудиофайл как бинарные данные
+      const audioBuffer = fs.readFileSync(audioFile);
+      
+      // 3. Создаем форму для отправки файла напрямую, без использования Base64
+      const formData = new FormData();
+      formData.append('file', await fileFromPath(audioFile));
+      formData.append('model', 'gpt-4o-audio-preview');
+      formData.append('prompt', 'Выполни транскрипцию аудиозаписи с выделением говорящих. Используй формат "Говорящий N: текст"');
+      
+      // 4. Отправляем запрос напрямую в OpenAI API
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        },
+        // @ts-ignore - игнорируем ошибку типизации для formData
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        log(`Ошибка при вызове GPT-4o API: ${response.status} ${response.statusText} - ${errorText}`, 'openai');
         return null;
       }
       
-      // Замер времени начала распознавания
-      const startTime = Date.now();
+      const result = await response.json() as any;
+      const transcribedText = result.text || '';
       
-      // По документации из https://cookbook.openai.com/examples/gpt4o/introduction_to_gpt4o
-      // 1. Проверяем, есть ли доступ к модели gpt-4o
-      try {
-        log('Проверка доступа к gpt-4o...', 'openai');
+      // 5. Форматируем результат через API чата для выделения говорящих,
+      // если транскрипция не содержит разделения на говорящих
+      if (!transcribedText.includes('Говорящий') && !transcribedText.includes('Мужчина:') && !transcribedText.includes('Женщина:')) {
+        log('Транскрипция не содержит выделения говорящих, применяем постобработку с gpt-4o', 'openai');
         
-        // Проверяем наличие модели путем вызова простого запроса
-        const testResponse = await openai.chat.completions.create({
+        const completion = await openai.chat.completions.create({
           model: "gpt-4o",
-          messages: [{role: "user", content: "Test connection"}],
-          max_tokens: 10
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt
+            },
+            {
+              role: "user", 
+              content: `Разбей этот текст на диалог с выделением говорящих: ${transcribedText}`
+            }
+          ],
+          temperature: 0.1,
         });
         
-        log('Доступ к GPT-4o подтвержден, продолжаем с аудио', 'openai');
-      } catch (modelError: any) {
-        if (modelError.status === 404 || modelError.message?.includes('does not exist')) {
-          log('Модель gpt-4o не найдена в вашем аккаунте OpenAI', 'openai');
-          return null;
-        } else {
-          log(`Ошибка при проверке доступа к модели: ${modelError}`, 'openai');
-          return null;
-        }
+        const formattedText = completion.choices[0].message.content || transcribedText;
+        
+        // Рассчитываем длительность аудиофайла на основе размера (приблизительно)
+        const durationSeconds = fileStats.size / 16000; // для WAV ~16 КБ на секунду при 16 кГц, моно
+        
+        // Рассчитываем стоимость и токены
+        const cost = calculateGPT4oTranscriptionCost(durationSeconds);
+        const tokensProcessed = Math.round(durationSeconds * 50); // примерно 50 токенов на секунду
+        
+        // Время распознавания
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        
+        log(`GPT-4o успешно распознал аудио за ${processingTime.toFixed(2)} секунд с постобработкой`, 'openai');
+        log(`Результат распознавания: ${formattedText.substring(0, 100)}...`, 'openai');
+        
+        return {
+          text: formattedText,
+          cost,
+          tokensProcessed
+        };
+      } else {
+        // Длительность аудиофайла и стоимость
+        const durationSeconds = fileStats.size / 16000;
+        const cost = calculateGPT4oTranscriptionCost(durationSeconds);
+        const tokensProcessed = Math.round(durationSeconds * 50);
+        
+        // Время распознавания
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        
+        log(`GPT-4o успешно распознал аудио за ${processingTime.toFixed(2)} секунд`, 'openai');
+        log(`Результат распознавания: ${transcribedText.substring(0, 100)}...`, 'openai');
+        
+        return {
+          text: transcribedText,
+          cost,
+          tokensProcessed
+        };
       }
-      
-      // 2. Теперь, когда мы знаем что есть доступ к GPT-4o, используем OpenAI SDK для
-      // более простого способа отправки аудио через content параметр
-
-      // Читаем файл в Base64
-      const audioBuffer = fs.readFileSync(filePath);
-      const audioBase64 = audioBuffer.toString('base64');
-      
-      // Формируем запрос к OpenAI API используя новые features GPT-4o
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user", 
-            content: [
-              {
-                type: "text",
-                text: "Распознай эту аудиозапись с выделением говорящих. Выдай только транскрипцию, без комментариев и метаданных."
-              },
-              {
-                type: "audio", 
-                audio_data: audioBase64,
-                audio_type: "wav"
-              }
-            ]
-          }
-        ],
-        temperature: 0.1,
-      });
-      
-      // Получаем текст из ответа
-      const transcribedText = completion.choices[0].message.content || '';
-      
-      // Рассчитываем длительность аудиофайла на основе размера (приблизительно)
-      // Для WAV файла: ~16 КБ на секунду для моно, 16-бит, 16 кГц
-      const durationSeconds = fileStats.size / 16000;
-      
-      // Рассчитываем стоимость
-      const cost = calculateGPT4oTranscriptionCost(durationSeconds);
-      
-      // Рассчитываем количество обработанных токенов
-      // Для аудио: примерно 50 токенов на секунду
-      const tokensProcessed = Math.round(durationSeconds * 50);
-      
-      // Время распознавания
-      const endTime = Date.now();
-      const processingTime = (endTime - startTime) / 1000;
-      
-      log(`GPT-4o успешно распознал аудио за ${processingTime.toFixed(2)} секунд`, 'openai');
-      log(`Результат распознавания: ${transcribedText.substring(0, 100)}...`, 'openai');
-      
-      return {
-        text: transcribedText,
-        cost: cost,
-        tokensProcessed: tokensProcessed
-      };
-    } catch (apiError) {
-      log(`Ошибка при вызове GPT-4o API: ${apiError}`, 'openai');
-      log('Продолжаем с использованием стандартного Whisper API', 'openai');
+    } catch (error) {
+      log(`Ошибка при вызове GPT-4o Audio Preview API: ${error}`, 'openai');
       return null;
     }
   } catch (error) {
@@ -546,13 +581,13 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
         log(`Пробуем использовать GPT-4o Audio Preview для улучшенной транскрипции...`, 'openai');
         const gpt4oResult = await transcribeWithGPT4o(fileToProcess);
         
-        // В текущей реализации GPT-4o всегда возвращает null
+        // Если GPT-4o вернул результат, используем его
         if (gpt4oResult) {
           log(`Успешно распознано с GPT-4o Audio Preview!`, 'openai');
           return {
-            text: "Распознано с помощью GPT-4o Audio",
-            cost: "0.0000",
-            tokensProcessed: 0
+            text: gpt4oResult.text,
+            cost: gpt4oResult.cost,
+            tokensProcessed: gpt4oResult.tokensProcessed
           };
         }
         
