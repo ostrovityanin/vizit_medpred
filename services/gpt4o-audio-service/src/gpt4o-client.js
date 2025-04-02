@@ -160,41 +160,30 @@ export async function transcribeWithGPT4o(audioFilePath) {
         fileType = 'audio/mpeg';
     }
     
-    // Подготавливаем тело запроса
-    const requestBody = {
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Транскрибируй это аудио на языке оригинала. Выдели говорящих, если это диалог.'
-            },
-            {
-              type: 'input_audio',
-              input_audio_data: {
-                data: audioBase64,
-                media_type: fileType
-              }
-            }
-          ]
-        }
-      ],
-      max_tokens: 4000
-    };
+    // Создаем FormData для multipart/form-data запроса
+    const FormData = (await import('form-data')).default;
+    const formData = new FormData();
+    
+    // Добавляем параметры формы
+    formData.append('model', 'whisper-1');
+    formData.append('file', fs.createReadStream(filePath));
+    formData.append('response_format', 'json');
+    
+    // Добавляем параметр языка, если можем определить
+    if (fileExt === '.ru.wav' || fileExt === '.ru.mp3') {
+      formData.append('language', 'ru');
+    }
     
     // Отправляем запрос к API
-    logDebug('Отправляем запрос к OpenAI API');
+    logDebug('Отправляем запрос к Whisper API');
     const startTime = Date.now();
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
-      body: JSON.stringify(requestBody)
+      body: formData
     });
     
     const responseTime = Date.now() - startTime;
