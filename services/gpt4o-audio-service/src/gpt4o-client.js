@@ -271,25 +271,51 @@ async function transcribeAudio(audioFilePath, options = {}) {
   // Проверка, используется ли новая модель транскрипции
   const isNewTranscribeModel = newTranscribeModels.includes(transcriptionOptions.model);
   
-  // Выбор метода транскрипции на основе предпочтений, модели или автоматически
-  if (isNewTranscribeModel) {
-    // Новые модели транскрипции должны использовать audio/transcriptions API
-    logger.info(`Используем метод audio/transcriptions с новой моделью ${transcriptionOptions.model}`);
+  // Проверка модели
+  const modelToUse = transcriptionOptions.model;
+  
+  // Выбор метода транскрипции на основе модели
+  if (isNewTranscribeModel || modelToUse === 'whisper-1') {
+    // Новые модели транскрипции и whisper должны использовать audio/transcriptions API
+    logger.info(`Используем метод audio/transcriptions с моделью ${modelToUse}`);
     return transcribeWithAudioAPI(audioFilePath, transcriptionOptions);
-  } else if (preferredMethod === 'chat' || 
-      (preferredMethod === 'auto' && 
-       (transcriptionOptions.model.includes('gpt-4o') || transcriptionOptions.model.includes('gpt-4')))) {
+  } else if (modelToUse.includes('gpt-4o') || modelToUse.includes('gpt-4')) {
     // Старые модели gpt-4o используют chat/completions API
-    logger.info(`Используем метод chat/completions с моделью ${transcriptionOptions.model}`);
+    logger.info(`Используем метод chat/completions с моделью ${modelToUse}`);
     return transcribeWithChatAPI(audioFilePath, transcriptionOptions);
   } else {
-    // По умолчанию используем Whisper API
-    if (model === 'auto') {
-      transcriptionOptions.model = 'whisper-1';
-    }
-    logger.info(`Используем метод audio/transcriptions с моделью ${transcriptionOptions.model}`);
-    return transcribeWithAudioAPI(audioFilePath, transcriptionOptions);
+    // По умолчанию используем Whisper API через audio/transcriptions
+    const fallbackOptions = { ...transcriptionOptions, model: 'whisper-1' };
+    logger.info(`Неизвестная модель, используем audio/transcriptions с моделью whisper-1`);
+    return transcribeWithAudioAPI(audioFilePath, fallbackOptions);
   }
+}
+
+/**
+ * Получает информацию о доступных моделях OpenAI для транскрипции
+ * @returns {Promise<Object>} Информация о доступных моделях
+ */
+async function getAvailableModels() {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    logger.error('OPENAI_API_KEY не установлен в переменных окружения');
+    return {
+      whisperAvailable: false,
+      gpt4oAvailable: false,
+      newModelsAvailable: false,
+      error: 'API ключ OpenAI не найден'
+    };
+  }
+
+  // По умолчанию все доступны без проверки
+  return {
+    whisperAvailable: true,
+    whisperModel: 'whisper-1',
+    gpt4oAvailable: true,
+    gpt4oModel: 'gpt-4o-audio-preview',
+    newModelsAvailable: true,
+    newModels: ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']
+  };
 }
 
 export default {
@@ -299,5 +325,6 @@ export default {
   transcribeWithChatAPI,
   transcribeWithAudioAPI,
   transcribeAudio,
-  calculateTranscriptionCost
+  calculateTranscriptionCost,
+  getAvailableModels
 };

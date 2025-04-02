@@ -16,9 +16,9 @@ import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 
-import { setupLogger } from './logger.js';
-import { AudioProcessor } from './audio-processor.js';
-import { GPT4oClient } from './gpt4o-client.js';
+import logger from './logger.js';
+import audioProcessor from './audio-processor.js';
+import gpt4oClient from './gpt4o-client.js';
 
 // Инициализация переменных окружения
 dotenv.config();
@@ -27,12 +27,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Настройка логирования
-const logger = setupLogger();
-
-// Инициализация классов для обработки аудио и транскрипции
-const audioProcessor = new AudioProcessor(logger);
-const gpt4oClient = new GPT4oClient(logger);
+// Логирование и обработчики аудио и GPT-4o уже импортированы из соответствующих файлов
 
 // Настройка сервера Express
 const app = express();
@@ -108,8 +103,8 @@ app.post('/api/transcribe/whisper', upload.single('audio'), async (req, res) => 
     
     const startTime = Date.now();
     
-    // Транскрибируем через Whisper API
-    const result = await gpt4oClient.transcribeWithWhisper(audioFile, options);
+    // Транскрибируем через API
+    const result = await gpt4oClient.transcribeAudio(audioFile, { ...options, model: 'whisper-1' });
     
     const elapsedTime = (Date.now() - startTime) / 1000;
     
@@ -177,19 +172,14 @@ app.post('/api/transcribe/gpt4o', upload.single('audio'), async (req, res) => {
     
     const startTime = Date.now();
     
-    // Проверяем доступность GPT-4o
-    const availableModels = await gpt4oClient.getAvailableModels();
+    // Подготовка параметров для транскрипции
+    let modelToUse = 'whisper-1';
     let result;
     
-    if (availableModels.gpt4oAvailable) {
-      logger.info(`Модель GPT-4o найдена: ${availableModels.gpt4oModel}, попытка транскрипции...`);
-      // Транскрибируем через GPT-4o
-      result = await gpt4oClient.transcribeWithGPT4o(audioFile, availableModels.gpt4oModel, options);
-    } else {
-      logger.warn('Модель GPT-4o не доступна, используем Whisper API в качестве запасного варианта');
-      // Используем Whisper как запасной вариант
-      result = await gpt4oClient.transcribeWithWhisper(audioFile, options);
-    }
+    logger.info(`Используем выбранную модель ${options.model || 'whisper-1'} для транскрипции`);
+    
+    // Транскрибируем через TranscribeAudio API
+    result = await gpt4oClient.transcribeAudio(audioFile, options);
     
     const elapsedTime = (Date.now() - startTime) / 1000;
     
@@ -259,24 +249,25 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     
     const startTime = Date.now();
     
-    // Проверяем, требуется ли расширенные возможности GPT-4o
+    // Выбираем модель на основе запрошенных возможностей
     let result;
+    let modelToUse = 'whisper-1'; // Модель по умолчанию
+    
     if (options.detailed) {
-      // Проверяем доступность GPT-4o
-      const availableModels = await gpt4oClient.getAvailableModels();
-      
-      if (availableModels.gpt4oAvailable) {
-        logger.info(`Запрошены расширенные возможности и GPT-4o доступен (${availableModels.gpt4oModel}), используем его`);
-        result = await gpt4oClient.transcribeWithGPT4o(audioFile, availableModels.gpt4oModel, options);
-      } else {
-        logger.warn('Запрошены расширенные возможности, но GPT-4o недоступен, используем Whisper');
-        result = await gpt4oClient.transcribeWithWhisper(audioFile, options);
-      }
+      // Для расширенной транскрипции используем одну из моделей GPT-4o
+      logger.info('Запрошены расширенные возможности, используем GPT-4o-transcribe');
+      modelToUse = 'gpt-4o-transcribe';
     } else {
       // Для обычной транскрипции используем Whisper как более надежный вариант
       logger.info('Используем Whisper API для стандартной транскрипции');
-      result = await gpt4oClient.transcribeWithWhisper(audioFile, options);
     }
+    
+    // Объединяем опции с выбранной моделью
+    const transcriptionOptions = { ...options, model: modelToUse };
+    
+    // Выполняем транскрипцию
+    logger.info(`Транскрибируем с моделью ${modelToUse}`);
+    result = await gpt4oClient.transcribeAudio(audioFile, transcriptionOptions);
     
     const elapsedTime = (Date.now() - startTime) / 1000;
     
@@ -309,6 +300,115 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
   } catch (error) {
     logger.error(`Ошибка обработки запроса: ${error.message}`);
     res.status(500).json({ error: 'Ошибка сервера при обработке запроса' });
+  }
+});
+
+// Маршрут для сравнения транскрипции с использованием всех доступных моделей
+app.post('/api/transcribe/compare', upload.single('audio'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Аудиофайл не загружен' });
+    }
+    
+    logger.info(`Получен запрос на сравнительную транскрипцию: ${req.file.originalname}, размер: ${req.file.size} байт`);
+    
+    // Список моделей для сравнения
+    const models = [
+      'whisper-1',
+      'gpt-4o-transcribe',
+      'gpt-4o-mini-transcribe'
+    ];
+    
+    // Оптимизируем аудиофайл для MP3 формата (лучшая совместимость с новыми моделями)
+    let audioFile = req.file.path;
+    try {
+      logger.info('Конвертация аудиофайла в MP3 для совместимости с новыми моделями');
+      const convertedFile = await audioProcessor.convertToMp3(req.file.path);
+      if (convertedFile) {
+        audioFile = convertedFile;
+        logger.info(`Аудио конвертировано в MP3: ${convertedFile}`);
+      }
+    } catch (convertError) {
+      logger.error(`Ошибка конвертации аудио в MP3: ${convertError.message}`);
+      // Продолжаем с оригинальным файлом
+    }
+    
+    // Параметры транскрипции
+    const options = {
+      language: req.body.language || 'ru',
+      prompt: req.body.prompt || ''
+    };
+    
+    // Результаты для каждой модели
+    const results = {};
+    const startTimeTotal = Date.now();
+    
+    // Запускаем транскрипцию для каждой модели параллельно
+    const transcriptionPromises = models.map(async (model) => {
+      try {
+        logger.info(`Запуск транскрипции с моделью ${model}`);
+        const startTime = Date.now();
+        
+        // Создаем опции с текущей моделью
+        const modelOptions = { ...options, model };
+        
+        // Транскрибируем через audio API
+        const result = await gpt4oClient.transcribeAudio(audioFile, modelOptions);
+        
+        const elapsedTime = (Date.now() - startTime) / 1000;
+        
+        if (result && result.text) {
+          results[model] = {
+            text: result.text,
+            processingTime: elapsedTime,
+            model
+          };
+          
+          logger.info(`Транскрипция с моделью ${model} выполнена за ${elapsedTime.toFixed(2)} секунд`);
+        } else {
+          const errorMsg = result?.error || 'Неизвестная ошибка';
+          results[model] = {
+            error: errorMsg,
+            model
+          };
+          logger.error(`Ошибка транскрипции с моделью ${model}: ${errorMsg}`);
+        }
+      } catch (error) {
+        logger.error(`Исключение при обработке модели ${model}: ${error.message}`);
+        results[model] = {
+          error: error.message,
+          model
+        };
+      }
+    });
+    
+    // Ждем завершения всех транскрипций
+    await Promise.all(transcriptionPromises);
+    
+    const totalElapsedTime = (Date.now() - startTimeTotal) / 1000;
+    
+    // Удаляем конвертированный файл если он был создан
+    if (audioFile !== req.file.path && fs.existsSync(audioFile)) {
+      fs.unlinkSync(audioFile);
+    }
+    
+    // Удаляем исходный файл
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    logger.info(`Сравнительная транскрипция выполнена за ${totalElapsedTime.toFixed(2)} секунд`);
+    
+    res.json({
+      results,
+      totalProcessingTime: totalElapsedTime,
+      fileSize: req.file.size,
+      fileName: req.file.originalname
+    });
+    
+  } catch (error) {
+    logger.error(`Ошибка обработки запроса сравнения: ${error.message}`);
+    res.status(500).json({ error: 'Ошибка сервера при сравнительной транскрипции' });
   }
 });
 
