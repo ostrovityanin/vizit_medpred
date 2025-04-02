@@ -521,10 +521,28 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
       };
     }
     
+    // Проверяем существование файла
+    if (!fs.existsSync(filePath)) {
+      log(`Ошибка: файл ${filePath} не найден`, 'openai');
+      return {
+        text: 'Ошибка: аудиофайл не найден',
+        cost: '0.0000',
+        tokensProcessed: 0
+      };
+    }
+    
     // Проверяем размер исходного файла
     const fileStats = fs.statSync(filePath);
-    const fileSizeMB = fileStats.size / (1024 * 1024);
+    if (fileStats.size === 0) {
+      log(`Ошибка: файл ${filePath} имеет нулевой размер`, 'openai');
+      return {
+        text: 'Ошибка: аудиофайл имеет нулевой размер',
+        cost: '0.0000',
+        tokensProcessed: 0
+      };
+    }
     
+    const fileSizeMB = fileStats.size / (1024 * 1024);
     log(`Размер исходного аудиофайла: ${fileSizeMB.toFixed(2)} МБ`, 'openai');
     
     // Проверяем, нужно ли оптимизировать файл
@@ -532,229 +550,60 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
     
     if (fileSizeMB > 20) { // Если файл больше 20 МБ, оптимизируем его
       try {
-        // Оптимизируем файл
+        log(`Оптимизируем аудиофайл для распознавания`, 'openai');
         fileToProcess = await optimizeAudioForTranscription(filePath);
         
-        // Проверяем размер оптимизированного файла
         const optimizedStats = fs.statSync(fileToProcess);
         const optimizedSizeMB = optimizedStats.size / (1024 * 1024);
-        
-        // Если файл все равно больше 25 МБ (лимит OpenAI), разделяем его и обрабатываем по частям
-        if (optimizedSizeMB > 25) {
-          log(`Оптимизированный файл слишком большой (${optimizedSizeMB.toFixed(2)} МБ), разделяем его на части`, 'openai');
-          
-          // Создаем временную директорию для частей файла
-          const tempDir = path.join(path.dirname(filePath), 'temp_segments');
-          await fsExtra.ensureDir(tempDir);
-          
-          try {
-            // Разделяем файл на части по 5 минут
-            const segmentFiles = await splitAudioFile(fileToProcess, tempDir, 300);
-            
-            if (segmentFiles.length === 0) {
-              throw new Error('Не удалось разделить файл на части');
-            }
-            
-            log(`Файл разделен на ${segmentFiles.length} частей, обрабатываем последовательно`, 'openai');
-            
-            // Выполняем транскрипцию каждой части отдельно
-            const transcriptions: string[] = [];
-            let totalCost = 0;
-            let totalTokens = 0;
-            
-            for (let i = 0; i < segmentFiles.length; i++) {
-              const segmentFile = segmentFiles[i];
-              log(`Обрабатываем часть ${i+1}/${segmentFiles.length}: ${segmentFile}`, 'openai');
-              
-              try {
-                // Базовое распознавание с помощью Whisper для каждого сегмента
-                const response = await openai.audio.transcriptions.create({
-                  file: fs.createReadStream(segmentFile),
-                  model: "whisper-1",
-                  language: "ru",
-                  temperature: 0.0,
-                });
-                
-                // Очищаем от нерусских символов
-                const segmentTranscription = cleanText(response.text);
-                log(`Распознавание сегмента ${i+1} успешно, длина текста: ${segmentTranscription.length}`, 'openai');
-                
-                // Получаем статистику файла для расчета стоимости
-                const segmentStats = fs.statSync(segmentFile);
-                const segmentDurationSeconds = segmentStats.size / 16000; // примерная оценка для WAV
-                const segmentTokens = Math.round(segmentDurationSeconds * 15);
-                const segmentCost = calculateTranscriptionCost(segmentDurationSeconds);
-                
-                transcriptions.push(`Часть ${i+1}:\n${segmentTranscription}`);
-                totalCost += parseFloat(segmentCost);
-                totalTokens += segmentTokens;
-              } catch (segmentError) {
-                log(`Ошибка при распознавании части ${i+1}: ${segmentError}`, 'openai');
-                transcriptions.push(`[Часть ${i+1}: Не распознана]`);
-              }
-            }
-            
-            // Объединяем все транскрипции
-            const combinedText = combineTranscriptions(transcriptions);
-            
-            // Очищаем временные файлы
-            try {
-              await fsExtra.remove(tempDir);
-              log(`Удалена временная директория: ${tempDir}`, 'openai');
-            } catch (cleanupError) {
-              log(`Ошибка при удалении временных файлов: ${cleanupError}`, 'openai');
-            }
-            
-            return {
-              text: combinedText,
-              cost: totalCost.toFixed(4),
-              tokensProcessed: totalTokens
-            };
-          } catch (splitError) {
-            log(`Ошибка при разделении и обработке файла: ${splitError}`, 'openai');
-            // Продолжаем с оптимизированным файлом, даже если он слишком большой
-            // OpenAI API может отклонить запрос, но мы все равно попробуем
-          }
-        }
+        log(`Размер оптимизированного аудиофайла: ${optimizedSizeMB.toFixed(2)} МБ`, 'openai');
       } catch (optimizeError) {
         log(`Ошибка при оптимизации файла: ${optimizeError}. Продолжаем с исходным файлом.`, 'openai');
         fileToProcess = filePath; // В случае ошибки используем оригинальный файл
       }
     }
     
-    log(`Отправляем аудиофайл на распознавание: ${fileToProcess}`, 'openai');
+    log(`Используем GPT-4o Audio для распознавания: ${fileToProcess}`, 'openai');
     
+    // Пробуем использовать GPT-4o Audio для улучшенной транскрипции
     try {
-      // Проверяем существование и размер файла перед обработкой
-      if (!fs.existsSync(fileToProcess)) {
-        log(`Ошибка: файл ${fileToProcess} не найден`, 'openai');
+      log(`Пробуем использовать GPT-4o Audio для улучшенной транскрипции...`, 'openai');
+      const gpt4oResult = await transcribeWithGPT4o(fileToProcess);
+      
+      // Если GPT-4o вернул результат, используем его
+      if (gpt4oResult) {
+        log(`Успешно распознано с GPT-4o Audio!`, 'openai');
         return {
-          text: 'Ошибка: аудиофайл не найден',
-          cost: '0.0000',
-          tokensProcessed: 0
+          text: gpt4oResult.text,
+          cost: gpt4oResult.cost,
+          tokensProcessed: gpt4oResult.tokensProcessed
         };
       }
       
-      const fileInfo = fs.statSync(fileToProcess);
-      if (fileInfo.size === 0) {
-        log(`Ошибка: файл ${fileToProcess} имеет нулевой размер`, 'openai');
-        return {
-          text: 'Ошибка: аудиофайл имеет нулевой размер',
-          cost: '0.0000',
-          tokensProcessed: 0
-        };
-      }
-      
-      log(`Проверка файла ${fileToProcess} перед отправкой: ${fileInfo.size} байт`, 'openai');
-      
-      // Пробуем сначала использовать GPT-4o Audio Preview
-      try {
-        log(`Пробуем использовать GPT-4o Audio Preview для улучшенной транскрипции...`, 'openai');
-        const gpt4oResult = await transcribeWithGPT4o(fileToProcess);
-        
-        // Если GPT-4o вернул результат, используем его
-        if (gpt4oResult) {
-          log(`Успешно распознано с GPT-4o Audio Preview!`, 'openai');
-          return {
-            text: gpt4oResult.text,
-            cost: gpt4oResult.cost,
-            tokensProcessed: gpt4oResult.tokensProcessed
-          };
-        }
-        
-        log(`GPT-4o Audio Preview не вернул результат, переключаемся на стандартный Whisper...`, 'openai');
-      } catch (gpt4oError) {
-        log(`Ошибка при использовании GPT-4o Audio Preview: ${gpt4oError}. Переключаемся на стандартный Whisper...`, 'openai');
-      }
-      
-      // Проверяем формат файла с помощью ffprobe
-      try {
-        const ffprobePromise = new Promise<boolean>((resolve, reject) => {
-          ffmpeg.ffprobe(fileToProcess, (err, metadata) => {
-            if (err) {
-              log(`Ошибка при анализе аудиофайла: ${err.message}`, 'openai');
-              reject(err);
-              return;
-            }
-            
-            if (!metadata || !metadata.format) {
-              log('Не удалось получить информацию о формате аудиофайла', 'openai');
-              reject(new Error('Неизвестный формат аудиофайла'));
-              return;
-            }
-            
-            // Проверяем, что файл содержит аудиопотоки
-            const hasAudioStreams = metadata.streams?.some(stream => stream.codec_type === 'audio');
-            if (!hasAudioStreams) {
-              log('Аудиофайл не содержит аудиопотоков', 'openai');
-              reject(new Error('Файл не содержит аудиопотоков'));
-              return;
-            }
-            
-            log(`Формат аудиофайла: ${metadata.format.format_name}, аудиопотоки: ${metadata.streams?.filter(s => s.codec_type === 'audio').length}`, 'openai');
-            resolve(true);
-          });
-        }).catch((error) => {
-          log(`Предупреждение при проверке аудиофайла: ${error}`, 'openai');
-          // Продолжаем даже при ошибке анализа, OpenAI API может справиться
-          return true;
-        });
-        
-        await ffprobePromise;
-      } catch (ffprobeError) {
-        log(`Ошибка при выполнении ffprobe: ${ffprobeError}`, 'openai');
-        // Продолжаем выполнение, так как эта проверка не критична
-      }
-      
-      // Единственный шаг: Базовое распознавание с помощью Whisper с напрямую выделенными говорящими
+      log(`GPT-4o Audio не вернул результат, переключаемся на стандартный Whisper...`, 'openai');
+    } catch (gpt4oError) {
+      log(`Ошибка при использовании GPT-4o Audio: ${gpt4oError}. Переключаемся на стандартный Whisper...`, 'openai');
+    }
+    
+    // Если GPT-4o не сработал, используем стандартный Whisper API
+    try {
+      // Базовое распознавание с помощью Whisper
       const response = await openai.audio.transcriptions.create({
         file: fs.createReadStream(fileToProcess),
         model: "whisper-1",
         language: "ru",
-        temperature: 0.2, // Небольшое увеличение temperature для более полного распознавания
-        response_format: "verbose_json", // Запрашиваем расширенный формат ответа
-        prompt: "Это аудиозапись диалога. Пожалуйста, распознай весь текст полностью." // Подсказка для улучшения распознавания
+        temperature: 0.2,
+        response_format: "text"
       });
       
-      // Извлекаем текст и информацию о сегментах
+      // Получаем текст транскрипции
       let transcription = '';
-      let segments = [];
-      
-      try {
-        if (typeof response === 'string') {
-          // Если ответ получен как строка, пробуем распарсить JSON
-          const parsedResponse = JSON.parse(response);
-          transcription = parsedResponse.text || '';
-          segments = parsedResponse.segments || [];
-        } else {
-          // Если ответ уже является объектом
-          transcription = response.text || '';
-          segments = (response as any).segments || [];
-        }
-      } catch (parseError) {
-        log(`Ошибка при парсинге ответа Whisper: ${parseError}. Используем текст напрямую.`, 'openai');
-        if (typeof response === 'string') {
-          transcription = response;
-        } else if (typeof response.text === 'string') {
-          transcription = response.text;
-        }
+      if (typeof response === 'string') {
+        transcription = response;
+      } else if (typeof response.text === 'string') {
+        transcription = response.text;
       }
-  
-      // Очищаем от нерусских символов сразу
-      transcription = cleanText(transcription);
-      log(`Базовое распознавание успешно: ${transcription}`, 'openai');
       
-      // Проверка на повторяющиеся паттерны, что может указывать на проблему с аудио
-      const hasPatternRepetition = /(.{2,5})\1{10,}/g.test(transcription) || 
-                                /((?:[А-Яа-я]+ ){1,3})\1{5,}/g.test(transcription);
-      if (hasPatternRepetition) {
-        log(`Обнаружен повторяющийся паттерн в транскрипции, возможно проблема с аудиофайлом`, 'openai');
-        return {
-          text: 'В аудиофайле обнаружены повторяющиеся паттерны или шум. Возможно проблема с записью.',
-          cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность 1 минута
-          tokensProcessed: 100 // Минимальное количество токенов
-        };
-      }
+      log(`Базовое распознавание успешно: ${transcription.substring(0, 100)}...`, 'openai');
       
       // Проверяем, достаточно ли текста для анализа
       if (transcription.trim().length < 10) {
@@ -766,120 +615,54 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
         };
       }
       
-      // Используем однопроходный метод с GPT-4 для идентификации говорящих
+      // Используем GPT-4 для разделения на говорящих
       try {
-        log(`Делим текст на говорящих...`, 'openai');
-        
-        // Создаем промпт для системы
-        const systemPrompt = "Ты эксперт по обработке аудиотранскрипций. Обязательно добавь метки говорящих, не меняй текст. Используй 'Говорящий:' для монологов. НИКОГДА не пиши комментарии о невозможности разделения. Возвращай только отформатированный текст."; 
-        
-        // Создаем промпт для пользователя
-        const userPrompt = `Транскрипция: "${transcription}". Добавь метки говорящих. Если сложно определить разных говорящих, пометь как "Говорящий: ${transcription}".`;
-        
-        // Отправляем запрос к OpenAI API
         const completion = await openai.chat.completions.create({
           model: "gpt-4",
           messages: [
             {
               role: "system",
-              content: systemPrompt
+              content: "Ты эксперт по обработке аудиотранскрипций. Добавь метки говорящих к тексту. Используй 'Говорящий:' для монологов. НИКОГДА не пиши комментарии о невозможности разделения."
             },
             {
               role: "user", 
-              content: userPrompt
+              content: `Транскрипция: "${transcription}". Добавь метки говорящих.`
             }
           ],
           temperature: 0.1,
-          max_tokens: 4000,
+          max_tokens: 2000,
         });
         
         const formattedText = completion.choices[0].message.content || '';
-        log(`Разделение на говорящих: ${formattedText}`, 'openai');
-        
-        // Проверяем, не содержит ли ответ метакомментариев вместо размеченного диалога
-        const errorPatterns = [
-          /в задании не указано/i,
-          /исправлений не требуется/i,
-          /транскрипция представлена верно/i,
-          /я не могу изменить/i,
-          /я должен сохранить/i,
-          /извините/i,
-          /извиняюсь/i,
-          /недостаточно информации/i,
-          /недостаточно данных/i,
-          /предоставьте более/i,
-          /предоставьте дополнительную/i,
-          /предоставьте контекст/i,
-          /недостаточно контекста/i,
-          /не могу определить/i,
-          /трудно определить/i,
-          /невозможно определить/i,
-          /пожалуйста/i,
-          /к сожалению/i,
-          /без контекста/i,
-          /не хватает данных/i
-        ];
-        
-        const containsErrorMessage = errorPatterns.some(pattern => pattern.test(formattedText));
-        
-        if (containsErrorMessage) {
-          log('Обнаружен ответ GPT с метаинструкциями вместо транскрипции', 'openai');
-          
-          // Если GPT вернул метакомментарий, форматируем базовую транскрипцию самостоятельно
-          const formattedBasicText = `Говорящий: ${transcription}`;
-          
-          return {
-            text: formattedBasicText,
-            cost: calculateTranscriptionCost(60), // Предполагаем минимальную длительность
-            tokensProcessed: 100 // Минимальное количество токенов
-          };
-        }
-        
-        // Обрабатываем результат для лучшего форматирования
-        const finalText = parseDialogueFromText(formattedText);
-        
-        // Получаем статистику файла, чтобы узнать его продолжительность
-        const stats = fs.statSync(filePath);
-        
-        // Используем общую продолжительность аудио для расчета стоимости
-        // Это берем из продолжительности файла в байтах / средний битрейт
-        // Для простоты возьмем примерную оценку: 16KB на 1 секунду для WAV файла
-        const estimatedDurationSeconds = stats.size / 16000;
-        
-        // Оценка количества токенов: приблизительно 15 токенов на секунду для русского языка
-        const estimatedTokens = Math.round(estimatedDurationSeconds * 15);
+        log(`Разделение на говорящих успешно`, 'openai');
         
         // Рассчитываем стоимость
-        const cost = calculateTranscriptionCost(estimatedDurationSeconds);
+        const durationSeconds = fileStats.size / 16000; // примерная оценка для WAV
+        const estimatedTokens = Math.round(durationSeconds * 15);
+        const cost = calculateTranscriptionCost(durationSeconds);
         
-        log(`Стоимость распознавания: $${cost} (${estimatedTokens} токенов)`, 'openai');
+        log(`Стоимость распознавания: $${cost}`, 'openai');
         
         return {
-          text: finalText,
+          text: formattedText,
           cost: cost,
           tokensProcessed: estimatedTokens
         };
+      } catch (gptError) {
+        log(`Ошибка при разделении на говорящих: ${gptError}`, 'openai');
         
-      } catch (error) {
-        log(`Ошибка при разделении на говорящих, возвращаем базовую транскрипцию с форматированием: ${error}`, 'openai');
-        
-        // Для упрощения также вернем оценочную стоимость и для базовой транскрипции
-        const stats = fs.statSync(filePath);
-        const estimatedDurationSeconds = stats.size / 16000;
-        const estimatedTokens = Math.round(estimatedDurationSeconds * 15);
-        const cost = calculateTranscriptionCost(estimatedDurationSeconds);
-        
-        // Форматируем базовую транскрипцию самостоятельно
+        // Форматируем базовую транскрипцию
         const formattedBasicText = `Говорящий: ${transcription}`;
+        const cost = calculateTranscriptionCost(60); // примерная оценка
         
         return {
           text: formattedBasicText,
           cost: cost,
-          tokensProcessed: estimatedTokens
+          tokensProcessed: 100
         };
       }
     } catch (whisperError) {
-      log(`Ошибка при базовом распознавании: ${whisperError}`, 'openai');
+      log(`Ошибка при использовании Whisper API: ${whisperError}`, 'openai');
       throw whisperError;
     }
   } catch (error) {

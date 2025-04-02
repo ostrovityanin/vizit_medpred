@@ -1,72 +1,96 @@
 /**
- * Модуль логирования для GPT-4o Audio Preview микросервиса
+ * Модуль для логирования событий в сервисе GPT-4o Audio
  */
 
-const winston = require('winston');
-const path = require('path');
-const fs = require('fs');
+import winston from 'winston';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Создаем директорию для логов, если она не существует
-const logDir = path.join(__dirname, '../logs');
-if (!fs.existsSync(logDir)) {
-  fs.mkdirSync(logDir, { recursive: true });
-}
+// Получаем текущую директорию (для ES modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Конфигурация логгера
-const loggerConfig = {
-  levels: {
-    error: 0,
-    warn: 1,
-    info: 2,
-    debug: 3,
-  },
-  colors: {
-    error: 'red',
-    warn: 'yellow',
-    info: 'green',
-    debug: 'blue',
-  },
-};
+// Путь к директории логов
+const logsDir = path.join(__dirname, '../logs');
 
-// Форматирование логов
+// Настройка формата логов
 const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.printf(({ timestamp, level, message }) => {
-    return `[${timestamp}] [${level.toUpperCase()}] ${message}`;
+  winston.format.printf(({ level, message, timestamp, ...meta }) => {
+    return `${timestamp} [${level.toUpperCase()}]: ${message} ${
+      Object.keys(meta).length ? JSON.stringify(meta) : ''
+    }`;
   })
 );
 
 // Создаем логгер
-const log = winston.createLogger({
-  levels: loggerConfig.levels,
+const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   format: logFormat,
   transports: [
-    // Выводим логи в консоль
+    // Запись логов в файл
+    new winston.transports.File({ 
+      filename: path.join(logsDir, 'error.log'), 
+      level: 'error' 
+    }),
+    new winston.transports.File({ 
+      filename: path.join(logsDir, 'combined.log') 
+    }),
+    // Вывод логов в консоль
     new winston.transports.Console({
       format: winston.format.combine(
-        winston.format.colorize({ all: true }),
+        winston.format.colorize(),
         logFormat
-      ),
-    }),
-    // Сохраняем логи в файл
-    new winston.transports.File({
-      filename: path.join(logDir, 'error.log'),
-      level: 'error',
-    }),
-    new winston.transports.File({
-      filename: path.join(logDir, 'combined.log'),
-    }),
-  ],
+      )
+    })
+  ]
 });
 
-// Добавляем цвета
-winston.addColors(loggerConfig.colors);
+// Расширенные функции для логирования с контекстом
+export const logRequest = (req, message) => {
+  const { method, url, ip, body, query, params } = req;
+  logger.info(`${message}`, {
+    method,
+    url,
+    ip,
+    body: body ? JSON.stringify(body).substring(0, 500) : undefined,
+    query,
+    params
+  });
+};
 
-// Пример использования:
-// log.debug('Отладочное сообщение');
-// log.info('Информационное сообщение');
-// log.warn('Предупреждение');
-// log.error('Ошибка');
+export const logResponse = (req, res, message) => {
+  const { method, url, ip } = req;
+  const { statusCode } = res;
+  logger.info(`${message}`, {
+    method,
+    url,
+    ip,
+    statusCode
+  });
+};
 
-module.exports = { log };
+export const logError = (err, req, message) => {
+  const { method, url, ip } = req;
+  logger.error(`${message}`, {
+    method,
+    url,
+    ip,
+    error: err.message,
+    stack: err.stack
+  });
+};
+
+export const logInfo = (message, meta = {}) => {
+  logger.info(message, meta);
+};
+
+export const logWarning = (message, meta = {}) => {
+  logger.warn(message, meta);
+};
+
+export const logDebug = (message, meta = {}) => {
+  logger.debug(message, meta);
+};
+
+export default logger;

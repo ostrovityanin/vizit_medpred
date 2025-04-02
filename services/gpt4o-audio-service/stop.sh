@@ -1,43 +1,48 @@
 #!/bin/bash
 
-# Скрипт для остановки GPT-4o Audio Preview микросервиса
+# Скрипт для остановки сервиса GPT-4o Audio
 
-# Переходим в директорию микросервиса
-cd "$(dirname "$0")"
+# Определяем директорию, в которой находится скрипт
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
 
 # Проверяем наличие файла с PID
-if [ -f .pid ]; then
-  PID=$(cat .pid)
-  
-  # Проверяем, запущен ли процесс
-  if ps -p $PID > /dev/null; then
-    echo "Останавливаем GPT-4o Audio Preview микросервис (PID: $PID)..."
-    kill $PID
-    
-    # Даем немного времени на корректное завершение
-    sleep 2
-    
-    # Проверяем, остановился ли процесс
-    if ps -p $PID > /dev/null; then
-      echo "Процесс не остановился. Принудительное завершение..."
-      kill -9 $PID
-    fi
-    
-    echo "Микросервис остановлен"
-  else
-    echo "Процесс с PID $PID не найден. Возможно, он уже остановлен."
-  fi
-  
-  # Удаляем файл с PID
-  rm .pid
-else
-  echo "Файл .pid не найден. Микросервис не запущен или был остановлен некорректно."
-  
-  # Пытаемся найти и остановить процесс по названию
-  PID=$(ps aux | grep "[n]ode src/index.js" | awk '{print $2}')
-  if [ ! -z "$PID" ]; then
-    echo "Найден процесс микросервиса (PID: $PID). Останавливаем..."
-    kill $PID
-    echo "Микросервис остановлен"
-  fi
+if [ ! -f .service.pid ]; then
+  echo "Сервис не запущен или файл с PID не найден"
+  exit 0
 fi
+
+# Получаем PID процесса
+PID=$(cat .service.pid)
+
+# Проверяем, запущен ли процесс
+if ! ps -p $PID > /dev/null; then
+  echo "Процесс с PID $PID не найден"
+  rm -f .service.pid
+  exit 0
+fi
+
+# Останавливаем процесс
+echo "Останавливаем сервис GPT-4o Audio (PID: $PID)..."
+kill $PID
+
+# Ждем завершения процесса
+MAX_WAIT=10
+WAITED=0
+while ps -p $PID > /dev/null && [ $WAITED -lt $MAX_WAIT ]; do
+  sleep 1
+  WAITED=$((WAITED + 1))
+  echo "Ожидание завершения процесса... ($WAITED/$MAX_WAIT)"
+done
+
+# Проверяем, завершился ли процесс
+if ps -p $PID > /dev/null; then
+  echo "Процесс не завершился корректно, принудительно завершаем..."
+  kill -9 $PID
+  sleep 1
+fi
+
+# Удаляем файл с PID
+rm -f .service.pid
+
+echo "Сервис GPT-4o Audio остановлен"

@@ -1,215 +1,179 @@
 /**
- * Клиентская библиотека для работы с GPT-4o Audio Preview микросервисом
+ * Клиентская библиотека для интеграции с сервисом GPT-4o Audio
  * 
- * Позволяет легко интегрировать транскрипцию аудио с GPT-4o
- * в основное приложение без изменения его кода.
+ * Предоставляет функции для взаимодействия с сервисом транскрипции
+ * из основного приложения.
  */
 
-const fs = require('fs');
-const path = require('path');
-const fetch = require('node-fetch');
-const FormData = require('form-data');
+import fs from 'fs';
+import path from 'path';
+import FormData from 'form-data';
+import fetch from 'node-fetch';
+import { logInfo, logError, logDebug } from './logger.js';
 
 /**
- * Клиент для работы с GPT-4o Audio Preview микросервисом
+ * Настройки для подключения к сервису GPT-4o Audio
  */
-class GPT4oAudioClient {
-  /**
-   * Создает новый экземпляр клиента
-   * @param {Object} options Опции подключения
-   * @param {string} options.baseUrl URL микросервиса
-   * @param {number} options.timeout Таймаут запросов в миллисекундах
-   */
-  constructor(options = {}) {
-    this.baseUrl = options.baseUrl || 'http://localhost:3400';
-    this.timeout = options.timeout || 120000; // 2 минуты по умолчанию
-  }
+const config = {
+  serviceUrl: process.env.GPT4O_SERVICE_URL || 'http://localhost:3100',
+  serviceToken: process.env.GPT4O_SERVICE_TOKEN,
+  defaultTimeout: 600000 // 10 минут
+};
 
-  /**
-   * Проверяет работоспособность микросервиса
-   * @returns {Promise<boolean>} Доступен ли сервис
-   */
-  async isServiceAvailable() {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      const response = await fetch(`${this.baseUrl}/health`, {
-        method: 'GET',
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-      
-      if (response.ok) {
-        const data = await response.json();
-        return data.status === 'ok' && data.apiKeyConfigured;
-      }
-      
-      return false;
-    } catch (error) {
-      console.warn(`GPT-4o Audio сервис недоступен: ${error.message}`);
-      return false;
+/**
+ * Отправляет аудиофайл на транскрипцию
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {Object} options Дополнительные опции
+ * @returns {Promise<Object>} Результат транскрипции
+ */
+export async function transcribeAudio(audioFilePath, options = {}) {
+  try {
+    if (!fs.existsSync(audioFilePath)) {
+      throw new Error(`Файл не найден: ${audioFilePath}`);
     }
-  }
-
-  /**
-   * Транскрибирует аудиофайл, загружая его в микросервис
-   * @param {string} filePath Путь к аудиофайлу
-   * @returns {Promise<{text: string, cost: string, tokensProcessed: number}>} Результат транскрипции
-   */
-  async transcribeAudio(filePath) {
-    try {
-      // Проверяем, существует ли файл
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`Файл не найден: ${filePath}`);
-      }
-
-      // Проверяем доступность сервиса
-      const isAvailable = await this.isServiceAvailable();
-      if (!isAvailable) {
-        throw new Error('GPT-4o Audio микросервис недоступен');
-      }
-
-      // Проверяем размер файла
-      const stats = fs.statSync(filePath);
-      if (stats.size === 0) {
-        throw new Error(`Файл имеет нулевой размер: ${filePath}`);
-      }
-
-      console.log(`Отправляем файл на транскрибирование: ${filePath} (${(stats.size / (1024 * 1024)).toFixed(2)} МБ)`);
-
-      // Создаем multipart/form-data
-      const form = new FormData();
-      form.append('audio', fs.createReadStream(filePath));
-
-      // Отправляем запрос
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-      const response = await fetch(`${this.baseUrl}/transcribe`, {
-        method: 'POST',
-        body: form,
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        let errorText = await response.text();
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorText = errorJson.message || errorText;
-        } catch (e) {
-          // Если не удалось разобрать JSON, используем как есть
-        }
-        throw new Error(`Ошибка при транскрибировании: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      // Парсим ответ
-      const result = await response.json();
-      
-      if (!result.success || !result.text) {
-        throw new Error('Неожиданный формат ответа от сервиса');
-      }
-
-      console.log(`Транскрибирование успешно завершено. Длина текста: ${result.text.length} символов`);
-
-      return {
-        text: result.text,
-        cost: result.metadata?.cost || '0.0000',
-        tokensProcessed: result.metadata?.tokensProcessed || 0
-      };
-    } catch (error) {
-      console.error(`Ошибка при вызове GPT-4o Audio микросервиса: ${error.message}`);
-      throw error;
+    
+    logInfo(`Отправка файла на транскрипцию: ${audioFilePath}`);
+    
+    const formData = new FormData();
+    formData.append('audioFile', fs.createReadStream(audioFilePath));
+    
+    // Добавляем дополнительные параметры
+    if (options.optimize !== undefined) {
+      formData.append('optimize', options.optimize.toString());
     }
-  }
-
-  /**
-   * Транскрибирует аудиофайл, отправляя путь к нему в микросервис
-   * Этот метод работает только если микросервис имеет доступ к файловой системе
-   * @param {string} filePath Путь к аудиофайлу
-   * @returns {Promise<{text: string, cost: string, tokensProcessed: number}>} Результат транскрипции
-   */
-  async transcribeAudioByPath(filePath) {
-    try {
-      // Проверяем, существует ли файл
-      if (!fs.existsSync(filePath)) {
-        throw new Error(`Файл не найден: ${filePath}`);
-      }
-
-      // Проверяем доступность сервиса
-      const isAvailable = await this.isServiceAvailable();
-      if (!isAvailable) {
-        throw new Error('GPT-4o Audio микросервис недоступен');
-      }
-
-      console.log(`Отправляем путь к файлу на транскрибирование: ${filePath}`);
-
-      // Отправляем запрос
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-      const response = await fetch(`${this.baseUrl}/transcribe/path`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ filePath }),
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        let errorText = await response.text();
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorText = errorJson.message || errorText;
-        } catch (e) {
-          // Если не удалось разобрать JSON, используем как есть
-        }
-        throw new Error(`Ошибка при транскрибировании: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      // Парсим ответ
-      const result = await response.json();
-      
-      if (!result.success || !result.text) {
-        throw new Error('Неожиданный формат ответа от сервиса');
-      }
-
-      console.log(`Транскрибирование успешно завершено. Длина текста: ${result.text.length} символов`);
-
-      return {
-        text: result.text,
-        cost: result.metadata?.cost || '0.0000',
-        tokensProcessed: result.metadata?.tokensProcessed || 0
-      };
-    } catch (error) {
-      console.error(`Ошибка при вызове GPT-4o Audio микросервиса: ${error.message}`);
-      throw error;
+    
+    if (options.format !== undefined) {
+      formData.append('format', options.format);
     }
+    
+    const startTime = Date.now();
+    
+    // Отправляем запрос на сервис
+    const response = await fetch(`${config.serviceUrl}/api/transcribe`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': config.serviceToken ? `Bearer ${config.serviceToken}` : undefined,
+        ...formData.getHeaders()
+      },
+      timeout: options.timeout || config.defaultTimeout
+    });
+    
+    const responseTime = Date.now() - startTime;
+    logDebug(`Получен ответ от сервиса за ${responseTime}ms`);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ошибка сервиса GPT-4o Audio (${response.status}): ${errorText}`);
+    }
+    
+    const result = await response.json();
+    logInfo(`Транскрипция завершена успешно. Использовано ${result.tokensProcessed || 0} токенов.`);
+    
+    return result;
+  } catch (error) {
+    logError(error, 'Ошибка при отправке аудио на транскрипцию');
+    throw error;
   }
 }
 
-// Создаем и экспортируем экземпляр клиента
-const client = new GPT4oAudioClient();
+/**
+ * Оптимизирует аудиофайл для лучшего распознавания
+ * @param {string} inputPath Путь к входному файлу
+ * @param {string} outputPath Путь для сохранения оптимизированного файла
+ * @returns {Promise<Object>} Результат оптимизации
+ */
+export async function optimizeAudio(inputPath, outputPath) {
+  try {
+    if (!fs.existsSync(inputPath)) {
+      throw new Error(`Файл не найден: ${inputPath}`);
+    }
+    
+    logInfo(`Отправка файла на оптимизацию: ${inputPath}`);
+    
+    const formData = new FormData();
+    formData.append('audioFile', fs.createReadStream(inputPath));
+    
+    if (outputPath) {
+      formData.append('outputPath', outputPath);
+    }
+    
+    // Отправляем запрос на сервис
+    const response = await fetch(`${config.serviceUrl}/api/optimize`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': config.serviceToken ? `Bearer ${config.serviceToken}` : undefined,
+        ...formData.getHeaders()
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ошибка сервиса GPT-4o Audio (${response.status}): ${errorText}`);
+    }
+    
+    const result = await response.json();
+    logInfo(`Оптимизация завершена успешно: ${result.outputPath}`);
+    
+    return result;
+  } catch (error) {
+    logError(error, 'Ошибка при оптимизации аудио');
+    throw error;
+  }
+}
 
-// Экспортируем метод транскрипции напрямую для удобства использования
-const transcribeAudio = async (filePath) => {
-  return client.transcribeAudio(filePath);
-};
+/**
+ * Проверяет доступность сервиса GPT-4o Audio
+ * @returns {Promise<boolean>} Результат проверки
+ */
+export async function checkServiceAvailability() {
+  try {
+    const response = await fetch(`${config.serviceUrl}/health`, {
+      method: 'GET',
+      headers: {
+        'Authorization': config.serviceToken ? `Bearer ${config.serviceToken}` : undefined
+      },
+      timeout: 5000 // 5 секунд
+    });
+    
+    if (!response.ok) {
+      logWarning(`Сервис GPT-4o Audio недоступен. Статус: ${response.status}`);
+      return false;
+    }
+    
+    const data = await response.json();
+    logInfo(`Сервис GPT-4o Audio доступен. Версия: ${data.version}`);
+    
+    return true;
+  } catch (error) {
+    logError(error, 'Ошибка при проверке доступности сервиса GPT-4o Audio');
+    return false;
+  }
+}
 
-// Экспортируем метод транскрипции по пути напрямую
-const transcribeAudioByPath = async (filePath) => {
-  return client.transcribeAudioByPath(filePath);
-};
-
-module.exports = {
-  GPT4oAudioClient,
-  client,
-  transcribeAudio,
-  transcribeAudioByPath
-};
+/**
+ * Получает информацию о версии и состоянии сервиса
+ * @returns {Promise<Object>} Информация о сервисе
+ */
+export async function getServiceInfo() {
+  try {
+    const response = await fetch(`${config.serviceUrl}/api/info`, {
+      method: 'GET',
+      headers: {
+        'Authorization': config.serviceToken ? `Bearer ${config.serviceToken}` : undefined
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Ошибка сервиса GPT-4o Audio (${response.status}): ${errorText}`);
+    }
+    
+    const info = await response.json();
+    return info;
+  } catch (error) {
+    logError(error, 'Ошибка при получении информации о сервисе');
+    throw error;
+  }
+}

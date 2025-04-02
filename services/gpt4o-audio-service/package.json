@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Микросервис для транскрибирования аудио с использованием GPT-4o Audio Preview API",
   "main": "src/index.js",
+  "type": "module",
   "scripts": {
     "start": "node src/index.js",
     "test": "node src/test.js"
