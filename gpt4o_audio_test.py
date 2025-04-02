@@ -59,9 +59,10 @@ def transcribe_with_gpt4o(audio_file_path, api_key):
                         "text": "Транскрибируй это аудио и идентифицируй говорящих. Представь результат в виде диалога."
                     },
                     {
-                        "type": "audio_url",
-                        "audio_url": {
-                            "url": f"data:audio/mp3;base64,{audio_base64}"
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": audio_base64,
+                            "format": "wav"
                         }
                     }
                 ]
@@ -107,9 +108,9 @@ def main():
 
     # Список тестовых аудиофайлов
     test_files = [
-        "attached_assets/35303ed6-9bbf-4df4-910f-be0193dc2a4e.jfif",
-        "temp/recording_sample.mp3",
-        "temp/recording_test.wav"
+        "server/uploads/dbbdcdc0-3e44-49d8-96c4-07afe0f3943d.wav",
+        "server/uploads/6e9987f5-f320-4c11-bbc3-158bbdb85455.wav",
+        "server/uploads/ddff78d2-d377-4bb2-8dde-767ca808f183.wav"
     ]
 
     # Создаем директорию для результатов, если не существует
