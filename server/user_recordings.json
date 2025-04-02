@@ -95,7 +95,39 @@
       "timestamp": "2025-04-02T18:25:26.335Z",
       "id": 12,
       "sent": false
+    },
+    {
+      "adminRecordingId": 19,
+      "username": "archive",
+      "duration": 26,
+      "timestamp": "2025-04-02T18:39:45.257Z",
+      "id": 13,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 19,
+      "username": "ostrovityanin",
+      "duration": 26,
+      "timestamp": "2025-04-02T18:39:45.257Z",
+      "id": 14,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 21,
+      "username": "archive",
+      "duration": 52,
+      "timestamp": "2025-04-02T18:45:48.773Z",
+      "id": 15,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 21,
+      "username": "ostrovityanin",
+      "duration": 52,
+      "timestamp": "2025-04-02T18:45:48.773Z",
+      "id": 16,
+      "sent": false
     }
   ],
-  "currentId": 13
+  "currentId": 17
 }

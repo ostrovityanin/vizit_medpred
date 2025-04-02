@@ -418,8 +418,9 @@ export async function transcribeAudio(filePath: string): Promise<{text: string |
         file: fs.createReadStream(fileToProcess),
         model: "whisper-1",
         language: "ru",
-        temperature: 0.0,
+        temperature: 0.2, // Небольшое увеличение temperature для более полного распознавания
         response_format: "verbose_json", // Запрашиваем расширенный формат ответа
+        prompt: "Это аудиозапись диалога. Пожалуйста, распознай весь текст полностью." // Подсказка для улучшения распознавания
       });
       
       // Извлекаем текст и информацию о сегментах

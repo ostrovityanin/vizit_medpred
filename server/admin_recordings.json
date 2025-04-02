@@ -237,7 +237,63 @@
       "status": "completed",
       "id": 17,
       "sent": false
+    },
+    {
+      "filename": "8d10f335-571a-4f29-a931-685eb42cd209.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T18:39:00.425Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 18,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий: А как его, инспектора, спрятать зовут? Прокажь, а? Прокажь, прокажь. Раджкот. Славанди, сэр, приветствую. Вчера утром противник прибыл на рейс, Санджай Раджкот, на борту которого был пассажир. Он был на месте 3.",
+      "transcriptionCost": "0.0053",
+      "tokensProcessed": 794
+    },
+    {
+      "filename": "91823dd4-5ce4-452d-ba24-d2e5c9fe6776.wav",
+      "duration": 26,
+      "timestamp": "2025-04-02T18:39:45.257Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 846798,
+      "transcription": "Говорящий: А как его, инспектора, спрятать зовут? Прокажь, а? Прокажь, прокажь. Раджкот. Славанди, сэр, приветствую. Вчера утром противник прибыл на рейс, Санджай Раджкот, на борту которого был пассажир. Он был на месте 3.",
+      "transcriptionCost": "0.0053",
+      "tokensProcessed": 794,
+      "status": "completed",
+      "id": 19,
+      "sent": false
+    },
+    {
+      "filename": "fbf855c6-aebf-4ea2-8d43-df7c5c16c9fb.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T18:44:49.517Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 20,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий: Простовая запись номер один. Номер один.",
+      "transcriptionCost": "0.0059",
+      "tokensProcessed": 882
+    },
+    {
+      "filename": "1d13b95f-02cb-48c6-a96f-618c990de8f7.wav",
+      "duration": 52,
+      "timestamp": "2025-04-02T18:45:48.773Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 940878,
+      "transcription": "Говорящий: Простовая запись номер один. Номер один.",
+      "transcriptionCost": "0.0059",
+      "tokensProcessed": 882,
+      "status": "completed",
+      "id": 21,
+      "sent": false
     }
   ],
-  "currentId": 18
+  "currentId": 22
 }

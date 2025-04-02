@@ -434,13 +434,18 @@ class FragmentManager {
       
       log(`Исходный файл проверен, размер: ${inputStats.size} байт`, 'fragments');
       
-      // Используем более надежный набор параметров для FFmpeg
+      // Используем более надежный набор параметров для FFmpeg с улучшенной обработкой аудио
       // -vn: отключаем обработку видео (если есть)
       // -acodec pcm_s16le: используем несжатый 16-bit PCM аудиокодек
       // -ar 16000: частота дискретизации 16kHz (рекомендуемая для OpenAI)
       // -ac 1: монофонический звук
       // -y: перезаписать файл, если существует
-      const command = `ffmpeg -y -i "${input}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${output}"`;
+      // -af "highpass=f=50, lowpass=f=8000, volume=2, dynaudnorm" - улучшение аудио для распознавания
+      //     - highpass: убирает низкочастотный шум (ниже 50 Гц)
+      //     - lowpass: фокусируется на речевом диапазоне (до 8000 Гц)
+      //     - volume: увеличивает громкость
+      //     - dynaudnorm: динамическая нормализация для выравнивания уровня громкости
+      const command = `ffmpeg -y -i "${input}" -vn -acodec pcm_s16le -ar 16000 -ac 1 -af "highpass=f=50, lowpass=f=8000, volume=2, dynaudnorm" "${output}"`;
       
       log(`Выполняем команду конвертации: ${command}`, 'fragments');
       await execAsync(command);
@@ -465,8 +470,13 @@ class FragmentManager {
       // Попробуем использовать запасной вариант конвертации
       try {
         log(`Попытка использовать альтернативный метод конвертации...`, 'fragments');
-        // Альтернативный вариант с минимальными параметрами
-        const fallbackCommand = `ffmpeg -y -i "${input}" "${output}"`;
+        // Альтернативный вариант с более надежными параметрами
+        // Используем более простые параметры, которые с большей вероятностью сработают
+        // -c:a libmp3lame - используем MP3 кодек, который более стабилен 
+        // -b:a 128k - достаточное качество для распознавания речи
+        // -ar 44100 - стандартная частота дискретизации
+        const fallbackCommand = `ffmpeg -y -i "${input}" -vn -c:a libmp3lame -b:a 128k -ar 44100 -ac 1 "${output}"`;
+        log(`Выполняем альтернативную команду конвертации: ${fallbackCommand}`, 'fragments');
         await execAsync(fallbackCommand);
         
         if (fs.existsSync(output)) {
