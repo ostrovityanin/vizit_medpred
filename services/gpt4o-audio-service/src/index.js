@@ -46,7 +46,7 @@ ensureDirectoryExists(tempDir);
 
 // Конфигурация сервиса
 const config = {
-  port: process.env.PORT || 3100,
+  port: process.env.PORT || 3200,
   maxFileSize: process.env.MAX_FILE_SIZE || 100 * 1024 * 1024, // 100MB по умолчанию
   apiToken: process.env.API_TOKEN,
   version: '1.0.0',

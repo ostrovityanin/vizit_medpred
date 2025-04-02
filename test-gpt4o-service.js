@@ -18,7 +18,7 @@ const __dirname = path.dirname(__filename);
 // Используем реальный записанный с микрофона файл
 const sampleAudioPath = path.join(__dirname, 'server', 'uploads', 'dbbdcdc0-3e44-49d8-96c4-07afe0f3943d.wav');
 // URL микросервиса
-const serviceUrl = 'http://localhost:3100';
+const serviceUrl = 'http://localhost:3200';
 // Путь к директории микросервиса
 const servicePath = path.join(__dirname, 'services', 'gpt4o-audio-service');
 // PID файл
