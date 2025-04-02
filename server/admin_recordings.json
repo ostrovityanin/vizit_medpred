@@ -293,7 +293,35 @@
       "status": "completed",
       "id": 21,
       "sent": false
+    },
+    {
+      "filename": "6cf87c2f-3b61-4843-877a-8d92b9819d73.wav",
+      "duration": 0,
+      "timestamp": "2025-04-02T19:04:32.545Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 22,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий: Тест. Это самый интересный тест из всех ранее озвученных. Маленькие крокодилы нападают на макак. Это сложно. Но не нужно.",
+      "transcriptionCost": "0.0037",
+      "tokensProcessed": 556
+    },
+    {
+      "filename": "b22dd7a6-68f4-4f66-9d72-7d33195500cd.wav",
+      "duration": 17,
+      "timestamp": "2025-04-02T19:05:07.047Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 593358,
+      "transcription": "Говорящий: Аня Камилюшка... Тест. Это самый интересный тест из всех ранее озвученных. Маленькие крокодилы нападают на макак. Это сложно. Но не нужно.",
+      "transcriptionCost": "0.0037",
+      "tokensProcessed": 556,
+      "status": "completed",
+      "id": 23,
+      "sent": false
     }
   ],
-  "currentId": 22
+  "currentId": 24
 }
