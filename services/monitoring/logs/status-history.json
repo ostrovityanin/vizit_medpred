@@ -1,0 +1,68 @@
+[
+  {
+    "time": "2025-04-02T16:29:36.854Z",
+    "service": "telegram-mini-app",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3100"
+  },
+  {
+    "time": "2025-04-02T16:29:36.858Z",
+    "service": "admin-service",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3101"
+  },
+  {
+    "time": "2025-04-02T16:29:36.861Z",
+    "service": "api-service",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3102"
+  },
+  {
+    "time": "2025-04-02T16:29:36.863Z",
+    "service": "audio-processor",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3103"
+  },
+  {
+    "time": "2025-04-02T16:29:36.865Z",
+    "service": "documentation-service",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3104"
+  },
+  {
+    "time": "2025-04-02T16:29:36.866Z",
+    "service": "data-storage",
+    "event": "failure",
+    "error": "connect ECONNREFUSED 127.0.0.1:3105"
+  },
+  {
+    "time": "2025-04-02T16:29:36.867Z",
+    "overallStatus": "critical",
+    "servicesStatus": [
+      {
+        "name": "telegram-mini-app",
+        "status": "critical"
+      },
+      {
+        "name": "admin-service",
+        "status": "critical"
+      },
+      {
+        "name": "api-service",
+        "status": "critical"
+      },
+      {
+        "name": "audio-processor",
+        "status": "critical"
+      },
+      {
+        "name": "documentation-service",
+        "status": "critical"
+      },
+      {
+        "name": "data-storage",
+        "status": "critical"
+      }
+    ]
+  }
+]
