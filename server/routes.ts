@@ -61,6 +61,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API для транскрипции аудио
   app.use('/api', transcriptionRoutes);
   
+  // API для сравнительной транскрипции записей из админ-панели
+  app.post('/api/admin/recordings/:id/compare', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const { language = 'ru' } = req.body;
+      
+      // Проверяем существование записи
+      const recording = await storage.getRecordingById(id);
+      
+      if (!recording) {
+        return res.status(404).json({ error: 'Запись не найдена' });
+      }
+      
+      if (!recording.filename) {
+        return res.status(400).json({ error: 'У записи отсутствует аудиофайл' });
+      }
+      
+      // Путь к аудиофайлу
+      const audioFilePath = path.join(__dirname, 'uploads', recording.filename);
+      
+      // Проверяем существование файла
+      if (!fs.existsSync(audioFilePath)) {
+        return res.status(404).json({ error: 'Аудиофайл не найден на сервере' });
+      }
+      
+      log(`Запрос сравнительной транскрипции для записи ID: ${id}`, 'admin');
+      
+      // Импортируем функцию сравнения из модуля транскрипции
+      const compareFunction = (await import('./routes/transcription-routes')).compareTranscriptionModels;
+      
+      // Выполняем сравнительную транскрипцию
+      const result = await compareFunction(audioFilePath, { language });
+      
+      // Возвращаем результат
+      res.json(result);
+    } catch (error) {
+      log(`Ошибка сравнительной транскрипции: ${error}`, 'error');
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Неизвестная ошибка при выполнении сравнительной транскрипции' 
+      });
+    }
+  });
+  
   // Эндпоинт для проверки здоровья сервера (health check)
   app.get('/health', (req: Request, res: Response) => {
     const startTime = Date.now();

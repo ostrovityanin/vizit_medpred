@@ -461,4 +461,7 @@ router.post('/transcribe/compare', upload.single('audio'), async (req: Request, 
   }
 });
 
+// Экспортируем функцию compareTranscriptionModels для использования в других модулях
+export { compareTranscriptionModels };
+
 export default router;

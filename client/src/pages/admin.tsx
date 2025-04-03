@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers, Volume2, ExternalLink } from 'lucide-react';
+import { DownloadCloud, ArrowLeft, Play, X, FileText, Send, Bell, MessageSquare, AlertCircle, CheckCircle, RefreshCw, Layers, Volume2, ExternalLink, Workflow, Languages } from 'lucide-react';
 import { Link } from 'wouter';
 import FileAudioPlayer from '@/components/FileAudioPlayer';
 import RecordingFragments from '@/components/RecordingFragments';
@@ -23,6 +23,27 @@ interface AdminRecording {
   status?: 'started' | 'completed' | 'error' | null;
 }
 
+// Интерфейс для результатов сравнительной транскрипции
+interface ComparisonResult {
+  'whisper-1'?: {
+    text: string;
+    processingTime: number;
+    error?: string;
+  };
+  'gpt-4o-mini-transcribe'?: {
+    text: string;
+    processingTime: number;
+    error?: string;
+  };
+  'gpt-4o-transcribe'?: {
+    text: string;
+    processingTime: number;
+    error?: string;
+  };
+  fileSize?: number;
+  fileName?: string;
+}
+
 export default function AdminPanel() {
   const [recordings, setRecordings] = useState<AdminRecording[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +51,9 @@ export default function AdminPanel() {
   const [audioPlayerVisible, setAudioPlayerVisible] = useState(false);
   const [transcriptionModalVisible, setTranscriptionModalVisible] = useState(false);
   const [fragmentsModalVisible, setFragmentsModalVisible] = useState(false);
+  const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
+  const [comparisonResult, setComparisonResult] = useState<ComparisonResult | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -310,9 +334,88 @@ export default function AdminPanel() {
   // Закрыть модальное окно с фрагментами
   const closeFragmentsModal = () => {
     setFragmentsModalVisible(false);
-    if (!audioPlayerVisible && !transcriptionModalVisible) {
+    if (!audioPlayerVisible && !transcriptionModalVisible && !comparisonModalVisible) {
       setSelectedRecording(null);
     }
+  };
+  
+  // Открыть модальное окно сравнительной транскрипции
+  const runComparisonTranscription = async (id: number) => {
+    try {
+      const recording = recordings.find(r => r.id === id);
+      if (!recording) {
+        throw new Error('Запись не найдена');
+      }
+      
+      // Проверяем, есть ли файл
+      if (!recording.filename) {
+        toast({
+          title: 'Ошибка',
+          description: 'У этого визита отсутствует аудиофайл',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      setSelectedRecording(recording);
+      setComparisonLoading(true);
+      setComparisonResult(null);
+      setComparisonModalVisible(true);
+      
+      toast({
+        title: 'Сравнительный анализ',
+        description: 'Запущена сравнительная транскрипция. Это может занять некоторое время...',
+        variant: 'default',
+      });
+      
+      // Отправляем запрос на сравнительную транскрипцию
+      const response = await fetch(`/api/admin/recordings/${id}/compare`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          language: 'ru', // По умолчанию используем русский язык
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Сервер вернул ошибку: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      setComparisonResult(result);
+      
+      toast({
+        title: 'Сравнение завершено',
+        description: 'Результаты сравнительной транскрипции получены',
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Ошибка при сравнительной транскрипции:', error);
+      toast({
+        title: 'Ошибка',
+        description: error instanceof Error ? error.message : 'Не удалось выполнить сравнительную транскрипцию',
+        variant: 'destructive',
+      });
+    } finally {
+      setComparisonLoading(false);
+    }
+  };
+  
+  // Закрыть модальное окно сравнительной транскрипции
+  const closeComparisonModal = () => {
+    setComparisonModalVisible(false);
+    setComparisonResult(null);
+    if (!audioPlayerVisible && !transcriptionModalVisible && !fragmentsModalVisible) {
+      setSelectedRecording(null);
+    }
+  };
+  
+  // Форматирование времени выполнения
+  const formatTimePerformance = (seconds: number) => {
+    return `${seconds.toFixed(2)} сек`;
   };
   
   // Принудительно завершить запись и объединить фрагменты
@@ -578,6 +681,17 @@ export default function AdminPanel() {
                           <Layers className="h-4 w-4" />
                         </Button>
                         
+                        {/* Кнопка сравнительной транскрипции */}
+                        <Button 
+                          onClick={() => runComparisonTranscription(recording.id)}
+                          variant="outline" 
+                          size="sm"
+                          className="text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                          title="Сравнительная транскрипция с разными моделями"
+                        >
+                          <Languages className="h-4 w-4" />
+                        </Button>
+                        
                         {/* Кнопка принудительного завершения записи */}
                         {recording.status === 'started' && (
                           <Button 
@@ -655,6 +769,132 @@ export default function AdminPanel() {
               </Button>
             </div>
             <RecordingFragments recordingId={selectedRecording.id} />
+          </div>
+        </div>
+      )}
+      
+      {/* Модальное окно для сравнительной транскрипции */}
+      {comparisonModalVisible && selectedRecording && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-5xl p-4 max-h-[90vh] overflow-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium">Сравнительная транскрипция визита #{selectedRecording.id}</h2>
+              <Button variant="ghost" size="sm" onClick={closeComparisonModal}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            {comparisonLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
+                <p className="text-neutral-600">Выполняется сравнительный анализ транскрипции...</p>
+                <p className="text-neutral-500 text-sm mt-2">Это может занять около 5-10 секунд</p>
+              </div>
+            ) : (
+              <div>
+                {comparisonResult ? (
+                  <div className="space-y-6">
+                    <p className="text-sm text-neutral-500">
+                      Файл: {comparisonResult.fileName || 'Не указан'} 
+                      {comparisonResult.fileSize && ` (${Math.round(comparisonResult.fileSize / 1024)} KB)`}
+                    </p>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Whisper-1 */}
+                      <div className="border rounded-lg p-4 bg-neutral-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="font-medium text-neutral-800">whisper-1</h3>
+                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                            {comparisonResult['whisper-1']?.processingTime ? 
+                              formatTimePerformance(comparisonResult['whisper-1'].processingTime) : 
+                              '-'}
+                          </span>
+                        </div>
+                        {comparisonResult['whisper-1']?.error ? (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                            Ошибка: {comparisonResult['whisper-1'].error}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
+                            {comparisonResult['whisper-1']?.text || 'Нет данных'}
+                          </div>
+                        )}
+                        <div className="mt-2 text-neutral-500 text-xs">
+                          Базовая модель, оптимальная по стоимости
+                        </div>
+                      </div>
+                      
+                      {/* gpt-4o-mini-transcribe */}
+                      <div className="border rounded-lg p-4 bg-neutral-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="font-medium text-neutral-800">gpt-4o-mini-transcribe</h3>
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                            {comparisonResult['gpt-4o-mini-transcribe']?.processingTime ? 
+                              formatTimePerformance(comparisonResult['gpt-4o-mini-transcribe'].processingTime) : 
+                              '-'}
+                          </span>
+                        </div>
+                        {comparisonResult['gpt-4o-mini-transcribe']?.error ? (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                            Ошибка: {comparisonResult['gpt-4o-mini-transcribe'].error}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
+                            {comparisonResult['gpt-4o-mini-transcribe']?.text || 'Нет данных'}
+                          </div>
+                        )}
+                        <div className="mt-2 text-neutral-500 text-xs">
+                          Быстрая модель, оптимальная для русского языка
+                        </div>
+                      </div>
+                      
+                      {/* gpt-4o-transcribe */}
+                      <div className="border rounded-lg p-4 bg-neutral-50">
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="font-medium text-neutral-800">gpt-4o-transcribe</h3>
+                          <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                            {comparisonResult['gpt-4o-transcribe']?.processingTime ? 
+                              formatTimePerformance(comparisonResult['gpt-4o-transcribe'].processingTime) : 
+                              '-'}
+                          </span>
+                        </div>
+                        {comparisonResult['gpt-4o-transcribe']?.error ? (
+                          <div className="p-3 bg-red-50 border border-red-200 rounded text-red-600 text-sm">
+                            Ошибка: {comparisonResult['gpt-4o-transcribe'].error}
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
+                            {comparisonResult['gpt-4o-transcribe']?.text || 'Нет данных'}
+                          </div>
+                        )}
+                        <div className="mt-2 text-neutral-500 text-xs">
+                          Самая точная модель для сложных случаев
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-blue-50 border border-blue-200 rounded p-4 text-blue-800 text-sm mt-4">
+                      <h4 className="font-medium mb-1">Рекомендации по выбору модели:</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        <li>
+                          <strong>whisper-1</strong>: хорошо работает с английским языком, наименьшая стоимость
+                        </li>
+                        <li>
+                          <strong>gpt-4o-mini-transcribe</strong>: оптимальный выбор для русского языка по соотношению скорость/качество
+                        </li>
+                        <li>
+                          <strong>gpt-4o-transcribe</strong>: лучшее качество для сложных случаев, шумных записей, акцентов
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-neutral-500">Нет результатов сравнительной транскрипции</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
