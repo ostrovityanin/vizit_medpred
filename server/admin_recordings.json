@@ -545,7 +545,91 @@
       "status": "completed",
       "id": 39,
       "sent": false
+    },
+    {
+      "filename": "fa7cf3b2-cb9b-4e8b-9305-5f8d5405ee69.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:35:26.629Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 40,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий 1: Т.е. в этой культуре есть очень сильный эффект. Вы можете посветить фонарик туда, свет вернется и повернет, и вы увидите свет собственного фонарика. Если вы еще ближе к вашему свету будете посылать черный белик, то он в принципе там выйдет на что-то типа орбиты вокруг черной культуры и будет мотаться примерно как МКС вокруг Земли, но только неустойчиво. А если еще ближе, то все падает. Вот это означает, что кривое пространство-время устроено так, что даже свет вынужден соскальзывать в определенную область пространства, которая собственно и называется черной дырой.\n\nГоворящий 2: Спрашивает, можно ли изменить пространство из-за того, что происходит?\n\nГоворящий 1: Ответ – нет. Таким образом, чтобы не просто, значит, не просто снять свет, а снять его, чтобы он был вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны, вне зоны.",
+      "transcriptionCost": "0.0971",
+      "tokensProcessed": 5886
+    },
+    {
+      "filename": "b1cd1ae3-059a-4b16-aa51-6eb42cbf04aa.wav",
+      "duration": 60,
+      "timestamp": "2025-04-03T14:36:36.083Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1883598,
+      "transcription": "Говорящий 1: МКС вокруг Земли. Но только неустойчиво. А если еще ближе, то все падает. Вот это означает, что кривое пространство-время устроено так, что даже свет вынужден соскальзывать в определенную область пространства, которая, собственно, и называется черной дырой.\n\nГоворящий 2: Спрашивает, можно ли сливить пространство из-за того, где-то за ней, где-то за ней. Таким образом, чтобы не просто, значит,",
+      "transcriptionCost": "0.0971",
+      "tokensProcessed": 5886,
+      "status": "completed",
+      "id": 41,
+      "sent": false
+    },
+    {
+      "filename": "ff4ae19e-8279-4046-8ce5-c5b99162d165.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:39:10.517Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 42,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Извините, я не могу помочь с этой просьбой.",
+      "transcriptionCost": "0.0018",
+      "tokensProcessed": 108
+    },
+    {
+      "filename": "6da22cb5-e752-45d5-9cfe-d1f8a739b43d.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:39:15.041Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 34638,
+      "transcription": "Извините, я не могу помочь с этой просьбой.",
+      "transcriptionCost": "0.0018",
+      "tokensProcessed": 108,
+      "status": "completed",
+      "id": 43,
+      "sent": false
+    },
+    {
+      "filename": "64d447fa-22cc-4400-a4a7-796b6bf63066.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:39:19.431Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 44,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий: С вами был Игорь Негода.",
+      "transcriptionCost": "0.0027",
+      "tokensProcessed": 162
+    },
+    {
+      "filename": "49bb7ad4-3ee4-4bef-8375-2e45f12de65e.wav",
+      "duration": 1,
+      "timestamp": "2025-04-03T14:39:24.580Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 51918,
+      "transcription": "Говорящий: Субтитры подогнал Игорь Негода",
+      "transcriptionCost": "0.0027",
+      "tokensProcessed": 162,
+      "status": "completed",
+      "id": 45,
+      "sent": false
     }
   ],
-  "currentId": 40
+  "currentId": 46
 }

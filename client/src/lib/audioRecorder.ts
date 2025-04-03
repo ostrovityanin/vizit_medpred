@@ -14,6 +14,9 @@ export class AudioRecorder {
   private destinationNode: MediaStreamAudioDestinationNode | null = null;
   private enhancedStream: MediaStream | null = null;
   
+  // Состояние разрешения на микрофон
+  private hasPermission: boolean = false;
+  
   // Данные для фрагментированной записи
   private audioFragments: AudioFragment[] = [];
   private fragmentInterval: number | null = null;
@@ -30,7 +33,41 @@ export class AudioRecorder {
   // Параметры усиления звука
   private gainValue: number = 2.5; // Коэффициент усиления (регулируемый)
 
-  async requestPermission(): Promise<boolean> {
+  // Конструктор автоматически попытается получить доступ к микрофону
+  constructor() {
+    // Пытаемся восстановить состояние разрешения из localStorage
+    const savedPermission = localStorage.getItem('microphonePermission');
+    if (savedPermission === 'granted') {
+      this.hasPermission = true;
+      console.log('Микрофон: обнаружено ранее выданное разрешение');
+      
+      // Сразу пытаемся получить поток, если разрешение было ранее выдано
+      this.ensureStreamAvailable().catch(err => {
+        console.warn('Не удалось инициализировать микрофон при запуске, хотя было сохранено разрешение:', err);
+        this.hasPermission = false;
+        localStorage.removeItem('microphonePermission');
+      });
+    }
+  }
+
+  /**
+   * Проверяет, есть ли у нас доступ к микрофону
+   */
+  hasAccess(): boolean {
+    return this.hasPermission && (this.stream !== null || this.enhancedStream !== null);
+  }
+
+  /**
+   * Метод обеспечивает наличие потока с микрофона, используя кэшированный, если доступен
+   * @private
+   */
+  private async ensureStreamAvailable(): Promise<boolean> {
+    // Если поток уже доступен, просто возвращаем true
+    if (this.stream || this.enhancedStream) {
+      return true;
+    }
+    
+    // Иначе запрашиваем новый поток
     try {
       // Запрашиваем доступ к микрофону с улучшенными параметрами
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -46,11 +83,32 @@ export class AudioRecorder {
       // Применяем обработку звука для улучшения качества
       await this.enhanceAudioStream(stream);
       
+      // Сохраняем состояние разрешения
+      this.hasPermission = true;
+      localStorage.setItem('microphonePermission', 'granted');
+      
       return true;
     } catch (error) {
-      console.error('Failed to get user media', error);
+      console.error('Не удалось получить доступ к микрофону:', error);
+      this.hasPermission = false;
+      localStorage.removeItem('microphonePermission');
       return false;
     }
+  }
+  
+  /**
+   * Запрашивает разрешение на доступ к микрофону, если еще не получено
+   * Для обратной совместимости сохраняем старое название метода
+   */
+  async requestPermission(): Promise<boolean> {
+    // Если у нас уже есть разрешение и поток, просто возвращаем true
+    if (this.hasAccess()) {
+      console.log('Используем существующий доступ к микрофону');
+      return true;
+    }
+    
+    // Пытаемся получить поток
+    return await this.ensureStreamAvailable();
   }
   
   // Метод для усиления громкости и улучшения качества звука
@@ -381,10 +439,28 @@ export class AudioRecorder {
       }
     } else {
       console.warn(`Ошибка получения объединенного файла: ${response.status} ${response.statusText}`);
-      // Получаем текст ошибки для лучшей диагностики
-      const errorText = await response.text();
-      console.warn(`Детали ошибки: ${errorText}`);
     }
+    
+    // Если дошли до сюда, значит не удалось получить файл с сервера
+    // Используем локальное объединение
+    console.log(`Объединяем ${this.audioFragments.length} фрагментов локально`);
+    if (this.audioFragments.length === 0) {
+      console.warn('Нет фрагментов для объединения');
+      resolve(null);
+      return;
+    }
+    
+    // Сортируем фрагменты по индексу
+    this.audioFragments.sort((a, b) => a.index - b.index);
+    
+    // Получаем блобы из всех фрагментов
+    const blobs = this.audioFragments.map(fragment => fragment.blob);
+    
+    // Создаем итоговый блоб
+    const finalBlob = new Blob(blobs, { type: 'audio/webm' });
+    console.log(`Локально объединены фрагменты, итоговый размер: ${finalBlob.size} байт`);
+    
+    resolve(finalBlob);
   }
 
   /**
@@ -531,7 +607,7 @@ export class AudioRecorder {
   }
 
   /**
-   * Очищает все ресурсы и освобождает память
+   * Очищает ресурсы записи, но не освобождает разрешение на микрофон
    */
   cleanup() {
     // Останавливаем таймер фрагментации
@@ -551,6 +627,50 @@ export class AudioRecorder {
       this.mediaRecorder.stop();
     }
     
+    // Очищаем массивы с данными
+    this.audioChunks = [];
+    this.audioFragments = [];
+    this.currentFragmentIndex = 0;
+    this.mediaRecorder = null;
+    
+    // Обратите внимание, что мы НЕ освобождаем медиа-потоки,
+    // чтобы сохранить разрешение между сессиями записи
+  }
+
+  /**
+   * Полностью освобождает все ресурсы, включая медиа-потоки и разрешение
+   * Вызывайте этот метод только когда приложение закрывается или 
+   * когда точно больше не планируется делать запись
+   */
+  releaseResources() {
+    // Сначала очищаем таймеры и запись
+    this.cleanup();
+    
+    // Закрываем аудио контекст
+    if (this.audioContext) {
+      if (this.sourceNode) {
+        this.sourceNode.disconnect();
+        this.sourceNode = null;
+      }
+      
+      if (this.gainNode) {
+        this.gainNode.disconnect();
+        this.gainNode = null;
+      }
+      
+      if (this.destinationNode) {
+        this.destinationNode = null;
+      }
+      
+      // Многие браузеры не реализуют close() для AudioContext, поэтому проверяем наличие
+      if (this.audioContext.state !== 'closed' && typeof this.audioContext.close === 'function') {
+        this.audioContext.close().catch(err => {
+          console.warn('Ошибка при закрытии AudioContext:', err);
+        });
+      }
+      this.audioContext = null;
+    }
+    
     // Останавливаем и удаляем медиапотоки
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
@@ -562,33 +682,11 @@ export class AudioRecorder {
       this.enhancedStream = null;
     }
     
-    // Отключаем и обнуляем аудиоузлы
-    if (this.sourceNode) {
-      this.sourceNode.disconnect();
-      this.sourceNode = null;
-    }
+    // Сбрасываем состояние разрешения
+    this.hasPermission = false;
+    localStorage.removeItem('microphonePermission');
     
-    if (this.gainNode) {
-      this.gainNode.disconnect();
-      this.gainNode = null;
-    }
-    
-    if (this.destinationNode) {
-      this.destinationNode = null;
-    }
-    
-    // Закрываем аудиоконтекст
-    if (this.audioContext) {
-      this.audioContext.close().catch(err => console.error('Error closing AudioContext:', err));
-      this.audioContext = null;
-    }
-    
-    // Очищаем массивы с данными
-    this.audioChunks = [];
-    this.audioFragments = [];
-    this.mediaRecorder = null;
-    
-    console.log('Audio recorder resources released');
+    console.log('Аудио рекордер: все ресурсы полностью освобождены');
   }
 }
 
