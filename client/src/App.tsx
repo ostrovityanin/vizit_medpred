@@ -12,6 +12,7 @@ import Architecture from "@/pages/architecture";
 import ZeppOSDocs from "@/pages/zepp-os-docs";
 import ReplitGuide from "./pages/replit-guide";
 import TranscriptionDemo from "@/pages/TranscriptionDemo";
+import AffirmationDemo from "@/pages/AffirmationDemo";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -28,6 +29,7 @@ function Router() {
       <Route path="/zepp-os-docs" component={ZeppOSDocs} />
       <Route path="/replit-guide" component={ReplitGuide} />
       <Route path="/transcription-demo" component={TranscriptionDemo} />
+      <Route path="/affirmation-demo" component={AffirmationDemo} />
       <Route component={NotFound} />
     </Switch>
   );
