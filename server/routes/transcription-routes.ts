@@ -71,9 +71,16 @@ function hasOpenAIKey(): boolean {
 /**
  * Оптимизация аудиофайла для транскрипции
  * @param {string} inputPath Путь к исходному файлу
+ * @param {Object} options Дополнительные опции оптимизации
  * @returns {Promise<string>} Путь к оптимизированному файлу
  */
-async function optimizeAudio(inputPath: string): Promise<string> {
+async function optimizeAudio(
+  inputPath: string, 
+  options: {
+    targetModel?: string;
+    highQuality?: boolean;
+  } = {}
+): Promise<string> {
   try {
     // Создаем папку для оптимизированных файлов если её нет
     const optimizedDir = path.join(path.dirname(inputPath), 'optimized');
@@ -89,23 +96,58 @@ async function optimizeAudio(inputPath: string): Promise<string> {
 
     // Проверяем существует ли файл
     if (!fs.existsSync(inputPath)) {
-      console.error(`Исходный файл ${inputPath} не найден`);
+      log(`Исходный файл ${inputPath} не найден`, 'error');
       return inputPath; // Возвращаем исходный путь как запасной вариант
     }
 
+    // Проверка размера файла
+    const stats = fs.statSync(inputPath);
+    const fileSizeInMB = stats.size / (1024 * 1024);
+    
+    // Если файл больше 20MB, может потребоваться дополнительная компрессия
+    const needsCompression = fileSizeInMB > 20;
+
+    // Определяем настройки на основе модели и требуемого качества
+    let bitrate = '32k';  // Стандартный битрейт для транскрипции
+    let sampleRate = '16000'; // Стандартная частота дискретизации
+    
+    // Для GPT-4o моделей:
+    if (options.targetModel && options.targetModel.includes('gpt-4o')) {
+      // Эти модели работают лучше с высоким качеством аудио
+      bitrate = options.highQuality ? '48k' : '40k';
+      sampleRate = '24000';
+    } 
+    
+    // Для Whisper и других случаев оставляем стандартные параметры
+    
     // Параметры оптимизации:
-    // - Преобразуем в MP3 формат с битрейтом 32k 
+    // - Преобразуем в MP3 формат с оптимальным битрейтом
+    // - Нормализация аудио для улучшения распознавания
     // - Моно аудио (1 канал)
-    // - Частота дискретизации 16 кГц
+    // - Оптимальная частота дискретизации
     return new Promise<string>((resolve, reject) => {
-      const ffmpeg = spawn('ffmpeg', [
+      const ffmpegArgs = [
         '-y',
         '-i', inputPath,
         '-ac', '1',
-        '-ar', '16000',
-        '-b:a', '32k',
-        optimizedPath
-      ]);
+        '-ar', sampleRate,
+      ];
+      
+      // Добавляем нормализацию громкости для лучшего распознавания тихих записей
+      ffmpegArgs.push('-af', 'loudnorm=I=-16:LRA=11:TP=-1.5');
+      
+      // Если требуется, добавляем фильтр шумоподавления (легкий, чтобы не испортить речь)
+      if (!options.highQuality && !options.targetModel?.includes('gpt-4o-transcribe')) {
+        ffmpegArgs.push('-af', 'afftdn=nf=-20');
+      }
+      
+      // Настройки битрейта
+      ffmpegArgs.push('-b:a', bitrate);
+      
+      // Добавляем выходной файл
+      ffmpegArgs.push(optimizedPath);
+
+      const ffmpeg = spawn('ffmpeg', ffmpegArgs);
 
       ffmpeg.on('close', (code) => {
         if (code === 0) {
@@ -122,10 +164,20 @@ async function optimizeAudio(inputPath: string): Promise<string> {
           } else {
             log(`Оптимизированный файл не был создан: ${optimizedPath}`, 'error');
           }
-          resolve(inputPath); // Возвращаем исходный путь в случае ошибки
+          // Если оптимизация не удалась, попробуем упрощенный вариант
+          trySimpleOptimization(inputPath, optimizedPath).then(result => {
+            resolve(result);
+          }).catch(() => {
+            resolve(inputPath); // В случае ошибки возвращаем исходный путь
+          });
         } else {
           log(`Ошибка при оптимизации аудио, код: ${code}`, 'error');
-          resolve(inputPath); // Возвращаем исходный путь в случае ошибки
+          // Если сложная оптимизация не удалась, попробуем упрощенный вариант
+          trySimpleOptimization(inputPath, optimizedPath).then(result => {
+            resolve(result);
+          }).catch(() => {
+            resolve(inputPath); // В случае ошибки возвращаем исходный путь
+          });
         }
       });
 
@@ -136,13 +188,52 @@ async function optimizeAudio(inputPath: string): Promise<string> {
 
       ffmpeg.on('error', (err) => {
         log(`Ошибка при запуске ffmpeg: ${err.message}`, 'error');
-        resolve(inputPath); // Возвращаем исходный путь в случае ошибки
+        // Пробуем упрощенный вариант оптимизации
+        trySimpleOptimization(inputPath, optimizedPath).then(result => {
+          resolve(result);
+        }).catch(() => {
+          resolve(inputPath); // В случае ошибки возвращаем исходный путь
+        });
       });
     });
   } catch (error) {
     log(`Ошибка при оптимизации аудио: ${error instanceof Error ? error.message : String(error)}`, 'error');
     return inputPath; // Возвращаем исходный путь в случае ошибки
   }
+}
+
+/**
+ * Упрощенная оптимизация файла без дополнительных фильтров
+ * @param {string} inputPath Путь к исходному файлу
+ * @param {string} outputPath Путь для сохранения оптимизированного файла
+ * @returns {Promise<string>} Путь к результирующему файлу
+ */
+async function trySimpleOptimization(inputPath: string, outputPath: string): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    log(`Попытка упрощенной оптимизации: ${inputPath}`, 'transcription');
+    const ffmpeg = spawn('ffmpeg', [
+      '-y',
+      '-i', inputPath,
+      '-ac', '1',        // Моно
+      '-ar', '16000',    // Частота 16 кГц
+      '-b:a', '32k',     // Битрейт 32 кбит/с
+      outputPath
+    ]);
+
+    ffmpeg.on('close', (code) => {
+      if (code === 0 && fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
+        log(`Упрощенная оптимизация успешна: ${outputPath}`, 'transcription');
+        resolve(outputPath);
+      } else {
+        log(`Упрощенная оптимизация не удалась`, 'error');
+        reject(new Error('Упрощенная оптимизация не удалась'));
+      }
+    });
+
+    ffmpeg.on('error', (err) => {
+      reject(err);
+    });
+  });
 }
 
 /**
@@ -159,6 +250,7 @@ async function transcribeWithAudioAPI(
     prompt?: string;
     detailed?: boolean;
     skipOptimization?: boolean;
+    speed?: string;
   } = {}
 ): Promise<{text: string, model: string, processingTime: number, segments?: any[]}> {
   try {
@@ -167,31 +259,42 @@ async function transcribeWithAudioAPI(
     // Оптимизируем аудиофайл (если не указан параметр skipOptimization)
     const fileToTranscribe = options.skipOptimization ? 
       audioFilePath : 
-      await optimizeAudio(audioFilePath);
+      await optimizeAudio(audioFilePath, { targetModel: options.model });
     
     // Создаем форму для отправки
     const form = new FormData();
     form.append('file', fs.createReadStream(fileToTranscribe));
-    form.append('model', options.model || 'whisper-1');
+    
+    // Указываем модель (с учетом особенностей новых моделей GPT-4o)
+    const model = options.model || 'whisper-1';
+    form.append('model', model);
     
     // Добавляем язык, если указан (повышает точность транскрипции)
     if (options.language) {
       form.append('language', options.language);
     }
     
-    // Добавляем подсказку, если указана
-    if (options.prompt) {
-      form.append('prompt', options.prompt);
+    // Для моделей gpt-4o добавляем дополнительные параметры и более информативный prompt
+    if (model.includes('gpt-4o')) {
+      // Для моделей gpt-4o используем специальные подсказки для улучшения качества
+      const enhancedPrompt = options.prompt || 
+        `Расшифруй полностью всю речь в аудиозаписи на языке ${options.language || 'русском'}. Не пропускай никакие фрагменты.`;
+      form.append('prompt', enhancedPrompt);
+      
+      // Настраиваем temperature для лучшего качества
+      form.append('temperature', '0.1');
+    } else {
+      // Для whisper используем стандартные параметры
+      if (options.prompt) {
+        form.append('prompt', options.prompt);
+      }
     }
     
     // Запрашиваем детализированную информацию если нужно
     if (options.detailed) {
       // verbose_json даёт нам дополнительную информацию, включая сегменты и их временные метки
       form.append('response_format', 'verbose_json');
-    }
-    
-    // Добавляем формат отклика JSON если не запрошена детализация
-    if (!options.detailed) {
+    } else {
       form.append('response_format', 'json');
     }
     
@@ -246,13 +349,14 @@ async function transcribeWithAudioAPI(
  */
 async function compareTranscriptionModels(
   audioFilePath: string, 
-  options: {language?: string, prompt?: string} = {}
+  options: {
+    language?: string; 
+    prompt?: string;
+    skipOptimization?: boolean;
+  } = {}
 ): Promise<Record<string, any>> {
   try {
-    // Оптимизируем аудиофайл один раз для всех моделей
-    const optimizedPath = await optimizeAudio(audioFilePath);
-    
-    log(`Сравнительная транскрипция файла ${optimizedPath} с использованием всех моделей`, 'transcription');
+    log(`Сравнительная транскрипция файла ${audioFilePath} с использованием всех моделей`, 'transcription');
     
     // Список моделей для сравнения
     const models = [
@@ -264,24 +368,60 @@ async function compareTranscriptionModels(
     // Собираем результаты от всех моделей
     const results: Record<string, any> = {};
     
-    // Параллельно запускаем транскрипцию с разными моделями
-    const transcriptionPromises = models.map(model => {
-      return transcribeWithAudioAPI(optimizedPath, {
-        ...options,
-        model,
-        skipOptimization: true // Файл уже оптимизирован
-      })
-      .then(result => {
+    // Для каждой модели выполняем оптимизацию под конкретную модель
+    for (const model of models) {
+      try {
+        // Оптимизируем файл для конкретной модели 
+        // (каждая модель может требовать разных параметров оптимизации)
+        const optimizedPath = await optimizeAudio(audioFilePath, {
+          targetModel: model,
+          highQuality: model === 'gpt-4o-transcribe' // Для высокоточной модели используем высшее качество
+        });
+        
+        log(`Транскрипция с моделью ${model} (оптимизированный файл: ${optimizedPath})`, 'transcription');
+        
+        // Формируем правильные параметры для каждой модели
+        const modelOptions: {
+          model: string;
+          language?: string;
+          prompt?: string;
+          skipOptimization?: boolean;
+        } = { 
+          ...options,
+          model 
+        };
+        
+        // Добавляем специфичные для каждой модели параметры
+        if (model.includes('gpt-4o')) {
+          // Для GPT-4o моделей добавляем более подробный prompt 
+          // с указанием особенностей языка (если не указано пользователем)
+          if (!options.prompt) {
+            const lang = options.language || 'ru';
+            let enhancedPrompt = '';
+            
+            if (lang === 'ru') {
+              enhancedPrompt = `Пожалуйста, расшифруй полностью всю речь в аудиозаписи на русском языке. Обрати внимание на специфические термины и выражения. Не пропускай никакие фрагменты речи.`;
+            } else if (lang === 'en') {
+              enhancedPrompt = `Please transcribe all the speech in this audio file in English. Pay attention to specific terms and expressions. Don't skip any part of the speech.`;
+            } else {
+              enhancedPrompt = `Please transcribe all the speech in this audio file in ${lang}. Pay attention to specific terms and expressions. Don't skip any fragments.`;
+            }
+            
+            modelOptions.prompt = enhancedPrompt;
+          }
+        }
+        
+        // Оптимизация аудио уже выполнена ранее
+        modelOptions.skipOptimization = true;
+        
+        // Выполняем транскрипцию
+        const result = await transcribeWithAudioAPI(optimizedPath, modelOptions);
         results[model] = result;
-      })
-      .catch(error => {
+      } catch (error) {
         log(`Ошибка при транскрипции с моделью ${model}: ${error instanceof Error ? error.message : String(error)}`, 'error');
         results[model] = { error: error instanceof Error ? error.message : String(error) };
-      });
-    });
-    
-    // Ждем завершения всех запросов
-    await Promise.all(transcriptionPromises);
+      }
+    }
     
     return results;
   } catch (error) {
