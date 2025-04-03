@@ -17,7 +17,6 @@ import { eventLogger } from './event-logger';
 import apiDocsRouter from './api-docs';
 import apiFilesRouter from './api-files';
 import transcriptionRoutes from './routes/transcription-routes';
-import affirmationRoutes from './routes/affirmation-routes';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -61,9 +60,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // API для транскрипции аудио
   app.use('/api', transcriptionRoutes);
-  
-  // API для работы с аффирмациями
-  app.use('/api/affirmations', affirmationRoutes);
   
   // API для сравнительной транскрипции записей из админ-панели
   app.post('/api/admin/recordings/:id/compare', async (req: Request, res: Response) => {
