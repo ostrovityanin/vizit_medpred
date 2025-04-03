@@ -303,7 +303,55 @@
       "timestamp": "2025-04-03T14:39:24.580Z",
       "id": 38,
       "sent": false
+    },
+    {
+      "adminRecordingId": 48,
+      "username": "archive",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:13.901Z",
+      "id": 39,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 48,
+      "username": "ostrovityanin",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:13.901Z",
+      "id": 40,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 50,
+      "username": "archive",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:32.899Z",
+      "id": 41,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 50,
+      "username": "ostrovityanin",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:32.899Z",
+      "id": 42,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 52,
+      "username": "archive",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:45.919Z",
+      "id": 43,
+      "sent": false
+    },
+    {
+      "adminRecordingId": 52,
+      "username": "ostrovityanin",
+      "duration": 2,
+      "timestamp": "2025-04-03T14:46:45.919Z",
+      "id": 44,
+      "sent": false
     }
   ],
-  "currentId": 39
+  "currentId": 45
 }

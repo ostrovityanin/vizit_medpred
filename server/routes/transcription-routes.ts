@@ -601,6 +601,129 @@ router.post('/transcribe/compare', upload.single('audio'), async (req: Request, 
   }
 });
 
+/**
+ * Маршрут для диаризации аудио (определения говорящих)
+ * 
+ * Отправляет аудиофайл в микросервис диаризации и возвращает результат
+ * с информацией о разных говорящих и сегментах их речи.
+ * 
+ * Опционально выполняет транскрипцию каждого сегмента и объединяет результаты.
+ */
+router.post('/diarize', upload.single('audio'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+    
+    // Проверяем параметры запроса
+    const minSpeakers = parseInt(req.body.min_speakers || '1', 10);
+    const maxSpeakers = parseInt(req.body.max_speakers || '10', 10);
+    const withTranscription = req.body.transcribe === 'true';
+    const language = req.body.language || 'ru';
+    
+    log(`Получен запрос на диаризацию аудио: ${req.file.path}, с транскрипцией: ${withTranscription}`, 'diarization');
+    
+    // Формируем данные для отправки в микросервис диаризации
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(req.file.path));
+    formData.append('min_speakers', minSpeakers.toString());
+    formData.append('max_speakers', maxSpeakers.toString());
+    formData.append('return_segments', 'true'); // Нам нужны сегменты для транскрипции
+    
+    try {
+      // Отправляем запрос в микросервис диаризации
+      const diarizationResponse = await axios.post(
+        'http://localhost:5001/diarize',
+        formData,
+        {
+          headers: {
+            ...formData.getHeaders()
+          },
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        }
+      );
+      
+      // Получаем результат диаризации
+      const diarizationResult = diarizationResponse.data;
+      
+      // Если не требуется транскрипция, возвращаем результат как есть
+      if (!withTranscription || !hasOpenAIKey()) {
+        return res.json(diarizationResult);
+      }
+      
+      // Если требуется транскрипция, обрабатываем каждый сегмент
+      log(`Начинаем транскрипцию ${diarizationResult.segments.length} сегментов`, 'diarization');
+      
+      // Выбираем модель для транскрипции (для русского лучше gpt-4o-transcribe)
+      const transcriptionModel = language === 'ru' ? 'gpt-4o-transcribe' : 'whisper-1';
+      
+      // Транскрибируем каждый сегмент
+      for (let i = 0; i < diarizationResult.segments.length; i++) {
+        const segment = diarizationResult.segments[i];
+        
+        // Проверяем, есть ли file_path в сегменте
+        if (!segment.file_path || !fs.existsSync(segment.file_path)) {
+          log(`Файл сегмента не найден: ${segment.file_path}`, 'error');
+          segment.transcription = ''; // Пустая транскрипция для этого сегмента
+          continue;
+        }
+        
+        try {
+          log(`Транскрипция сегмента ${i+1}/${diarizationResult.segments.length} (Speaker ${segment.speaker}, ${segment.start.toFixed(2)}-${segment.end.toFixed(2)} сек)`, 'diarization');
+          
+          // Транскрибируем сегмент
+          const transcriptionResult = await transcribeWithAudioAPI(segment.file_path, {
+            model: transcriptionModel,
+            language: language,
+            prompt: `Расшифруй точно текст этого фрагмента на ${language === 'ru' ? 'русском' : 'английском'} языке.`
+          });
+          
+          // Добавляем транскрипцию в результат
+          segment.transcription = transcriptionResult.text;
+          
+          // Удаляем file_path из ответа
+          delete segment.file_path;
+        } catch (transcriptionError) {
+          log(`Ошибка при транскрипции сегмента ${i+1}: ${transcriptionError instanceof Error ? transcriptionError.message : String(transcriptionError)}`, 'error');
+          segment.transcription = ''; // Пустая транскрипция для этого сегмента
+          
+          // Удаляем file_path из ответа
+          delete segment.file_path;
+        }
+      }
+      
+      // Добавляем полный текст со всеми сегментами
+      diarizationResult.full_transcript = diarizationResult.segments
+        .map(segment => `Speaker ${segment.speaker}: ${segment.transcription}`)
+        .join('\n\n');
+      
+      return res.json(diarizationResult);
+      
+    } catch (diarizationError) {
+      log(`Ошибка при диаризации: ${diarizationError instanceof Error ? diarizationError.message : String(diarizationError)}`, 'error');
+      
+      // Проверяем, доступен ли микросервис диаризации
+      try {
+        await axios.get('http://localhost:5001/health');
+        return res.status(500).json({ 
+          error: 'Ошибка при обработке запроса диаризации',
+          details: diarizationError instanceof Error ? diarizationError.message : String(diarizationError)
+        });
+      } catch (healthCheckError) {
+        // Микросервис недоступен
+        return res.status(503).json({ 
+          error: 'Микросервис диаризации недоступен',
+          details: 'Необходимо запустить микросервис командой: node start-diarization-service.js'
+        });
+      }
+    }
+  } catch (error) {
+    log(`Ошибка в маршруте /diarize: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 // Экспортируем функцию compareTranscriptionModels для использования в других модулях
 export { compareTranscriptionModels };
 
