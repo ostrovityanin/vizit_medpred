@@ -1,323 +1,261 @@
-import React, { useState, useEffect } from 'react';
-import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useQuery, useMutation } from '@tanstack/react-query';
-import axios from 'axios';
+import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle2, Send } from "lucide-react";
 
 /**
- * Компонент для демонстрации работы с аффирмациями
+ * Демонстрационная страница для проверки механизма уникальности комментариев
  */
 export default function AffirmationDemo() {
-  const { toast } = useToast();
-  const [commentId, setCommentId] = useState('');
-  const [affirmationText, setAffirmationText] = useState('');
-  const [recipientUsername, setRecipientUsername] = useState('');
-  const [authorUsername, setAuthorUsername] = useState('');
+  const [commentId, setCommentId] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [checkResult, setCheckResult] = useState<{
+    isProcessed: boolean;
+    commentId: string;
+    timestamp: string;
+  } | null>(null);
+  const [markResult, setMarkResult] = useState<{
+    success: boolean;
+    commentId: string;
+    timestamp: string;
+  } | null>(null);
 
-  // Запрос на получение списка обработанных комментариев
-  const { 
-    data: processedComments,
-    isLoading,
-    isError,
-    refetch: refetchProcessedComments
-  } = useQuery({
-    queryKey: ['processedComments'],
-    queryFn: async () => {
-      const { data } = await axios.get('/api/affirmations/processed');
-      return data;
-    }
-  });
-
-  // Мутация для отправки аффирмации
-  const sendAffirmationMutation = useMutation({
-    mutationFn: async (data: { 
-      text: string;
-      recipientUsername?: string;
-      authorUsername?: string;
-      messageId: string;
-    }) => {
-      const response = await axios.post('/api/affirmations', data);
-      return response.data;
-    },
-    onSuccess: () => {
+  /**
+   * Проверка, был ли комментарий обработан ранее
+   */
+  const checkComment = async () => {
+    if (!commentId.trim()) {
       toast({
-        title: "Аффирмация отправлена",
-        description: "Аффирмация успешно обработана и отправлена",
-      });
-      // Очищаем форму
-      setAffirmationText('');
-      setCommentId('');
-      // Обновляем список обработанных комментариев
-      refetchProcessedComments();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка отправки",
-        description: error.response?.data?.error || "Произошла ошибка при отправке аффирмации",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Мутация для проверки, обработан ли комментарий
-  const checkCommentMutation = useMutation({
-    mutationFn: async (commentId: string) => {
-      const response = await axios.post('/api/affirmations/check-comment', { commentId });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: data.isProcessed ? "Комментарий уже обработан" : "Комментарий не обработан",
-        description: data.isProcessed 
-          ? `Комментарий ${data.commentId} уже был обработан ранее` 
-          : `Комментарий ${data.commentId} еще не был обработан`
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка проверки",
-        description: error.response?.data?.error || "Произошла ошибка при проверке комментария",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Мутация для пометки комментария как обработанного
-  const markProcessedMutation = useMutation({
-    mutationFn: async (commentId: string) => {
-      const response = await axios.post('/api/affirmations/mark-processed', { commentId });
-      return response.data;
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Комментарий помечен как обработанный",
-        description: `Комментарий ${data.commentId} успешно помечен как обработанный`
-      });
-      // Обновляем список обработанных комментариев
-      refetchProcessedComments();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка обработки",
-        description: error.response?.data?.error || "Произошла ошибка при пометке комментария",
-        variant: "destructive",
-      });
-    }
-  });
-
-  // Обработчик отправки аффирмации
-  const handleSendAffirmation = () => {
-    if (!affirmationText) {
-      toast({
-        title: "Не указан текст аффирмации",
-        description: "Пожалуйста, введите текст аффирмации",
+        title: "Ошибка",
+        description: "Введите ID комментария",
         variant: "destructive",
       });
       return;
     }
 
-    if (!commentId) {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/affirmations/check-comment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ commentId: commentId.trim() }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка при проверке комментария");
+      }
+
+      setCheckResult(data);
       toast({
-        title: "Не указан ID комментария",
-        description: "Пожалуйста, введите ID комментария",
+        title: "Проверка выполнена",
+        description: data.isProcessed
+          ? `Комментарий ${data.commentId} уже был обработан`
+          : `Комментарий ${data.commentId} еще не обрабатывался`,
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка при проверке",
+        description: error instanceof Error ? error.message : "Неизвестная ошибка",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    // Отправляем аффирмацию
-    sendAffirmationMutation.mutate({
-      text: affirmationText,
-      recipientUsername: recipientUsername || undefined,
-      authorUsername: authorUsername || undefined,
-      messageId: commentId
-    });
   };
 
-  // Обработчик проверки комментария
-  const handleCheckComment = () => {
-    if (!commentId) {
+  /**
+   * Отметка комментария как обработанного
+   */
+  const markAsProcessed = async () => {
+    if (!commentId.trim()) {
       toast({
-        title: "Не указан ID комментария",
-        description: "Пожалуйста, введите ID комментария для проверки",
+        title: "Ошибка",
+        description: "Введите ID комментария",
         variant: "destructive",
       });
       return;
     }
 
-    checkCommentMutation.mutate(commentId);
+    setLoading(true);
+    try {
+      const response = await fetch("/api/affirmations/mark-processed", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ commentId: commentId.trim() }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка при обработке комментария");
+      }
+
+      setMarkResult(data);
+      toast({
+        title: "Комментарий обработан",
+        description: `Комментарий ${data.commentId} отмечен как обработанный`,
+      });
+    } catch (error) {
+      toast({
+        title: "Ошибка при обработке",
+        description: error instanceof Error ? error.message : "Неизвестная ошибка",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Обработчик пометки комментария как обработанного
-  const handleMarkProcessed = () => {
-    if (!commentId) {
+  /**
+   * Получение списка всех обработанных комментариев
+   */
+  const getProcessedComments = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch("/api/affirmations/processed");
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка при получении списка комментариев");
+      }
+
       toast({
-        title: "Не указан ID комментария",
-        description: "Пожалуйста, введите ID комментария для пометки",
+        title: "Список обработанных комментариев",
+        description: `Всего обработано: ${data.count} комментариев`,
+      });
+
+      // Отображение списка комментариев в виде alert-ов, но не более 10
+      if (data.processed.length > 0) {
+        const displayList = data.processed.slice(0, 10);
+        const remainingCount = data.processed.length - displayList.length;
+        
+        setTimeout(() => {
+          displayList.forEach((id: string, index: number) => {
+            setTimeout(() => {
+              toast({
+                title: `Комментарий #${index + 1}`,
+                description: id,
+              });
+            }, index * 500);
+          });
+          
+          if (remainingCount > 0) {
+            setTimeout(() => {
+              toast({
+                title: "И еще...",
+                description: `Еще ${remainingCount} комментариев не показано`,
+              });
+            }, displayList.length * 500);
+          }
+        }, 500);
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка при получении списка",
+        description: error instanceof Error ? error.message : "Неизвестная ошибка",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setLoading(false);
     }
-
-    markProcessedMutation.mutate(commentId);
   };
 
   return (
-    <div className="container mx-auto py-6">
-      <h1 className="text-3xl font-bold mb-6">Демонстрация работы с аффирмациями</h1>
+    <div className="container mx-auto py-8">
+      <h1 className="text-3xl font-bold mb-6 text-center">Демо проверки уникальности комментариев</h1>
       
-      <Tabs defaultValue="send">
-        <TabsList className="grid grid-cols-3 mb-6">
-          <TabsTrigger value="send">Отправка аффирмации</TabsTrigger>
-          <TabsTrigger value="check">Проверка комментария</TabsTrigger>
-          <TabsTrigger value="list">Список обработанных</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="send">
-          <Card>
-            <CardHeader>
-              <CardTitle>Отправка аффирмации</CardTitle>
-              <CardDescription>
-                Заполните форму для отправки новой аффирмации
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="comment-id">ID комментария *</Label>
+      <div className="grid gap-8 max-w-2xl mx-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>Проверка обработки комментариев</CardTitle>
+            <CardDescription>
+              Проверьте, был ли комментарий уже обработан системой
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex space-x-2">
                 <Input 
-                  id="comment-id" 
-                  placeholder="Введите уникальный ID комментария" 
+                  placeholder="Введите ID комментария" 
                   value={commentId} 
                   onChange={(e) => setCommentId(e.target.value)}
+                  disabled={loading}
                 />
+                <Button 
+                  onClick={checkComment} 
+                  disabled={loading}
+                  variant="outline"
+                >
+                  Проверить
+                </Button>
               </div>
               
-              <div className="grid gap-2">
-                <Label htmlFor="affirmation-text">Текст аффирмации *</Label>
-                <Textarea 
-                  id="affirmation-text" 
-                  placeholder="Введите текст аффирмации" 
-                  value={affirmationText} 
-                  onChange={(e) => setAffirmationText(e.target.value)}
-                  rows={4}
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="recipient">Получатель аффирмации</Label>
-                <Input 
-                  id="recipient" 
-                  placeholder="Имя пользователя получателя (необязательно)" 
-                  value={recipientUsername} 
-                  onChange={(e) => setRecipientUsername(e.target.value)}
-                />
-              </div>
-              
-              <div className="grid gap-2">
-                <Label htmlFor="author">Автор аффирмации</Label>
-                <Input 
-                  id="author" 
-                  placeholder="Имя пользователя автора (необязательно)" 
-                  value={authorUsername} 
-                  onChange={(e) => setAuthorUsername(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={handleSendAffirmation} 
-                disabled={sendAffirmationMutation.isPending}
-              >
-                {sendAffirmationMutation.isPending ? "Отправка..." : "Отправить аффирмацию"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
+              {checkResult && (
+                <Alert variant={checkResult.isProcessed ? "default" : "destructive"}>
+                  <div className="flex items-center">
+                    {checkResult.isProcessed ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <AlertCircle className="h-4 w-4 mr-2" />}
+                    <AlertTitle>
+                      {checkResult.isProcessed ? "Комментарий обработан" : "Комментарий не обработан"}
+                    </AlertTitle>
+                  </div>
+                  <AlertDescription className="mt-2">
+                    ID: {checkResult.commentId}<br />
+                    Время проверки: {new Date(checkResult.timestamp).toLocaleString()}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </CardContent>
+          
+          <CardFooter className="flex justify-between">
+            <Button
+              onClick={markAsProcessed}
+              disabled={loading}
+              variant="default"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Отметить как обработанный
+            </Button>
+            
+            <Button
+              onClick={getProcessedComments}
+              disabled={loading}
+              variant="secondary"
+            >
+              Показать все обработанные
+            </Button>
+          </CardFooter>
+        </Card>
         
-        <TabsContent value="check">
+        {markResult && (
           <Card>
             <CardHeader>
-              <CardTitle>Проверка и обработка комментария</CardTitle>
-              <CardDescription>
-                Проверьте, был ли комментарий уже обработан, или пометьте его как обработанный
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-2">
-                <Label htmlFor="check-comment-id">ID комментария *</Label>
-                <Input 
-                  id="check-comment-id" 
-                  placeholder="Введите ID комментария для проверки" 
-                  value={commentId} 
-                  onChange={(e) => setCommentId(e.target.value)}
-                />
-              </div>
-            </CardContent>
-            <CardFooter className="flex gap-2">
-              <Button 
-                onClick={handleCheckComment}
-                disabled={checkCommentMutation.isPending}
-                variant="outline"
-              >
-                {checkCommentMutation.isPending ? "Проверка..." : "Проверить"}
-              </Button>
-              <Button 
-                onClick={handleMarkProcessed}
-                disabled={markProcessedMutation.isPending}
-              >
-                {markProcessedMutation.isPending ? "Обработка..." : "Пометить как обработанный"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="list">
-          <Card>
-            <CardHeader>
-              <CardTitle>Список обработанных комментариев</CardTitle>
-              <CardDescription>
-                Все комментарии, которые были помечены как обработанные
-              </CardDescription>
+              <CardTitle>Результат обработки</CardTitle>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
-                <p>Загрузка списка обработанных комментариев...</p>
-              ) : isError ? (
-                <p className="text-red-500">Ошибка при загрузке списка обработанных комментариев</p>
-              ) : (
-                <div>
-                  <p>Всего обработано комментариев: {processedComments?.count || 0}</p>
-                  
-                  {processedComments?.processed?.length > 0 ? (
-                    <div className="mt-4 border rounded-md p-4 max-h-80 overflow-auto">
-                      <ul className="list-disc list-inside">
-                        {processedComments.processed.map((commentId: string) => (
-                          <li key={commentId} className="py-1">{commentId}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : (
-                    <p className="mt-4">Список обработанных комментариев пуст</p>
-                  )}
+              <Alert variant={markResult.success ? "default" : "destructive"}>
+                <div className="flex items-center">
+                  {markResult.success ? <CheckCircle2 className="h-4 w-4 mr-2" /> : <AlertCircle className="h-4 w-4 mr-2" />}
+                  <AlertTitle>
+                    {markResult.success ? "Успешно обработан" : "Ошибка обработки"}
+                  </AlertTitle>
                 </div>
-              )}
+                <AlertDescription className="mt-2">
+                  ID: {markResult.commentId}<br />
+                  Время обработки: {new Date(markResult.timestamp).toLocaleString()}
+                </AlertDescription>
+              </Alert>
             </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={() => refetchProcessedComments()} 
-                variant="outline"
-              >
-                Обновить список
-              </Button>
-            </CardFooter>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+      </div>
     </div>
   );
 }

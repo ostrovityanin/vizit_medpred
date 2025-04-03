@@ -26,6 +26,9 @@ const CommentCheckSchema = z.object({
 type Affirmation = z.infer<typeof AffirmationSchema>;
 
 // Путь к файлу для хранения информации об обработанных комментариях
+// Корректное получение пути в ES модулях
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const DATA_DIR = path.join(__dirname, '../../data/affirmations');
 const PROCESSED_COMMENTS_FILE = path.join(DATA_DIR, 'processed_comments.json');
 
