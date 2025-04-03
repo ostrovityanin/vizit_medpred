@@ -161,7 +161,7 @@ async function transcribeWithAudioAPI(audioFilePath, options = {}) {
 
   const { 
     prompt = '', 
-    language = '', 
+    language = 'ru',  // По умолчанию используем русский язык
     model = 'whisper-1' 
   } = options;
   
@@ -262,7 +262,8 @@ async function transcribeAudio(audioFilePath, options = {}) {
   
   // Автоматический выбор модели и метода транскрипции
   if (model === 'auto') {
-    transcriptionOptions.model = 'gpt-4o-audio-preview';
+    // Используем более быструю модель gpt-4o-mini-transcribe вместо gpt-4o-audio-preview
+    transcriptionOptions.model = 'gpt-4o-mini-transcribe';
   }
   
   // Новые модели, которые должны использовать audio/transcriptions API

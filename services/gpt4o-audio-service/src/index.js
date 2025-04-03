@@ -254,12 +254,17 @@ app.post('/api/transcribe', upload.single('audio'), async (req, res) => {
     let modelToUse = 'whisper-1'; // Модель по умолчанию
     
     if (options.detailed) {
-      // Для расширенной транскрипции используем одну из моделей GPT-4o
+      // Для расширенной транскрипции с высоким качеством используем GPT-4o-transcribe
       logger.info('Запрошены расширенные возможности, используем GPT-4o-transcribe');
       modelToUse = 'gpt-4o-transcribe';
+    } else if (req.body.speed === 'fast') {
+      // Для быстрой транскрипции используем whisper-1 (самый быстрый вариант по тестам)
+      logger.info('Запрошена быстрая транскрипция, используем whisper-1');
+      modelToUse = 'whisper-1';
     } else {
-      // Для обычной транскрипции используем Whisper как более надежный вариант
-      logger.info('Используем Whisper API для стандартной транскрипции');
+      // По умолчанию используем gpt-4o-mini-transcribe как компромисс между скоростью и качеством
+      logger.info('Используем gpt-4o-mini-transcribe для стандартной транскрипции');
+      modelToUse = 'gpt-4o-mini-transcribe';
     }
     
     // Объединяем опции с выбранной моделью

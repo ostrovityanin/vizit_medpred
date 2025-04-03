@@ -297,12 +297,12 @@ async function convertToMp3(inputPath, options = {}) {
     await ensureDirectoryExists(uploadsDir);
     await ensureDirectoryExists(tempDir);
     
-    // Параметры по умолчанию
+    // Параметры по умолчанию - оптимизированы для новых моделей транскрипции
     const {
-      sampleRate = 48000,
-      channels = 1,
-      bitrate = '128k',
-      normalize = false
+      sampleRate = 16000,  // Понижаем до 16kHz - оптимально для моделей транскрипции
+      channels = 1,        // Mono для лучшего распознавания речи
+      bitrate = '32k',     // Оптимальный битрейт для транскрипции
+      normalize = false    // Избегаем сложной обработки для предотвращения ошибок
     } = options;
     
     // Генерируем имя для MP3 файла
