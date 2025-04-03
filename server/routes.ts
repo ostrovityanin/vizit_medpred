@@ -16,6 +16,7 @@ import { fragmentManager } from './fragments';
 import { eventLogger } from './event-logger';
 import apiDocsRouter from './api-docs';
 import apiFilesRouter from './api-files';
+import transcriptionRoutes from './routes/transcription-routes';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +57,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // API для доступа к файлам
   app.use('/api/files', apiFilesRouter);
+  
+  // API для транскрипции аудио
+  app.use('/api', transcriptionRoutes);
   
   // Эндпоинт для проверки здоровья сервера (health check)
   app.get('/health', (req: Request, res: Response) => {

@@ -11,6 +11,7 @@ import UserRecordings from "@/pages/user-recordings";
 import Architecture from "@/pages/architecture";
 import ZeppOSDocs from "@/pages/zepp-os-docs";
 import ReplitGuide from "./pages/replit-guide";
+import TranscriptionDemo from "@/pages/TranscriptionDemo";
 import { Notification } from "@/components/Notification";
 import { useEffect } from "react";
 
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/architecture" component={Architecture} />
       <Route path="/zepp-os-docs" component={ZeppOSDocs} />
       <Route path="/replit-guide" component={ReplitGuide} />
+      <Route path="/transcription-demo" component={TranscriptionDemo} />
       <Route component={NotFound} />
     </Switch>
   );
