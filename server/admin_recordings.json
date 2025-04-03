@@ -447,7 +447,77 @@
       "status": "completed",
       "id": 32,
       "sent": false
+    },
+    {
+      "filename": "65d4b5c1-e505-4ec0-abb3-0f2a253b1e3f.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:14:28.159Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 33,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Извините, но мне нужно аудио или текст, чтобы выполнить транскрипцию и выделить говорящих. Пожалуйста, предоставьте необходимую информацию.",
+      "transcriptionCost": "0.0495",
+      "tokensProcessed": 3000
+    },
+    {
+      "filename": "4637e5fb-a188-4823-98e8-fc6a09dc057a.wav",
+      "duration": 29,
+      "timestamp": "2025-04-03T14:15:05.529Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 960078,
+      "transcription": "Извините, но мне нужно аудио или текст, чтобы выполнить транскрипцию и выделить говорящих. Пожалуйста, предоставьте аудиозапись или текст для обработки.",
+      "transcriptionCost": "0.0495",
+      "tokensProcessed": 3000,
+      "status": "completed",
+      "id": 34,
+      "sent": false
+    },
+    {
+      "filename": "d9a86909-ab06-459b-b067-3d14eb40a13d.wav",
+      "duration": 0,
+      "timestamp": "2025-04-03T14:15:45.469Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 35,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Извините, но мне нужно аудио или текст, чтобы выполнить транскрипцию и выделить говорящих. Пожалуйста, предоставьте аудиозапись или текст для обработки.",
+      "transcriptionCost": "0.0018",
+      "tokensProcessed": 108
+    },
+    {
+      "filename": null,
+      "duration": 0,
+      "timestamp": "2025-04-03T14:15:49.542Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 36,
+      "sent": false,
+      "fileSize": null,
+      "transcription": null,
+      "transcriptionCost": null,
+      "tokensProcessed": null
+    },
+    {
+      "filename": "52dc1ae8-6d79-4d36-bb37-f78277ac520e.wav",
+      "duration": 1,
+      "timestamp": "2025-04-03T14:15:50.943Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 34638,
+      "transcription": "Извините, но мне нужно больше информации, чтобы помочь вам. Пожалуйста, предоставьте текст, который нужно разбить на диалог.",
+      "transcriptionCost": "0.0018",
+      "tokensProcessed": 108,
+      "status": "completed",
+      "id": 37,
+      "sent": false
     }
   ],
-  "currentId": 33
+  "currentId": 38
 }

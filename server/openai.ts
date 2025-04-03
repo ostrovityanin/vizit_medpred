@@ -8,6 +8,8 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 import { FormData } from 'formdata-node';
 import { fileFromPath } from 'formdata-node/file-from-path';
 import fetch from 'node-fetch';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // Инициализируем ffmpeg с установленной версией
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
@@ -282,10 +284,14 @@ async function transcribeWithGPT4o(filePath: string): Promise<{text: string, cos
       // Пытаемся импортировать клиентскую библиотеку микросервиса
       let gpt4oService = null;
       try {
+        // Используем import.meta.url для определения текущего пути в ES модулях
+        const currentFilePath = fileURLToPath(import.meta.url);
+        const currentDirPath = dirname(currentFilePath);
+        
         // Динамический импорт клиентской библиотеки
-        const gpt4oServicePath = path.resolve(__dirname, '../services/gpt4o-audio-service/src/client-lib.js');
+        const gpt4oServicePath = path.resolve(currentDirPath, '../services/gpt4o-audio-service/src/client-lib.js');
         if (fs.existsSync(gpt4oServicePath)) {
-          gpt4oService = require(gpt4oServicePath);
+          gpt4oService = await import(gpt4oServicePath);
           log(`GPT-4o Audio Preview микросервис успешно загружен`, 'openai');
         } else {
           log(`Клиентская библиотека GPT-4o Audio Preview не найдена по пути: ${gpt4oServicePath}`, 'openai');

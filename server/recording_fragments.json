@@ -199,7 +199,37 @@
       "size": 33065,
       "processed": false,
       "id": 20
+    },
+    {
+      "recordingId": 33,
+      "filename": "fragment-session-1743689667869-79-00001.webm",
+      "index": 1,
+      "timestamp": 1743689698315,
+      "sessionId": "session-1743689667869-79",
+      "size": 13681,
+      "processed": true,
+      "id": 21
+    },
+    {
+      "recordingId": 33,
+      "filename": "fragment-session-1743689667869-79-00000.webm",
+      "index": 0,
+      "timestamp": 1743689697899,
+      "sessionId": "session-1743689667869-79",
+      "size": 471053,
+      "processed": true,
+      "id": 22
+    },
+    {
+      "recordingId": 35,
+      "filename": "fragment-session-1743689745130-356-00000.webm",
+      "index": 0,
+      "timestamp": 1743689746689,
+      "sessionId": "session-1743689745130-356",
+      "size": 16672,
+      "processed": true,
+      "id": 23
     }
   ],
-  "currentId": 21
+  "currentId": 24
 }
