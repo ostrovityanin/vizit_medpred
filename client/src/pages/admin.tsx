@@ -601,6 +601,17 @@ export default function AdminPanel() {
                             <FileText className="h-4 w-4" />
                           </Button>
                         )}
+                        {recording.filename && (
+                          <Button 
+                            onClick={() => runComparisonTranscription(recording.id)}
+                            variant="outline" 
+                            size="sm"
+                            className="text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                            title="Сравнительная транскрипция с разными моделями"
+                          >
+                            <Languages className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button 
                           onClick={() => downloadRecording(recording.id)}
                           variant="outline" 
@@ -679,17 +690,6 @@ export default function AdminPanel() {
                           title="Просмотреть фрагменты записи"
                         >
                           <Layers className="h-4 w-4" />
-                        </Button>
-                        
-                        {/* Кнопка сравнительной транскрипции */}
-                        <Button 
-                          onClick={() => runComparisonTranscription(recording.id)}
-                          variant="outline" 
-                          size="sm"
-                          className="text-indigo-700 border-indigo-200 hover:bg-indigo-50"
-                          title="Сравнительная транскрипция с разными моделями"
-                        >
-                          <Languages className="h-4 w-4" />
                         </Button>
                         
                         {/* Кнопка принудительного завершения записи */}
