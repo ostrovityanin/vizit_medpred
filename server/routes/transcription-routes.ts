@@ -676,15 +676,29 @@ router.post('/diarize', upload.single('audio'), async (req: Request, res: Respon
       
       if (withTranscription && hasOpenAIKey()) {
         // Функция для транскрипции сегментов
-        const transcribeSegment = async (segmentPath: string) => {
+        const transcribeSegment = async (segmentPath: string, speakerIndex = 0) => {
           try {
+            const prompt = language === 'ru' 
+              ? `Это речь говорящего ${speakerIndex+1}. Расшифруй максимально точно текст на русском языке.`
+              : `This is speech from speaker ${speakerIndex+1}. Transcribe the text in ${language} accurately.`;
+              
             const transcriptionResult = await transcribeWithAudioAPI(segmentPath, {
               model,
               language,
-              prompt: `Расшифруй точно текст этого фрагмента на ${language === 'ru' ? 'русском' : 'английском'} языке.`
+              prompt
             });
             
-            return transcriptionResult.text;
+            // Добавляем метку говорящего к тексту
+            let text = transcriptionResult.text || '';
+            
+            // Не добавляем метку говорящего к тишине и шуму
+            if (text.trim().toLowerCase() === '[тишина]' || 
+                text.trim().toLowerCase() === '[шум]' ||
+                text.includes('запись без распознаваемой речи')) {
+              return text;
+            }
+            
+            return `[Говорящий ${speakerIndex+1}]: ${text}`;
           } catch (error) {
             log(`Ошибка при транскрипции сегмента: ${error instanceof Error ? error.message : String(error)}`, 'error');
             return '';
@@ -784,9 +798,9 @@ router.post('/diarize/compare', upload.single('audio'), async (req: Request, res
               // Формируем промпт для транскрипции с указанием номера говорящего
               let prompt = '';
               if (language === 'ru') {
-                prompt = `Расшифруй точно текст этого фрагмента на русском языке. Это речь говорящего ${speakerIndex}.`;
+                prompt = `Это речь говорящего ${speakerIndex+1}. Расшифруй точно текст на русском языке.`;
               } else {
-                prompt = `Transcribe this audio segment accurately in ${language}. This is speech from speaker ${speakerIndex}.`;
+                prompt = `This is speech from speaker ${speakerIndex+1}. Transcribe the text in ${language} accurately.`;
               }
               
               // Транскрибируем
@@ -797,9 +811,22 @@ router.post('/diarize/compare', upload.single('audio'), async (req: Request, res
                 skipOptimization: true // Уже оптимизировали выше
               });
               
-              // Добавляем информацию о говорящем к результату
+              // Добавляем информацию о говорящем к результату и обрабатываем текст
+              let text = result.text || '';
+              
+              // Не добавляем метку говорящего к тишине и шуму
+              if (text.trim().toLowerCase() === '[тишина]' || 
+                  text.trim().toLowerCase() === '[шум]' ||
+                  text.includes('запись без распознаваемой речи')) {
+                // Оставляем текст как есть
+              } else {
+                // Добавляем префикс с номером говорящего
+                text = `[Говорящий ${speakerIndex+1}]: ${text}`;
+              }
+              
               results[model] = {
                 ...result,
+                text: text,
                 speaker: speakerIndex // Явно добавляем номер говорящего в результат
               };
             } catch (error) {

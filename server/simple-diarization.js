@@ -663,8 +663,8 @@ export async function simpleDiarizeAndTranscribe(audioFilePath, options, transcr
           ffmpeg.on('error', reject);
         });
         
-        // Транскрибируем сегмент
-        const transcription = await transcribeFunction(segmentPath);
+        // Транскрибируем сегмент, передавая индекс говорящего для лучшей разметки
+        const transcription = await transcribeFunction(segmentPath, parseInt(segment.speaker) - 1);
         
         return { 
           ...segment, 
@@ -688,7 +688,17 @@ export async function simpleDiarizeAndTranscribe(audioFilePath, options, transcr
     diarizationResult.full_transcription = diarizationResult.segments
       .filter(s => s.transcription) // Только сегменты с успешной транскрипцией
       .sort((a, b) => a.start - b.start) // Сортируем по времени
-      .map(s => `[Говорящий ${s.speaker}]: ${s.transcription}`)
+      .map(s => {
+        // Не добавляем метку говорящего если текст уже содержит метку, или если это тишина/шум
+        if (s.transcription.includes('[Говорящий') || 
+            s.transcription.toLowerCase().includes('[тишина]') || 
+            s.transcription.toLowerCase().includes('[шум]') ||
+            s.transcription.includes('запись без распознаваемой речи')) {
+          return s.transcription;
+        } else {
+          return `[Говорящий ${s.speaker}]: ${s.transcription}`;
+        }
+      })
       .join('\n');
     
     // Очищаем временную директорию
@@ -760,7 +770,7 @@ export async function simpleDiarizeAndCompareModels(audioFilePath, options, tran
         
         // Получаем сравнительные результаты транскрипции для этого сегмента
         const comparisonResults = await transcribeCompareFunction(segmentPath, {
-          speakerIndex: segment.speaker
+          speakerIndex: parseInt(segment.speaker) - 1 // Передаём индекс говорящего (0-based)
         });
         
         return { 
@@ -800,7 +810,17 @@ export async function simpleDiarizeAndCompareModels(audioFilePath, options, tran
       
       // Формируем полный текст для этой модели
       const fullText = transcriptsByModel
-        .map(item => `[Говорящий ${item.speaker}]: ${item.text}`)
+        .map(item => {
+          // Если текст уже содержит метку [Говорящий], или это тишина/шум, оставляем как есть
+          if (item.text.includes('[Говорящий') || 
+              item.text.toLowerCase().includes('[тишина]') || 
+              item.text.toLowerCase().includes('[шум]') ||
+              item.text.includes('запись без распознаваемой речи')) {
+            return item.text;
+          } else {
+            return `[Говорящий ${item.speaker}]: ${item.text}`;
+          }
+        })
         .join('\n');
       
       modelResults[model] = {
