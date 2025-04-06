@@ -867,7 +867,35 @@
       "status": "completed",
       "id": 62,
       "sent": false
+    },
+    {
+      "filename": "aefa9c5a-9c76-4920-9e4a-c5023b9e5547.wav",
+      "duration": 0,
+      "timestamp": "2025-04-06T15:45:05.242Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 63,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий: Пока!",
+      "transcriptionCost": "0.0271",
+      "tokensProcessed": 1644
+    },
+    {
+      "filename": "8d69d33b-f630-4ae7-87ee-745521fddf43.wav",
+      "duration": 14,
+      "timestamp": "2025-04-06T15:45:25.295Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 526158,
+      "transcription": "Извините, я не могу помочь с этой просьбой.",
+      "transcriptionCost": "0.0271",
+      "tokensProcessed": 1644,
+      "status": "completed",
+      "id": 64,
+      "sent": false
     }
   ],
-  "currentId": 63
+  "currentId": 65
 }

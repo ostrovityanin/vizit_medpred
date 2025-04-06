@@ -274,21 +274,35 @@ async function transcribeWithAudioAPI(
       form.append('language', options.language);
     }
     
-    // Для моделей gpt-4o добавляем дополнительные параметры и более информативный prompt
-    if (model.includes('gpt-4o')) {
-      // Для моделей gpt-4o используем специальные подсказки для улучшения качества
-      const enhancedPrompt = options.prompt || 
-        `Расшифруй полностью всю речь в аудиозаписи на языке ${options.language || 'русском'}. Не пропускай никакие фрагменты.`;
-      form.append('prompt', enhancedPrompt);
+    // Для всех моделей добавляем специальные промпты для улучшения качества распознавания
+    let enhancedPrompt = options.prompt || '';
+    
+    // Если промпт не указан явно пользователем, создаем свой в зависимости от модели
+    if (!options.prompt) {
+      const lang = options.language || 'ru';
       
-      // Настраиваем temperature для лучшего качества
-      form.append('temperature', '0.1');
-    } else {
-      // Для whisper используем стандартные параметры
-      if (options.prompt) {
-        form.append('prompt', options.prompt);
+      if (model.includes('gpt-4o')) {
+        // Для моделей GPT-4o особый промпт с обработкой края случаев
+        if (lang === 'ru') {
+          enhancedPrompt = `Расшифруй все звуки в этой записи на русском языке. Даже если слышишь только шумы или тишину, опиши их (например, [тихий шум] или [тишина]). Если слышишь речь но не можешь разобрать слова, напиши [неразборчивая речь]. Не оставляй текст пустым. Не пиши, что не слышишь речи.`;
+        } else {
+          enhancedPrompt = `Transcribe all sounds in this recording in ${lang}. Even if you only hear noise or silence, describe it (e.g., [quiet noise] or [silence]). If you hear speech but can't make out the words, write [unintelligible speech]. Don't leave the text empty. Don't write that you can't hear any speech.`;
+        }
+      } else {
+        // Для Whisper используем другой промпт (тоже работает с тишиной/шумом)
+        if (lang === 'ru') {
+          enhancedPrompt = `Это запись может содержать речь, шумы или тишину. Если слышна речь - расшифруй её. Если слышны только шумы или тишина, укажи это.`;
+        } else {
+          enhancedPrompt = `This recording may contain speech, noise, or silence. If there is speech - transcribe it. If you only hear noise or silence, indicate this.`;
+        }
       }
     }
+    
+    // Применяем промпт ко всем моделям
+    form.append('prompt', enhancedPrompt);
+    
+    // Настраиваем temperature
+    form.append('temperature', model.includes('gpt-4o') ? '0.1' : '0.2');
     
     // Запрашиваем детализированную информацию если нужно
     if (options.detailed) {
@@ -317,9 +331,24 @@ async function transcribeWithAudioAPI(
     const endTime = Date.now();
     const processingTime = (endTime - startTime) / 1000; // в секундах
     
+    // Обработка результата текста
+    let transcribedText = response.data.text || '';
+    
+    // Постобработка текста
+    if (!transcribedText || transcribedText.trim() === '') {
+      // Если текст пустой - явно указываем тишину
+      transcribedText = '[тишина]';
+    } else if (transcribedText.toLowerCase().includes('извините') && 
+              (transcribedText.toLowerCase().includes('не могу помочь') || 
+               transcribedText.toLowerCase().includes('не слышу речи') || 
+               transcribedText.toLowerCase().includes('не удается распознать'))) {
+      // Заменяем стандартные сообщения об ошибке от GPT-4o
+      transcribedText = '[запись без распознаваемой речи]';
+    }
+    
     // Результат
     const result: {text: string, model: string, processingTime: number, segments?: any[]} = {
-      text: response.data.text,
+      text: transcribedText,
       model: options.model || 'whisper-1',
       processingTime
     };
