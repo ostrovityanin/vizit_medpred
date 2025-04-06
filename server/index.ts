@@ -1,12 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
 // Динамически импортируем маршруты API
 let apiRoutes: any = null;
 
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// Инициализация локального хранилища в приложении
+app.locals.storage = storage;
 
 app.use((req, res, next) => {
   const start = Date.now();

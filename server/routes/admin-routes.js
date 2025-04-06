@@ -46,10 +46,17 @@ const upload = multer({
  * Получение списка всех записей
  * GET /api/admin/recordings
  */
-router.get('/admin/recordings', (req, res) => {
+router.get('/admin/recordings', async (req, res) => {
   try {
-    // Получаем записи из хранилища
-    const recordings = req.app.locals.storage?.getRecordings?.() || [];
+    // Получаем записи из хранилища асинхронно
+    // Это согласуется с типами IStorage в storage.ts
+    const recordings = await req.app.locals.storage?.getRecordings?.() || [];
+    
+    // Добавим проверку, что recordings - это массив
+    if (!Array.isArray(recordings)) {
+      console.error(`[Admin API] Ошибка: recordings не является массивом: ${typeof recordings}`);
+      return res.json([]);
+    }
     
     // Сортируем записи по времени в обратном порядке
     const sortedRecordings = [...recordings].sort((a, b) => {
@@ -67,7 +74,7 @@ router.get('/admin/recordings', (req, res) => {
  * Получение информации о конкретной записи
  * GET /api/admin/recordings/:id
  */
-router.get('/admin/recordings/:id', (req, res) => {
+router.get('/admin/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -75,9 +82,8 @@ router.get('/admin/recordings/:id', (req, res) => {
       return res.status(400).json({ error: 'Некорректный ID записи' });
     }
     
-    // Получаем запись из хранилища
-    const recordings = req.app.locals.storage?.getRecordings?.() || [];
-    const recording = recordings.find(r => r.id === id);
+    // Получаем запись напрямую из хранилища
+    const recording = await req.app.locals.storage?.getRecordingById?.(id);
     
     if (!recording) {
       return res.status(404).json({ error: 'Запись не найдена' });
@@ -94,7 +100,7 @@ router.get('/admin/recordings/:id', (req, res) => {
  * Загрузка аудиофайла
  * POST /api/admin/recordings/upload
  */
-router.post('/admin/recordings/upload', upload.single('file'), (req, res) => {
+router.post('/admin/recordings/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Файл не был загружен' });
@@ -107,11 +113,14 @@ router.post('/admin/recordings/upload', upload.single('file'), (req, res) => {
       originalFilename: req.file.originalname,
       timestamp: new Date().toISOString(),
       size: req.file.size,
-      status: 'uploaded'
+      status: 'uploaded',
+      targetUsername: req.body.targetUsername || "archive",
+      senderUsername: req.body.senderUsername || "Пользователь",
+      duration: 0
     };
     
     // Добавляем запись в хранилище
-    const savedRecording = req.app.locals.storage?.addRecording?.(newRecording);
+    const savedRecording = await req.app.locals.storage?.createRecording?.(newRecording);
     
     if (!savedRecording) {
       return res.status(500).json({ error: 'Не удалось сохранить запись' });
@@ -128,7 +137,7 @@ router.post('/admin/recordings/upload', upload.single('file'), (req, res) => {
  * Обновление информации о записи
  * PATCH /api/admin/recordings/:id
  */
-router.patch('/admin/recordings/:id', (req, res) => {
+router.patch('/admin/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -136,23 +145,22 @@ router.patch('/admin/recordings/:id', (req, res) => {
       return res.status(400).json({ error: 'Некорректный ID записи' });
     }
     
-    // Получаем запись из хранилища
-    const recordings = req.app.locals.storage?.getRecordings?.() || [];
-    const recordingIndex = recordings.findIndex(r => r.id === id);
+    // Получаем запись напрямую из хранилища
+    const recording = await req.app.locals.storage?.getRecordingById?.(id);
     
-    if (recordingIndex === -1) {
+    if (!recording) {
       return res.status(404).json({ error: 'Запись не найдена' });
     }
     
     // Обновляем запись
     const updatedRecording = {
-      ...recordings[recordingIndex],
+      ...recording,
       ...req.body,
       id // Сохраняем оригинальный ID
     };
     
     // Сохраняем обновленную запись
-    const savedRecording = req.app.locals.storage?.updateRecording?.(id, updatedRecording);
+    const savedRecording = await req.app.locals.storage?.updateRecording?.(updatedRecording);
     
     if (!savedRecording) {
       return res.status(500).json({ error: 'Не удалось обновить запись' });
@@ -169,7 +177,7 @@ router.patch('/admin/recordings/:id', (req, res) => {
  * Удаление записи
  * DELETE /api/admin/recordings/:id
  */
-router.delete('/admin/recordings/:id', (req, res) => {
+router.delete('/admin/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -177,9 +185,8 @@ router.delete('/admin/recordings/:id', (req, res) => {
       return res.status(400).json({ error: 'Некорректный ID записи' });
     }
     
-    // Получаем запись из хранилища
-    const recordings = req.app.locals.storage?.getRecordings?.() || [];
-    const recording = recordings.find(r => r.id === id);
+    // Получаем запись напрямую из хранилища
+    const recording = await req.app.locals.storage?.getRecordingById?.(id);
     
     if (!recording) {
       return res.status(404).json({ error: 'Запись не найдена' });
@@ -194,7 +201,7 @@ router.delete('/admin/recordings/:id', (req, res) => {
     }
     
     // Удаляем запись из хранилища
-    const success = req.app.locals.storage?.deleteRecording?.(id);
+    const success = await req.app.locals.storage?.deleteRecording?.(id);
     
     if (!success) {
       return res.status(500).json({ error: 'Не удалось удалить запись' });

@@ -110,6 +110,7 @@ export default function AdminPanel() {
       }
       
       const data = await response.json();
+      console.log('Fetched recordings:', data); // Добавляем логирование данных
       setRecordings(data);
     } catch (error) {
       console.error('Error fetching recordings:', error);
