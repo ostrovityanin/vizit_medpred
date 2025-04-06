@@ -289,11 +289,11 @@ async function transcribeWithAudioAPI(
           enhancedPrompt = `Transcribe all sounds in this recording in ${lang}. Even if you only hear noise or silence, describe it (e.g., [quiet noise] or [silence]). If you hear speech but can't make out the words, write [unintelligible speech]. Don't leave the text empty. Don't write that you can't hear any speech.`;
         }
       } else {
-        // Для Whisper используем другой промпт (тоже работает с тишиной/шумом)
+        // Для Whisper используем специфический короткий промпт, который лучше работает с тишиной
         if (lang === 'ru') {
-          enhancedPrompt = `Это запись может содержать речь, шумы или тишину. Если слышна речь - расшифруй её. Если слышны только шумы или тишина, укажи это.`;
+          enhancedPrompt = `[Тишина]`;
         } else {
-          enhancedPrompt = `This recording may contain speech, noise, or silence. If there is speech - transcribe it. If you only hear noise or silence, indicate this.`;
+          enhancedPrompt = `[Silence]`;
         }
       }
     }
@@ -338,12 +338,20 @@ async function transcribeWithAudioAPI(
     if (!transcribedText || transcribedText.trim() === '') {
       // Если текст пустой - явно указываем тишину
       transcribedText = '[тишина]';
-    } else if (transcribedText.toLowerCase().includes('извините') && 
+    } else if ((transcribedText.toLowerCase().includes('извините') || 
+                transcribedText.toLowerCase().includes('sorry')) && 
               (transcribedText.toLowerCase().includes('не могу помочь') || 
                transcribedText.toLowerCase().includes('не слышу речи') || 
-               transcribedText.toLowerCase().includes('не удается распознать'))) {
+               transcribedText.toLowerCase().includes('не удается распознать') ||
+               transcribedText.toLowerCase().includes('cannot help') ||
+               transcribedText.toLowerCase().includes('cannot transcribe'))) {
       // Заменяем стандартные сообщения об ошибке от GPT-4o
       transcribedText = '[запись без распознаваемой речи]';
+    } else if (transcribedText.toLowerCase().includes('если слышны') || 
+              transcribedText.toLowerCase().includes('if you hear') ||
+              transcribedText.toLowerCase().includes('если слышна речь')) {
+      // Если модель повторяет промпт - заменяем на метку тишины
+      transcribedText = '[тишина]';
     }
     
     // Результат
