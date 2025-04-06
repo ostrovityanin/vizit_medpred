@@ -7,6 +7,7 @@ import Home from "@/pages/home";
 import Recordings from "@/pages/recordings";
 import ClientBotTest from "@/pages/client-bot-test";
 import Admin from "@/pages/admin";
+import AdminNew from "./pages/admin-new";
 import UserRecordings from "@/pages/user-recordings";
 import Architecture from "@/pages/architecture";
 import ZeppOSDocs from "@/pages/zepp-os-docs";
@@ -23,6 +24,8 @@ function Router() {
       <Route path="/client-bot-test" component={ClientBotTest} />
       <Route path="/admin" component={Admin} />
       <Route path="/admin-panel" component={Admin} />
+      <Route path="/admin-new" component={AdminNew} />
+      <Route path="/admin/recordings/:id" component={AdminNew} />
       <Route path="/user-recordings" component={UserRecordings} />
       <Route path="/architecture" component={Architecture} />
       <Route path="/zepp-os-docs" component={ZeppOSDocs} />

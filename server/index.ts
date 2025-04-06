@@ -1,6 +1,8 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { createServer } from "http";
 import { setupVite, serveStatic, log } from "./vite";
+// Динамически импортируем маршруты API
+let apiRoutes: any = null;
 
 const app = express();
 app.use(express.json());
@@ -37,7 +39,29 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
+  // Создаем HTTP сервер
+  const server = createServer(app);
+  
+  // Регистрируем API маршруты
+  try {
+    // Импортируем наши новые маршруты
+    const routes = await import('./routes/index.js');
+    apiRoutes = routes.default;
+    app.use('/api', apiRoutes);
+    log('API маршруты успешно зарегистрированы', 'routes');
+  } catch (error) {
+    // Если не удалось загрузить новые маршруты, пробуем использовать старые
+    log(`Ошибка при загрузке новых маршрутов: ${error}`, 'error');
+    log('Пытаемся использовать старые маршруты...', 'routes');
+    
+    try {
+      const { registerRoutes } = await import('./routes');
+      await registerRoutes(app);
+      log('Старые API маршруты успешно зарегистрированы', 'routes');
+    } catch (routesError) {
+      log(`Ошибка при регистрации маршрутов: ${routesError}`, 'error');
+    }
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
