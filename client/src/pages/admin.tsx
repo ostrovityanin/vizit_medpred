@@ -29,19 +29,59 @@ interface ComparisonResult {
     text: string;
     processingTime: number;
     error?: string;
+    full_text?: string;
+    segments?: Array<{
+      speaker: number;
+      text: string;
+      start: number;
+      end: number;
+      processingTime: number;
+    }>;
+    avg_processing_time?: number;
   };
   'gpt-4o-mini-transcribe'?: {
     text: string;
     processingTime: number;
     error?: string;
+    full_text?: string;
+    segments?: Array<{
+      speaker: number;
+      text: string;
+      start: number;
+      end: number;
+      processingTime: number;
+    }>;
+    avg_processing_time?: number;
   };
   'gpt-4o-transcribe'?: {
     text: string;
     processingTime: number;
     error?: string;
+    full_text?: string;
+    segments?: Array<{
+      speaker: number;
+      text: string;
+      start: number;
+      end: number;
+      processingTime: number;
+    }>;
+    avg_processing_time?: number;
   };
   fileSize?: number;
   fileName?: string;
+  model_results?: {
+    [key: string]: {
+      segments: Array<{
+        speaker: number;
+        text: string;
+        start: number;
+        end: number;
+        processingTime: number;
+      }>;
+      full_text: string;
+      avg_processing_time: number;
+    }
+  };
 }
 
 export default function AdminPanel() {
@@ -799,14 +839,61 @@ export default function AdminPanel() {
                       {comparisonResult.fileSize && ` (${Math.round(comparisonResult.fileSize / 1024)} KB)`}
                     </p>
                     
+                    {/* Таблица с результатами диаризации */}
+                    <div className="border rounded-lg p-4 bg-white mb-4">
+                      <h3 className="text-lg font-medium mb-3">Сравнение результатов диаризации по моделям</h3>
+                      
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-neutral-100">
+                              <th className="border px-4 py-2 text-left">Говорящий</th>
+                              <th className="border px-4 py-2 text-left">Время</th>
+                              <th className="border px-4 py-2 text-left">whisper-1</th>
+                              <th className="border px-4 py-2 text-left">gpt-4o-mini-transcribe</th>
+                              <th className="border px-4 py-2 text-left">gpt-4o-transcribe</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {comparisonResult?.model_results && 
+                             comparisonResult.model_results['whisper-1']?.segments.map((segment, index) => {
+                              const speakerIndex = segment.speaker;
+                              const timeRange = `${formatDuration(segment.start)} - ${formatDuration(segment.end)}`;
+                              
+                              // Получаем текст для каждой модели
+                              const whisperText = comparisonResult.model_results['whisper-1']?.segments
+                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              
+                              const miniText = comparisonResult.model_results['gpt-4o-mini-transcribe']?.segments
+                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              
+                              const gpt4oText = comparisonResult.model_results['gpt-4o-transcribe']?.segments
+                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              
+                              return (
+                                <tr key={`segment-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>
+                                  <td className="border px-4 py-2 font-medium">Говорящий {speakerIndex}</td>
+                                  <td className="border px-4 py-2 text-neutral-500 text-sm">{timeRange}</td>
+                                  <td className="border px-4 py-2">{whisperText}</td>
+                                  <td className="border px-4 py-2">{miniText}</td>
+                                  <td className="border px-4 py-2">{gpt4oText}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    
+                    {/* Блоки с полными результатами */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {/* Whisper-1 */}
                       <div className="border rounded-lg p-4 bg-neutral-50">
                         <div className="flex justify-between items-center mb-2">
                           <h3 className="font-medium text-neutral-800">whisper-1</h3>
                           <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                            {comparisonResult['whisper-1']?.processingTime ? 
-                              formatTimePerformance(comparisonResult['whisper-1'].processingTime) : 
+                            {comparisonResult.model_results?.['whisper-1']?.avg_processing_time ? 
+                              formatTimePerformance(comparisonResult.model_results['whisper-1'].avg_processing_time) : 
                               '-'}
                           </span>
                         </div>
@@ -816,7 +903,7 @@ export default function AdminPanel() {
                           </div>
                         ) : (
                           <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
-                            {comparisonResult['whisper-1']?.text || 'Нет данных'}
+                            {comparisonResult.model_results?.['whisper-1']?.full_text || comparisonResult['whisper-1']?.text || 'Нет данных'}
                           </div>
                         )}
                         <div className="mt-2 text-neutral-500 text-xs">
@@ -829,8 +916,8 @@ export default function AdminPanel() {
                         <div className="flex justify-between items-center mb-2">
                           <h3 className="font-medium text-neutral-800">gpt-4o-mini-transcribe</h3>
                           <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            {comparisonResult['gpt-4o-mini-transcribe']?.processingTime ? 
-                              formatTimePerformance(comparisonResult['gpt-4o-mini-transcribe'].processingTime) : 
+                            {comparisonResult.model_results?.['gpt-4o-mini-transcribe']?.avg_processing_time ? 
+                              formatTimePerformance(comparisonResult.model_results['gpt-4o-mini-transcribe'].avg_processing_time) : 
                               '-'}
                           </span>
                         </div>
@@ -840,7 +927,7 @@ export default function AdminPanel() {
                           </div>
                         ) : (
                           <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
-                            {comparisonResult['gpt-4o-mini-transcribe']?.text || 'Нет данных'}
+                            {comparisonResult.model_results?.['gpt-4o-mini-transcribe']?.full_text || comparisonResult['gpt-4o-mini-transcribe']?.text || 'Нет данных'}
                           </div>
                         )}
                         <div className="mt-2 text-neutral-500 text-xs">
@@ -853,8 +940,8 @@ export default function AdminPanel() {
                         <div className="flex justify-between items-center mb-2">
                           <h3 className="font-medium text-neutral-800">gpt-4o-transcribe</h3>
                           <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                            {comparisonResult['gpt-4o-transcribe']?.processingTime ? 
-                              formatTimePerformance(comparisonResult['gpt-4o-transcribe'].processingTime) : 
+                            {comparisonResult.model_results?.['gpt-4o-transcribe']?.avg_processing_time ? 
+                              formatTimePerformance(comparisonResult.model_results['gpt-4o-transcribe'].avg_processing_time) : 
                               '-'}
                           </span>
                         </div>
@@ -864,7 +951,7 @@ export default function AdminPanel() {
                           </div>
                         ) : (
                           <div className="p-3 bg-white border border-neutral-200 rounded h-64 overflow-y-auto text-sm whitespace-pre-wrap">
-                            {comparisonResult['gpt-4o-transcribe']?.text || 'Нет данных'}
+                            {comparisonResult.model_results?.['gpt-4o-transcribe']?.full_text || comparisonResult['gpt-4o-transcribe']?.text || 'Нет данных'}
                           </div>
                         )}
                         <div className="mt-2 text-neutral-500 text-xs">

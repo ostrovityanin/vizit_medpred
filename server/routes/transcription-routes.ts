@@ -744,7 +744,7 @@ router.post('/diarize/compare', upload.single('audio'), async (req: Request, res
                 highQuality: model === 'gpt-4o-transcribe'
               });
               
-              // Формируем промпт для транскрипции
+              // Формируем промпт для транскрипции с указанием номера говорящего
               let prompt = '';
               if (language === 'ru') {
                 prompt = `Расшифруй точно текст этого фрагмента на русском языке. Это речь говорящего ${speakerIndex}.`;
@@ -760,12 +760,17 @@ router.post('/diarize/compare', upload.single('audio'), async (req: Request, res
                 skipOptimization: true // Уже оптимизировали выше
               });
               
-              results[model] = result;
+              // Добавляем информацию о говорящем к результату
+              results[model] = {
+                ...result,
+                speaker: speakerIndex // Явно добавляем номер говорящего в результат
+              };
             } catch (error) {
               log(`Ошибка при транскрипции сегмента моделью ${model}: ${error instanceof Error ? error.message : String(error)}`, 'error');
               results[model] = { 
                 error: error instanceof Error ? error.message : String(error),
-                text: ''
+                text: '',
+                speaker: speakerIndex
               };
             }
           }
