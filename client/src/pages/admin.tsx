@@ -856,19 +856,22 @@ export default function AdminPanel() {
                           </thead>
                           <tbody>
                             {comparisonResult?.model_results && 
-                             comparisonResult.model_results['whisper-1']?.segments.map((segment, index) => {
+                             comparisonResult.model_results['whisper-1']?.segments?.map((segment, index) => {
                               const speakerIndex = segment.speaker;
                               const timeRange = `${formatDuration(segment.start)} - ${formatDuration(segment.end)}`;
                               
-                              // Получаем текст для каждой модели
-                              const whisperText = comparisonResult.model_results['whisper-1']?.segments
-                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              // Получаем текст для каждой модели (добавлены дополнительные проверки)
+                              const whisperSegments = comparisonResult?.model_results?.['whisper-1']?.segments;
+                              const whisperText = whisperSegments && Array.isArray(whisperSegments) ? 
+                                (whisperSegments.find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-') : '-';
                               
-                              const miniText = comparisonResult.model_results['gpt-4o-mini-transcribe']?.segments
-                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              const miniSegments = comparisonResult?.model_results?.['gpt-4o-mini-transcribe']?.segments;
+                              const miniText = miniSegments && Array.isArray(miniSegments) ? 
+                                (miniSegments.find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-') : '-';
                               
-                              const gpt4oText = comparisonResult.model_results['gpt-4o-transcribe']?.segments
-                                .find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-';
+                              const gpt4oSegments = comparisonResult?.model_results?.['gpt-4o-transcribe']?.segments;
+                              const gpt4oText = gpt4oSegments && Array.isArray(gpt4oSegments) ? 
+                                (gpt4oSegments.find(s => s.speaker === speakerIndex && s.start === segment.start)?.text || '-') : '-';
                               
                               return (
                                 <tr key={`segment-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-neutral-50'}>

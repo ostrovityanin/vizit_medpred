@@ -399,7 +399,37 @@
       "size": 223310,
       "processed": false,
       "id": 40
+    },
+    {
+      "recordingId": 59,
+      "filename": "fragment-session-1743953180555-486-00000.webm",
+      "index": 0,
+      "timestamp": 1743953210575,
+      "sessionId": "session-1743953180555-486",
+      "size": 469621,
+      "processed": true,
+      "id": 41
+    },
+    {
+      "recordingId": 59,
+      "filename": "fragment-session-1743953180555-486-00001.webm",
+      "index": 1,
+      "timestamp": 1743953240572,
+      "sessionId": "session-1743953180555-486",
+      "size": 478155,
+      "processed": true,
+      "id": 42
+    },
+    {
+      "recordingId": 59,
+      "filename": "fragment-session-1743953180555-486-00002.webm",
+      "index": 2,
+      "timestamp": 1743953253409,
+      "sessionId": "session-1743953180555-486",
+      "size": 221135,
+      "processed": false,
+      "id": 43
     }
   ],
-  "currentId": 41
+  "currentId": 44
 }

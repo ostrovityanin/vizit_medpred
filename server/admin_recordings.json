@@ -811,7 +811,35 @@
       "status": "completed",
       "id": 58,
       "sent": false
+    },
+    {
+      "filename": "c8b12a9a-f8bc-479b-b324-b57d3ce3b121.wav",
+      "duration": 0,
+      "timestamp": "2025-04-06T15:26:20.849Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 59,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Извините, но мне нужно аудио или текст для выполнения транскрипции. Пожалуйста, предоставьте аудиозапись или текст, который нужно разбить на диалог.",
+      "transcriptionCost": "0.0967",
+      "tokensProcessed": 5862
+    },
+    {
+      "filename": "b1d999fe-02f3-43db-beb9-439553f0d7ac.wav",
+      "duration": 72,
+      "timestamp": "2025-04-06T15:27:40.458Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 1875918,
+      "transcription": "Извините, но мне нужно аудио или текст, чтобы выполнить транскрипцию и выделить говорящих. Пожалуйста, предоставьте текст или аудиофайл для обработки.",
+      "transcriptionCost": "0.0967",
+      "tokensProcessed": 5862,
+      "status": "completed",
+      "id": 60,
+      "sent": false
     }
   ],
-  "currentId": 59
+  "currentId": 61
 }
