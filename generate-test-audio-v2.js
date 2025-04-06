@@ -157,5 +157,10 @@ async function main() {
   }
 }
 
-// Запускаем скрипт
-main();
+// Запускаем скрипт, если запущен напрямую
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
+
+// Экспортируем функции для использования в других модулях
+export { generateTestAudio, generateMultiSpeakerAudio };

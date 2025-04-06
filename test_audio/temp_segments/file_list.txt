@@ -1,0 +1,7 @@
+file '/home/runner/workspace/test_audio/temp_segments/segment_0_speaker_1.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/silence_1.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/segment_2_speaker_2.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/silence_3.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/segment_4_speaker_1.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/silence_5.mp3'
+file '/home/runner/workspace/test_audio/temp_segments/segment_6_speaker_2.mp3'

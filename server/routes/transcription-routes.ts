@@ -610,7 +610,8 @@ router.post('/transcribe/compare', upload.single('audio'), async (req: Request, 
  * Опционально выполняет транскрипцию каждого сегмента и объединяет результаты.
  */
 // Импортируем функции для диаризации из нашего нового модуля
-import { simpleDiarizeAudio, simpleDiarizeAndTranscribe } from '../simple-diarization.js';
+// @ts-ignore - Игнорируем ошибки типизации для JS модуля
+import { simpleDiarizeAudio, simpleDiarizeAndTranscribe, simpleDiarizeAndCompareModels } from '../simple-diarization.js';
 
 /**
  * Маршрут для диаризации аудио (определения говорящих)
@@ -638,7 +639,7 @@ router.post('/diarize', upload.single('audio'), async (req: Request, res: Respon
       
       if (withTranscription && hasOpenAIKey()) {
         // Функция для транскрипции сегментов
-        const transcribeSegment = async (segmentPath) => {
+        const transcribeSegment = async (segmentPath: string) => {
           try {
             const transcriptionResult = await transcribeWithAudioAPI(segmentPath, {
               model,
@@ -692,6 +693,126 @@ router.post('/diarize', upload.single('audio'), async (req: Request, res: Respon
     
   } catch (error) {
     log(`Ошибка в маршруте /diarize: ${error instanceof Error ? error.message : String(error)}`, 'error');
+    return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Маршрут для диаризации аудио с транскрипцией разными моделями
+ * 
+ * Этот маршрут использует упрощенную JavaScript-диаризацию и сравнивает
+ * качество транскрипции сегментов разными моделями.
+ */
+router.post('/diarize/compare', upload.single('audio'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'Файл не загружен' });
+    }
+    
+    // Проверяем параметры запроса
+    const minSpeakers = parseInt(req.body.min_speakers || '1', 10);
+    const maxSpeakers = parseInt(req.body.max_speakers || '10', 10);
+    const language = req.body.language || 'ru';
+    
+    log(`Получен запрос на сравнительную диаризацию аудио: ${req.file.path}`, 'diarization');
+    
+    if (!hasOpenAIKey()) {
+      return res.status(400).json({ 
+        error: 'API ключ OpenAI не настроен',
+        details: 'Для сравнительной транскрипции требуется ключ API OpenAI'
+      });
+    }
+    
+    try {
+      // Функция для сравнительной транскрипции сегментов разными моделями
+      const compareTranscriptionForSegment = async (segmentPath: string, options: {speakerIndex?: number} = {}) => {
+        try {
+          const speakerIndex = options.speakerIndex || 0;
+          
+          // Список моделей
+          const models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
+          
+          // Результаты по каждой модели
+          const results: { [key: string]: any } = {};
+          
+          // Транскрибируем сегмент каждой моделью
+          for (const model of models) {
+            try {
+              // Оптимизируем файл для конкретной модели
+              const optimizedPath = await optimizeAudio(segmentPath, {
+                targetModel: model,
+                highQuality: model === 'gpt-4o-transcribe'
+              });
+              
+              // Формируем промпт для транскрипции
+              let prompt = '';
+              if (language === 'ru') {
+                prompt = `Расшифруй точно текст этого фрагмента на русском языке. Это речь говорящего ${speakerIndex}.`;
+              } else {
+                prompt = `Transcribe this audio segment accurately in ${language}. This is speech from speaker ${speakerIndex}.`;
+              }
+              
+              // Транскрибируем
+              const result = await transcribeWithAudioAPI(optimizedPath, {
+                model,
+                language,
+                prompt,
+                skipOptimization: true // Уже оптимизировали выше
+              });
+              
+              results[model] = result;
+            } catch (error) {
+              log(`Ошибка при транскрипции сегмента моделью ${model}: ${error instanceof Error ? error.message : String(error)}`, 'error');
+              results[model] = { 
+                error: error instanceof Error ? error.message : String(error),
+                text: ''
+              };
+            }
+          }
+          
+          return results;
+        } catch (error) {
+          log(`Ошибка при сравнительной транскрипции сегмента: ${error instanceof Error ? error.message : String(error)}`, 'error');
+          return {
+            error: error instanceof Error ? error.message : String(error)
+          };
+        }
+      };
+      
+      // Выполняем диаризацию и сравнительную транскрипцию
+      const result = await simpleDiarizeAndCompareModels(
+        req.file.path,
+        { minSpeakers, maxSpeakers },
+        compareTranscriptionForSegment
+      );
+      
+      // Форматируем ответ
+      const response = {
+        ...result,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+      };
+      
+      // Удаляем временные файлы
+      try {
+        if (fs.existsSync(req.file.path)) {
+          fs.unlinkSync(req.file.path);
+        }
+      } catch (error) {
+        log(`Ошибка при удалении временного файла: ${error instanceof Error ? error.message : String(error)}`, 'warning');
+      }
+      
+      return res.json(response);
+      
+    } catch (processingError) {
+      log(`Ошибка при обработке аудио: ${processingError instanceof Error ? processingError.message : String(processingError)}`, 'error');
+      return res.status(500).json({
+        error: 'Ошибка при обработке аудио',
+        details: processingError instanceof Error ? processingError.message : String(processingError)
+      });
+    }
+  } catch (error) {
+    log(`Ошибка в маршруте /diarize/compare: ${error instanceof Error ? error.message : String(error)}`, 'error');
     return res.status(500).json({ error: 'Внутренняя ошибка сервера' });
   }
 });
