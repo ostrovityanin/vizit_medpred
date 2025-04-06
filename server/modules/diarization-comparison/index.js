@@ -10,16 +10,31 @@
  * 3. Возвращает результаты в формате, удобном для сравнения
  */
 
-const fs = require('fs');
-const path = require('path');
-const { promisify } = require('util');
-const exec = promisify(require('child_process').exec);
-const { v4: uuidv4 } = require('uuid');
-const { spawn } = require('child_process');
-const axios = require('axios');
+import fs from 'fs';
+import path from 'path';
+import { promisify } from 'util';
+import { exec as execCb, spawn } from 'child_process';
+import { v4 as uuidv4 } from 'uuid';
+import axios from 'axios';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Импортируем функции для работы с OpenAI API
-const { transcribeWithWhisper } = require('../../openai');
+// Преобразуем callback-версию exec в Promise
+const exec = promisify(execCb);
+
+// Получаем путь к текущему файлу и директории (для ESM совместимости)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Динамически импортируем функции из модуля OpenAI
+let openaiModule = null;
+
+async function getOpenAIModule() {
+  if (!openaiModule) {
+    openaiModule = await import('../../openai.compat.js');
+  }
+  return openaiModule;
+}
 
 // Пути для временных файлов
 const TEMP_DIR = path.join(process.cwd(), 'temp');
@@ -49,18 +64,23 @@ async function performDiarization(audioPath, options = {}) {
     
     console.log(`[diarization-comparison] Запуск диаризации для файла: ${audioPath}`);
     
-    // Формируем команду для диаризации
-    const pythonScript = path.join(process.cwd(), 'server', 'simple-diarization.py');
+    // Полный путь к Python скрипту (от корня проекта)
+    const pythonScript = path.resolve(process.cwd(), 'server', 'simple-diarization.py');
     const outputPath = path.join(TEMP_DIR, `diarization-${uuidv4()}.json`);
     
+    console.log(`[diarization-comparison] Проверка наличия скрипта: ${pythonScript}`);
+    if (!fs.existsSync(pythonScript)) {
+      throw new Error(`Скрипт диаризации не найден: ${pythonScript}`);
+    }
+    
     // Запускаем Python скрипт для диаризации
-    const command = `python3 ${pythonScript} --audio_file "${audioPath}" --output_file "${outputPath}" --min_speakers ${minSpeakers} --max_speakers ${maxSpeakers} --format ${outputFormat}`;
+    const command = `python3 "${pythonScript}" --audio_file "${audioPath}" --output_file "${outputPath}" --min_speakers ${minSpeakers} --max_speakers ${maxSpeakers} --format ${outputFormat}`;
     
     console.log(`[diarization-comparison] Выполнение команды: ${command}`);
     
     const { stdout, stderr } = await exec(command);
     
-    if (stderr) {
+    if (stderr && !stderr.includes("Tensorflow")) {
       console.error(`[diarization-comparison] Ошибка при выполнении диаризации: ${stderr}`);
     }
     
@@ -169,8 +189,8 @@ async function transcribeWithGPT4o(audioPath, model) {
             content: [
               { type: 'text', text: 'Пожалуйста, сделайте транскрипцию этого аудио. Это русская речь.' },
               {
-                type: 'audio',
-                audio_data: `data:audio/mp3;base64,${base64Audio}`
+                type: 'input_audio',
+                input_audio: `data:audio/mp3;base64,${base64Audio}`
               }
             ]
           }
@@ -208,10 +228,13 @@ async function transcribeSegmentWithMultipleModels(segment) {
   try {
     console.log(`[diarization-comparison] Начало транскрипции сегмента ${segment.index} (говорящий ${segment.speaker})`);
     
+    // Получаем модуль OpenAI для использования его функций
+    const openaiModule = await getOpenAIModule();
+    
     // Параллельно запускаем транскрипцию тремя разными моделями
     const [whisperResult, gpt4oMiniResult, gpt4oResult] = await Promise.allSettled([
       // 1. Whisper-1 API
-      transcribeWithWhisper(segment.path),
+      openaiModule.transcribeWithWhisper(segment.path),
       
       // 2. GPT-4o-mini Audio
       transcribeWithGPT4o(segment.path, 'gpt-4o-mini'),
@@ -313,6 +336,7 @@ async function performDiarizationAndMultiTranscription(audioPath, options = {}) 
   }
 }
 
-module.exports = {
+// Экспорт в ESM формате
+export default {
   performDiarizationAndMultiTranscription
 };

@@ -2,135 +2,227 @@
  * Маршруты для транскрипции аудио
  */
 
-const express = require('express');
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const transcriptionAPI = require('../transcription-api');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const router = express.Router();
+
+// Получаем путь к текущему файлу и директории
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Динамически импортируем модуль транскрипции
+let transcriptionModule = null;
+
+async function getTranscriptionModule() {
+  if (!transcriptionModule) {
+    transcriptionModule = await import('../../server/transcription-api.js');
+  }
+  return transcriptionModule;
+}
+
+// Настройка временной директории для загрузки файлов
+const TEMP_DIR = path.join(process.cwd(), 'temp');
+const UPLOADS_DIR = path.join(TEMP_DIR, 'uploads');
+
+// Создаем директории, если они не существуют
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
+}
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 // Настройка multer для загрузки аудиофайлов
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../temp/uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, UPLOADS_DIR);
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, uniqueSuffix + ext);
+    const uniqueFilename = `${uuidv4()}${path.extname(file.originalname)}`;
+    cb(null, uniqueFilename);
   }
 });
 
 const upload = multer({
   storage,
   limits: {
-    fileSize: 25 * 1024 * 1024, // 25MB максимальный размер файла
+    fileSize: 50 * 1024 * 1024 // 50 MB
   },
   fileFilter: (req, file, cb) => {
-    // Проверка типа файла
-    const allowedFileTypes = /wav|mp3|ogg|m4a|webm|mp4|mpga|mpeg/;
-    const extname = allowedFileTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedFileTypes.test(file.mimetype);
+    const allowedTypes = [
+      'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/x-wav', 
+      'audio/webm', 'audio/aac', 'audio/m4a', 'audio/x-m4a'
+    ];
     
-    if (extname || mimetype) {
-      return cb(null, true);
+    if (allowedTypes.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+      cb(null, true);
     } else {
-      cb(new Error('Неподдерживаемый формат аудиофайла'));
+      cb(new Error('Недопустимый формат файла. Поддерживаются только аудиофайлы.'));
     }
   }
 });
 
-// Проверка API ключа
-router.use((req, res, next) => {
-  if (!transcriptionAPI.hasOpenAIKey()) {
-    return res.status(500).json({ 
-      error: 'Ключ API OpenAI не найден. Проверьте переменную окружения OPENAI_API_KEY.'
-    });
+/**
+ * Эндпоинт для транскрипции аудиофайла с использованием стандартной модели
+ * 
+ * POST /api/transcribe
+ * 
+ * Параметры:
+ * - file: аудиофайл (multipart/form-data)
+ * - model: модель для транскрипции (опционально, по умолчанию 'whisper-1')
+ */
+router.post('/transcribe', upload.single('file'), async (req, res) => {
+  const file = req.file;
+  
+  if (!file) {
+    return res.status(400).json({ error: 'Отсутствует аудиофайл' });
   }
-  next();
-});
-
-// Маршрут для транскрипции аудио
-router.post('/transcribe', upload.single('audio'), async (req, res) => {
+  
+  let audioPath = file.path;
+  
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Аудиофайл не загружен' });
-    }
+    console.log(`[API] Запрос на транскрипцию файла: ${file.originalname}`);
     
-    console.log(`Получен запрос на транскрипцию: ${req.file.originalname}, размер: ${req.file.size} байт`);
+    // Получаем модель для транскрипции из запроса или используем значение по умолчанию
+    const model = req.body.model || 'whisper-1';
     
-    // Параметры транскрипции из запроса
-    const options = {
-      language: req.body.language || 'ru',
-      prompt: req.body.prompt || '',
-      detailed: req.body.detailed === 'true',
-      speed: req.body.speed
-    };
+    // Получаем модуль транскрипции
+    const transcriptionApi = await getTranscriptionModule();
     
     // Выполняем транскрипцию
-    const result = await transcriptionAPI.transcribeAudio(req.file.path, options);
+    const startTime = Date.now();
+    const transcriptionResult = await transcriptionApi.transcribeAudio(audioPath, { 
+      model, 
+      language: req.body.language || 'ru'
+    });
+    const processingTime = (Date.now() - startTime) / 1000;
     
-    // Удаляем исходный файл
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    // Формируем ответ
+    const response = {
+      text: transcriptionResult.text,
+      model: model,
+      processingTime: processingTime.toFixed(2),
+      language: req.body.language || 'ru',
+      originalFilename: file.originalname
+    };
+    
+    // Если есть детали транскрипции, добавляем их
+    if (transcriptionResult.segments) {
+      response.segments = transcriptionResult.segments;
     }
     
     // Возвращаем результат
-    res.json({
-      text: result.text,
-      processingTime: result.processingTime,
-      model: result.model,
-      fileSize: req.file.size,
-      fileName: req.file.originalname
-    });
-    
+    return res.status(200).json(response);
   } catch (error) {
-    console.error(`Ошибка обработки запроса транскрипции: ${error.message}`);
-    res.status(500).json({ error: 'Ошибка сервера при обработке запроса транскрипции' });
+    console.error(`[API] Ошибка при транскрипции: ${error.message}`);
+    return res.status(500).json({ error: 'Ошибка при транскрипции', details: error.message });
+  } finally {
+    // Удаляем загруженный файл
+    try {
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+        console.log(`[API] Удален временный файл: ${audioPath}`);
+      }
+    } catch (err) {
+      console.error(`[API] Ошибка при удалении файла ${audioPath}: ${err.message}`);
+    }
   }
 });
 
-// Маршрут для сравнения всех моделей транскрипции
-router.post('/transcribe/compare', upload.single('audio'), async (req, res) => {
+/**
+ * Эндпоинт для сравнительной транскрипции аудиофайла с использованием разных моделей
+ * 
+ * POST /api/transcribe/compare
+ * 
+ * Параметры:
+ * - file: аудиофайл (multipart/form-data)
+ * - language: язык аудио (опционально, по умолчанию 'ru')
+ */
+router.post('/transcribe/compare', upload.single('file'), async (req, res) => {
+  const file = req.file;
+  
+  if (!file) {
+    return res.status(400).json({ error: 'Отсутствует аудиофайл' });
+  }
+  
+  let audioPath = file.path;
+  
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Аудиофайл не загружен' });
+    console.log(`[API] Запрос на сравнительную транскрипцию файла: ${file.originalname}`);
+    
+    // Получаем язык из запроса
+    const language = req.body.language || 'ru';
+    
+    // Получаем модуль транскрипции
+    const transcriptionApi = await getTranscriptionModule();
+    
+    // Список моделей для сравнения
+    const models = [
+      'whisper-1',
+      'gpt-4o-mini-transcribe',
+      'gpt-4o-transcribe'
+    ];
+    
+    // Выполняем транскрипцию с использованием разных моделей
+    const results = {};
+    
+    for (const model of models) {
+      try {
+        const startTime = Date.now();
+        const transcriptionResult = await transcriptionApi.transcribeAudio(audioPath, { 
+          model, 
+          language
+        });
+        const processingTime = (Date.now() - startTime) / 1000;
+        
+        results[model] = {
+          text: transcriptionResult.text,
+          processingTime: processingTime.toFixed(2)
+        };
+        
+        if (transcriptionResult.segments) {
+          results[model].segments = transcriptionResult.segments;
+        }
+      } catch (modelError) {
+        console.error(`[API] Ошибка при транскрипции моделью ${model}: ${modelError.message}`);
+        results[model] = {
+          error: modelError.message,
+          status: 'failed'
+        };
+      }
     }
     
-    console.log(`Получен запрос на сравнительную транскрипцию: ${req.file.originalname}`);
-    
-    // Параметры транскрипции из запроса
-    const options = {
-      language: req.body.language || 'ru',
-      prompt: req.body.prompt || ''
+    // Формируем ответ
+    const response = {
+      language,
+      originalFilename: file.originalname,
+      fileSize: file.size,
+      results
     };
     
-    // Выполняем сравнительную транскрипцию
-    const results = await transcriptionAPI.compareTranscriptionModels(req.file.path, options);
-    
-    // Удаляем исходный файл
-    if (fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-    
-    // Добавляем информацию о файле
-    results.fileSize = req.file.size;
-    results.fileName = req.file.originalname;
-    
-    // Возвращаем результаты
-    res.json(results);
-    
+    // Возвращаем результат
+    return res.status(200).json(response);
   } catch (error) {
-    console.error(`Ошибка обработки запроса сравнения: ${error.message}`);
-    res.status(500).json({ error: 'Ошибка сервера при сравнительной транскрипции' });
+    console.error(`[API] Ошибка при сравнительной транскрипции: ${error.message}`);
+    return res.status(500).json({ error: 'Ошибка при транскрипции', details: error.message });
+  } finally {
+    // Удаляем загруженный файл
+    try {
+      if (fs.existsSync(audioPath)) {
+        fs.unlinkSync(audioPath);
+        console.log(`[API] Удален временный файл: ${audioPath}`);
+      }
+    } catch (err) {
+      console.error(`[API] Ошибка при удалении файла ${audioPath}: ${err.message}`);
+    }
   }
 });
 
-// Для ESM-совместимости мы также экспортируем маршруты как default
-module.exports = router;
-module.exports.default = router;
+export default router;

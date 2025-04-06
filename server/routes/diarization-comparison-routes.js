@@ -2,15 +2,19 @@
  * Маршруты API для модуля сравнительной диаризации и мульти-модельной транскрипции
  */
 
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { v4 as uuidv4 } from 'uuid';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 // Импортируем модуль диаризации с мульти-модельной транскрипцией
-const { performDiarizationAndMultiTranscription } = require('../modules/diarization-comparison');
+import diarizationComparison from '../modules/diarization-comparison/index.js';
+const { performDiarizationAndMultiTranscription } = diarizationComparison;
+
+const router = express.Router();
 
 // Настройка временной директории для загрузки файлов
 const TEMP_DIR = path.join(process.cwd(), 'temp');
@@ -180,4 +184,4 @@ router.post('/diarize/compare/recording/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

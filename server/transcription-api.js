@@ -1,301 +1,307 @@
 /**
- * API для транскрипции аудио с помощью различных моделей OpenAI
+ * Модуль для централизованной транскрипции аудио
  * 
- * Этот модуль предоставляет прямой доступ к функциям транскрипции
- * без необходимости запуска отдельного микросервиса.
+ * Этот модуль предоставляет унифицированный API для транскрипции аудиофайлов
+ * с использованием различных моделей OpenAI.
  */
 
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const FormData = require('form-data');
-const { promisify } = require('util');
-const { exec } = require('child_process');
-const execAsync = promisify(exec);
-const { transcribeWithModel } = require('./openai.compat');
+import fs from 'fs';
+import path from 'path';
+import axios from 'axios';
+import { v4 as uuidv4 } from 'uuid';
+import { promisify } from 'util';
+import { exec as execCb } from 'child_process';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import FormData from 'form-data';
 
-// API ключ OpenAI
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+// Получаем путь к текущему файлу и директории
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// Базовый URL API OpenAI
-const OPENAI_API_URL = 'https://api.openai.com/v1';
+// Преобразуем callback-версию exec в Promise
+const exec = promisify(execCb);
 
-/**
- * Проверка наличия API ключа OpenAI
- * @returns {boolean} Результат проверки
- */
-function hasOpenAIKey() {
-  return !!OPENAI_API_KEY;
+// Пути для временных файлов
+const TEMP_DIR = path.join(process.cwd(), 'temp');
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR, { recursive: true });
 }
 
 /**
- * Оптимизация аудиофайла для транскрипции
- * @param {string} inputPath Путь к исходному файлу
- * @returns {Promise<string>} Путь к оптимизированному файлу
+ * Подготовка аудиофайла для оптимальной транскрипции
+ * @param {string} audioPath Путь к исходному аудиофайлу
+ * @param {Object} options Опции оптимизации
+ * @returns {Promise<string>} Путь к оптимизированному аудиофайлу
  */
-async function optimizeAudio(inputPath) {
+async function prepareAudioFile(audioPath, options = {}) {
   try {
-    // Создаем папку для оптимизированных файлов если её нет
-    const optimizedDir = path.join(path.dirname(inputPath), 'optimized');
-    if (!fs.existsSync(optimizedDir)) {
-      fs.mkdirSync(optimizedDir, { recursive: true });
-    }
-
-    // Путь к оптимизированному файлу
-    const optimizedPath = path.join(
-      optimizedDir,
-      path.basename(inputPath, path.extname(inputPath)) + '.mp3'
-    );
-
-    // Проверяем существует ли файл
-    if (!fs.existsSync(inputPath)) {
-      console.error(`Исходный файл ${inputPath} не найден`);
-      return inputPath; // Возвращаем исходный путь как запасной вариант
-    }
-
-    // Параметры оптимизации:
-    // - Преобразуем в MP3 формат с битрейтом 32k 
-    // - Моно аудио (1 канал)
-    // - Частота дискретизации 16 кГц
-    const cmd = `ffmpeg -y -i "${inputPath}" -ac 1 -ar 16000 -b:a 32k "${optimizedPath}"`;
+    const {
+      convertToMp3 = true,
+      normalize = true,
+      removeSilence = false,
+      sampleRate = 16000,
+      mono = true
+    } = options;
     
-    console.log(`Оптимизируем аудио: ${cmd}`);
+    // Определяем тип исходного файла
+    const fileExt = path.extname(audioPath).toLowerCase();
+    const needsConversion = convertToMp3 && fileExt !== '.mp3';
     
-    // Выполняем конвертацию
-    await execAsync(cmd);
-    
-    // Проверяем размер оптимизированного файла
-    if (fs.existsSync(optimizedPath)) {
-      const stats = fs.statSync(optimizedPath);
-      if (stats.size > 0) {
-        console.log(`Аудио успешно оптимизировано: ${optimizedPath} (${Math.round(stats.size / 1024)} KB)`);
-        return optimizedPath;
-      } else {
-        console.error(`Оптимизированный файл имеет нулевой размер: ${optimizedPath}`);
-      }
-    } else {
-      console.error(`Оптимизированный файл не был создан: ${optimizedPath}`);
+    // Если не требуется конвертация или нормализация, возвращаем исходный файл
+    if (!needsConversion && !normalize && !removeSilence) {
+      return audioPath;
     }
     
-    // Если что-то пошло не так, возвращаем исходный путь
-    return inputPath;
+    // Генерируем имя для оптимизированного файла
+    const optimizedFilename = `optimized_${uuidv4()}.mp3`;
+    const optimizedPath = path.join(TEMP_DIR, optimizedFilename);
+    
+    // Формируем команду FFmpeg
+    let ffmpegCommand = `ffmpeg -i "${audioPath}"`;
+    
+    // Добавляем параметры оптимизации
+    if (mono) {
+      ffmpegCommand += ' -ac 1';
+    }
+    
+    if (sampleRate) {
+      ffmpegCommand += ` -ar ${sampleRate}`;
+    }
+    
+    // Нормализация аудио
+    if (normalize) {
+      ffmpegCommand += ' -filter:a loudnorm';
+    }
+    
+    // Удаление тишины
+    if (removeSilence) {
+      ffmpegCommand += ' -af silenceremove=stop_periods=-1:stop_threshold=-50dB';
+    }
+    
+    // Настройки кодирования MP3
+    ffmpegCommand += ' -c:a libmp3lame -b:a 32k';
+    
+    // Путь для вывода
+    ffmpegCommand += ` "${optimizedPath}" -y`;
+    
+    console.log(`[transcription-api] Оптимизация аудио: ${ffmpegCommand}`);
+    
+    // Выполняем команду
+    await exec(ffmpegCommand);
+    
+    // Проверяем, что файл создался
+    if (!fs.existsSync(optimizedPath)) {
+      throw new Error('Не удалось оптимизировать аудиофайл');
+    }
+    
+    return optimizedPath;
   } catch (error) {
-    console.error(`Ошибка при оптимизации аудио: ${error.message}`);
-    return inputPath; // Возвращаем исходный путь в случае ошибки
+    console.error(`[transcription-api] Ошибка при подготовке аудиофайла: ${error.message}`);
+    // В случае ошибки, возвращаем исходный файл
+    return audioPath;
   }
 }
 
 /**
- * Транскрипция аудио с использованием audio/transcriptions API
- * @param {string} audioFilePath Путь к аудиофайлу
- * @param {Object} options Опции транскрипции
+ * Транскрипция аудио с использованием модели Whisper
+ * @param {string} audioPath Путь к аудиофайлу
+ * @param {Object} options Дополнительные опции
  * @returns {Promise<Object>} Результат транскрипции
  */
-async function transcribeWithAudioAPI(audioFilePath, options = {}) {
+async function transcribeWithWhisper(audioPath, options = {}) {
   try {
-    console.log(`Транскрипция файла ${audioFilePath} с моделью ${options.model || 'whisper-1'}`);
+    console.log(`[transcription-api] Транскрипция Whisper для файла: ${audioPath}`);
     
-    // Оптимизируем аудиофайл (если не указан параметр skipOptimization)
-    const fileToTranscribe = options.skipOptimization ? 
-      audioFilePath : 
-      await optimizeAudio(audioFilePath);
+    const apiKey = process.env.OPENAI_API_KEY;
     
-    // Создаем форму для отправки
-    const form = new FormData();
-    form.append('file', fs.createReadStream(fileToTranscribe));
-    form.append('model', options.model || 'whisper-1');
-    
-    // Добавляем язык, если указан (повышает точность транскрипции)
-    if (options.language) {
-      form.append('language', options.language);
+    if (!apiKey) {
+      throw new Error('Отсутствует ключ API OpenAI');
     }
     
-    // Добавляем подсказку, если указана
-    if (options.prompt) {
-      form.append('prompt', options.prompt);
+    const {
+      model = 'whisper-1',
+      language = 'ru',
+      prompt = 'Это русская речь. Транскрибируйте максимально точно.'
+    } = options;
+    
+    // Оптимизируем аудио для Whisper (WAV часто работает лучше)
+    const optimizedAudioPath = await prepareAudioFile(audioPath, {
+      convertToMp3: true,
+      normalize: true,
+      sampleRate: 16000
+    });
+    
+    // Создаем форму для запроса
+    const formData = new FormData();
+    formData.append('file', fs.createReadStream(optimizedAudioPath));
+    formData.append('model', model);
+    
+    if (language) {
+      formData.append('language', language);
     }
     
-    // Запрашиваем детализированную информацию если нужно
-    if (options.detailed) {
-      // verbose_json даёт нам дополнительную информацию, включая сегменты и их временные метки
-      form.append('response_format', 'verbose_json');
+    if (prompt) {
+      formData.append('prompt', prompt);
     }
     
-    // Добавляем формат отклика JSON если не запрошена детализация
-    if (!options.detailed) {
-      form.append('response_format', 'json');
-    }
+    // Параметры запроса
+    formData.append('response_format', 'verbose_json');
     
-    // Начало замера времени
-    const startTime = Date.now();
-    
-    // Отправляем запрос
+    // Отправляем запрос к API
     const response = await axios.post(
-      `${OPENAI_API_URL}/audio/transcriptions`,
-      form,
+      'https://api.openai.com/v1/audio/transcriptions',
+      formData,
       {
         headers: {
-          ...form.getHeaders(),
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'Authorization': `Bearer ${apiKey}`,
+          ...formData.getHeaders()
+        },
+        maxBodyLength: Infinity
+      }
+    );
+    
+    // Удаляем оптимизированный файл, если это не исходный файл
+    if (optimizedAudioPath !== audioPath && fs.existsSync(optimizedAudioPath)) {
+      fs.unlinkSync(optimizedAudioPath);
+    }
+    
+    // Возвращаем текст и сегменты
+    return {
+      text: response.data.text,
+      segments: response.data.segments,
+      language: response.data.language,
+      model: model
+    };
+  } catch (error) {
+    console.error(`[transcription-api] Ошибка при транскрипции с Whisper: ${error.message}`);
+    if (error.response) {
+      console.error(`[transcription-api] Детали ошибки API: ${JSON.stringify(error.response.data)}`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Транскрипция аудио с использованием GPT-4o Audio Preview
+ * @param {string} audioPath Путь к аудиофайлу
+ * @param {Object} options Дополнительные опции
+ * @returns {Promise<Object>} Результат транскрипции
+ */
+async function transcribeWithGPT4o(audioPath, options = {}) {
+  try {
+    const {
+      model = 'gpt-4o',
+      language = 'ru',
+      prompt = 'Пожалуйста, сделайте транскрипцию этого аудио. Это русская речь.'
+    } = options;
+    
+    console.log(`[transcription-api] Транскрипция с моделью ${model} для файла: ${audioPath}`);
+    
+    const apiKey = process.env.OPENAI_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('Отсутствует ключ API OpenAI');
+    }
+    
+    // Определяем модель
+    const apiModel = model.includes('mini') ? 'gpt-4o-mini' : 'gpt-4o';
+    
+    // Оптимизируем аудио для GPT-4o
+    const optimizedAudioPath = await prepareAudioFile(audioPath, {
+      convertToMp3: true,
+      normalize: true
+    });
+    
+    // Чтение файла и кодирование в base64
+    const audioData = fs.readFileSync(optimizedAudioPath);
+    const base64Audio = audioData.toString('base64');
+    
+    // Запрос к API
+    const response = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model: apiModel,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
+              {
+                type: 'input_audio',
+                input_audio: `data:audio/mp3;base64,${base64Audio}`
+              }
+            ]
+          }
+        ],
+        temperature: 0,
+        max_tokens: 4096
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
         }
       }
     );
     
-    // Конец замера времени
-    const endTime = Date.now();
-    const processingTime = (endTime - startTime) / 1000; // в секундах
+    // Удаляем оптимизированный файл, если это не исходный файл
+    if (optimizedAudioPath !== audioPath && fs.existsSync(optimizedAudioPath)) {
+      fs.unlinkSync(optimizedAudioPath);
+    }
     
-    // Результат
-    const result = {
-      text: response.data.text,
-      model: options.model || 'whisper-1',
-      processingTime
+    // Получаем текст
+    const transcription = response.data.choices[0].message.content;
+    
+    return {
+      text: transcription,
+      model: apiModel
     };
-    
-    // Если запрошена детализированная информация, добавляем её
-    if (options.detailed && response.data.segments) {
-      result.segments = response.data.segments;
-    }
-    
-    return result;
   } catch (error) {
-    console.error('Ошибка при транскрипции аудио:', error.message);
+    console.error(`[transcription-api] Ошибка при транскрипции с GPT-4o: ${error.message}`);
     if (error.response) {
-      console.error('Ответ API:', error.response.data);
+      console.error(`[transcription-api] Детали ошибки API: ${JSON.stringify(error.response.data)}`);
     }
     throw error;
   }
 }
 
 /**
- * Сравнительная транскрипция аудио с использованием всех доступных моделей
- * @param {string} audioFilePath Путь к аудиофайлу
- * @param {Object} options Опции транскрипции
- * @returns {Promise<Object>} Результаты транскрипции от всех моделей
- */
-async function compareTranscriptionModels(audioFilePath, options = {}) {
-  try {
-    // Оптимизируем аудиофайл один раз для всех моделей
-    const optimizedPath = await optimizeAudio(audioFilePath);
-    
-    console.log(`Сравнительная транскрипция файла ${optimizedPath} с использованием всех моделей`);
-    
-    // Список моделей для сравнения
-    const models = [
-      'whisper-1',              // Базовая модель
-      'gpt-4o-mini-transcribe', // Быстрая модель
-      'gpt-4o-transcribe'       // Высокоточная модель
-    ];
-    
-    // Собираем результаты от всех моделей
-    const results = {};
-    
-    // Параллельно запускаем транскрипцию с разными моделями
-    const transcriptionPromises = models.map(model => {
-      return transcribeAudio(optimizedPath, {
-        ...options,
-        model,
-        skipOptimization: true // Файл уже оптимизирован
-      })
-      .then(result => {
-        results[model] = result;
-      })
-      .catch(error => {
-        console.error(`Ошибка при транскрипции с моделью ${model}:`, error.message);
-        results[model] = { error: error.message };
-      });
-    });
-    
-    // Ждем завершения всех запросов
-    await Promise.all(transcriptionPromises);
-    
-    return results;
-  } catch (error) {
-    console.error('Ошибка при сравнительной транскрипции:', error.message);
-    throw error;
-  }
-}
-
-/**
- * Выполняет транскрипцию аудиофайла с автоматическим выбором лучшей модели
- * @param {string} audioFilePath Путь к аудиофайлу
- * @param {Object} options Опции транскрипции
+ * Основная функция для транскрипции аудио с выбором модели
+ * @param {string} audioPath Путь к аудиофайлу
+ * @param {Object} options Дополнительные опции
  * @returns {Promise<Object>} Результат транскрипции
  */
-async function transcribeAudio(audioFilePath, options = {}) {
+export async function transcribeAudio(audioPath, options = {}) {
+  const { model = 'whisper-1' } = options;
+  
+  console.log(`[transcription-api] Запрос на транскрипцию с моделью ${model}`);
+  
   try {
-    // Выбор модели на основе предпочтений пользователя
-    let model = 'whisper-1'; // Модель по умолчанию
+    if (!fs.existsSync(audioPath)) {
+      throw new Error(`Файл не найден: ${audioPath}`);
+    }
     
-    // Если указан параметр speed, выбираем модель в зависимости от него
-    if (options.speed) {
-      if (options.speed === 'fast') {
-        model = 'gpt-4o-mini-transcribe'; // Быстрая модель
-      } else if (options.speed === 'accurate') {
-        model = 'gpt-4o-transcribe'; // Точная модель
+    // Выбираем нужную функцию в зависимости от модели
+    if (model === 'whisper-1') {
+      return await transcribeWithWhisper(audioPath, options);
+    } else if (model.includes('gpt-4o')) {
+      if (model === 'gpt-4o-mini-transcribe') {
+        return await transcribeWithGPT4o(audioPath, { ...options, model: 'gpt-4o-mini' });
+      } else {
+        return await transcribeWithGPT4o(audioPath, options);
       }
     } else {
-      // Если скорость не указана, выбираем по умолчанию gpt-4o-mini-transcribe
-      // как хороший баланс между скоростью и точностью
-      model = 'gpt-4o-mini-transcribe';
+      throw new Error(`Неподдерживаемая модель: ${model}`);
     }
-    
-    console.log(`Автоматический выбор модели: ${model} для транскрипции файла ${audioFilePath}`);
-    
-    // Начало замера времени
-    const startTime = Date.now();
-    
-    // Используем универсальную функцию транскрипции из модуля openai
-    const transcriptionText = await transcribeWithModel(audioFilePath, model, {
-      language: options.language || 'ru',
-      prompt: options.prompt || ''
-    });
-    
-    // Конец замера времени
-    const endTime = Date.now();
-    const processingTime = (endTime - startTime) / 1000; // в секундах
-    
-    // Формируем результат в формате, совместимом с предыдущей версией API
-    return {
-      text: transcriptionText,
-      model,
-      processingTime
-    };
   } catch (error) {
-    console.error('Ошибка при транскрипции:', error.message);
-    
-    // Если ошибка связана с моделью (например, модель не существует),
-    // пробуем с базовой моделью whisper-1
-    if (error.response && error.response.status === 404) {
-      console.log('Пробуем с базовой моделью whisper-1');
-      try {
-        const startTime = Date.now();
-        const transcriptionText = await transcribeWithModel(audioFilePath, 'whisper-1', {
-          language: options.language || 'ru',
-          prompt: options.prompt || ''
-        });
-        const endTime = Date.now();
-        const processingTime = (endTime - startTime) / 1000;
-        
-        return {
-          text: transcriptionText,
-          model: 'whisper-1',
-          processingTime
-        };
-      } catch (fallbackError) {
-        console.error('Ошибка при транскрипции с запасной моделью:', fallbackError.message);
-        throw fallbackError;
-      }
-    }
-    
+    console.error(`[transcription-api] Ошибка при транскрипции: ${error.message}`);
     throw error;
   }
 }
 
-module.exports = {
-  hasOpenAIKey,
-  optimizeAudio,
-  transcribeWithAudioAPI,
-  compareTranscriptionModels,
-  transcribeAudio
+export {
+  transcribeWithWhisper,
+  transcribeWithGPT4o,
+  prepareAudioFile
 };
