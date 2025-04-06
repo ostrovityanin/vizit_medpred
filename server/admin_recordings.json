@@ -1021,7 +1021,35 @@
       "status": "completed",
       "id": 73,
       "sent": false
+    },
+    {
+      "filename": "98636f4d-2a12-4aa7-9d32-0c339d4e42e0.wav",
+      "duration": 0,
+      "timestamp": "2025-04-06T17:56:06.840Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 74,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий 1: Меньше, но происходит отбой в линейных армитажах. Дороги в линейных армитажах продолжают расти.\n\nГоворящий 2: Так, подождите, а какая же инфляция нормальная? Вот кто это придумал? Инфляция должна быть низкая.",
+      "transcriptionCost": "0.0222",
+      "tokensProcessed": 1344
+    },
+    {
+      "filename": "9c8fff11-cd30-4ce7-b5e4-7ee8ce2fb09e.wav",
+      "duration": 12,
+      "timestamp": "2025-04-06T17:56:27.767Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 430158,
+      "transcription": "Говорящий 1: Меньше, но произрастает более лимитерный, и все это продолжает расти.  \nГоворящий 2: Так, подождите, а какая же инфляция нормальная?  \nГоворящий 1: Кто это придумал? Инфляция должна быть низкая.",
+      "transcriptionCost": "0.0222",
+      "tokensProcessed": 1344,
+      "status": "completed",
+      "id": 75,
+      "sent": false
     }
   ],
-  "currentId": 74
+  "currentId": 76
 }

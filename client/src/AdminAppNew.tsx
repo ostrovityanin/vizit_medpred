@@ -366,8 +366,10 @@ const RecordingsList: React.FC = () => {
     return <div className="flex justify-center p-6 text-destructive">Ошибка при загрузке записей</div>;
   }
   
-  const recordings: Recording[] = data?.recordings || [];
-  const totalRecordings = data?.total || 0;
+  // Проверяем формат ответа - если это массив, используем его напрямую
+  // иначе ищем свойство recordings
+  const recordings: Recording[] = Array.isArray(data) ? data : data?.recordings || [];
+  const totalRecordings = Array.isArray(data) ? recordings.length : data?.total || recordings.length;
   const totalPages = Math.ceil(totalRecordings / pageSize);
   
   return (
