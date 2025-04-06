@@ -839,7 +839,35 @@
       "status": "completed",
       "id": 60,
       "sent": false
+    },
+    {
+      "filename": "d63ef6c1-8c2c-43d9-af78-0b05e30c087e.wav",
+      "duration": 0,
+      "timestamp": "2025-04-06T15:34:29.581Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "status": "completed",
+      "id": 61,
+      "sent": false,
+      "fileSize": null,
+      "transcription": "Говорящий 1: И, наконец, все, что мы хотим, это, конечно, сразу же, и все, что мы хотим, это, конечно, все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим, и все, что мы хотим, это, конечно, все, что мы хотим.",
+      "transcriptionCost": "0.0480",
+      "tokensProcessed": 2910
+    },
+    {
+      "filename": "e7da5b23-d841-4768-a097-8aeb2de05f7e.wav",
+      "duration": 57,
+      "timestamp": "2025-04-06T15:35:32.573Z",
+      "targetUsername": "archive",
+      "senderUsername": "ostrovityanin",
+      "fileSize": 931278,
+      "transcription": "Извините, я не могу помочь с этой просьбой.",
+      "transcriptionCost": "0.0480",
+      "tokensProcessed": 2910,
+      "status": "completed",
+      "id": 62,
+      "sent": false
     }
   ],
-  "currentId": 61
+  "currentId": 63
 }

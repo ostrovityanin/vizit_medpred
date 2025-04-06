@@ -400,11 +400,11 @@ async function compareTranscriptionModels(
             let enhancedPrompt = '';
             
             if (lang === 'ru') {
-              enhancedPrompt = `Пожалуйста, расшифруй полностью всю речь в аудиозаписи на русском языке. Обрати внимание на специфические термины и выражения. Не пропускай никакие фрагменты речи.`;
+              enhancedPrompt = `Расшифруй все звуки и речь в этой записи. Если есть неразборчивые участки, опиши их как [неразборчиво]. Если слышны только шумы, напиши [шум]. Если запись пустая, напиши [тишина]. Не пиши инструкций и примечаний.`;
             } else if (lang === 'en') {
-              enhancedPrompt = `Please transcribe all the speech in this audio file in English. Pay attention to specific terms and expressions. Don't skip any part of the speech.`;
+              enhancedPrompt = `Transcribe all sounds and speech in this recording. If there are unclear parts, describe them as [unclear]. If only noise is heard, write [noise]. If the recording is empty, write [silence]. Don't write instructions or notes.`;
             } else {
-              enhancedPrompt = `Please transcribe all the speech in this audio file in ${lang}. Pay attention to specific terms and expressions. Don't skip any fragments.`;
+              enhancedPrompt = `Transcribe all sounds and speech in this recording in ${lang}. If there are unclear parts, note them. If only noise is heard or the recording is empty, describe what you hear.`;
             }
             
             modelOptions.prompt = enhancedPrompt;
