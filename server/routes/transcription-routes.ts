@@ -282,18 +282,18 @@ async function transcribeWithAudioAPI(
       const lang = options.language || 'ru';
       
       if (model.includes('gpt-4o')) {
-        // Для моделей GPT-4o особый промпт с обработкой края случаев
+        // Для моделей GPT-4o особый промпт с акцентом на точное распознавание речи
         if (lang === 'ru') {
-          enhancedPrompt = `Расшифруй все звуки в этой записи на русском языке. Даже если слышишь только шумы или тишину, опиши их (например, [тихий шум] или [тишина]). Если слышишь речь но не можешь разобрать слова, напиши [неразборчивая речь]. Не оставляй текст пустым. Не пиши, что не слышишь речи.`;
+          enhancedPrompt = `Транскрибируй все слова и звуки, которые ты слышишь в этой записи. Расшифруй максимально точно все слова на русском языке. Если слышны только шумы или тишина, просто напиши [тишина].`;
         } else {
-          enhancedPrompt = `Transcribe all sounds in this recording in ${lang}. Even if you only hear noise or silence, describe it (e.g., [quiet noise] or [silence]). If you hear speech but can't make out the words, write [unintelligible speech]. Don't leave the text empty. Don't write that you can't hear any speech.`;
+          enhancedPrompt = `Transcribe all words and sounds you hear in this recording in ${lang}. If you hear speech, transcribe it accurately. If you only hear background noise or silence, simply write [silence].`;
         }
       } else {
-        // Для Whisper используем специфический короткий промпт, который лучше работает с тишиной
+        // Для Whisper используем специфический короткий промпт, который работает лучше
         if (lang === 'ru') {
-          enhancedPrompt = `[Тишина]`;
+          enhancedPrompt = `Распознай речь на русском языке`;
         } else {
-          enhancedPrompt = `[Silence]`;
+          enhancedPrompt = `Transcribe speech in ${lang}`;
         }
       }
     }
@@ -437,11 +437,11 @@ async function compareTranscriptionModels(
             let enhancedPrompt = '';
             
             if (lang === 'ru') {
-              enhancedPrompt = `Расшифруй все звуки и речь в этой записи. Если есть неразборчивые участки, опиши их как [неразборчиво]. Если слышны только шумы, напиши [шум]. Если запись пустая, напиши [тишина]. Не пиши инструкций и примечаний.`;
+              enhancedPrompt = `Транскрибируй все слова и звуки, которые ты слышишь в этой записи. Расшифруй максимально точно все слова на русском языке. Если слышны только шумы или тишина, просто напиши [тишина].`;
             } else if (lang === 'en') {
-              enhancedPrompt = `Transcribe all sounds and speech in this recording. If there are unclear parts, describe them as [unclear]. If only noise is heard, write [noise]. If the recording is empty, write [silence]. Don't write instructions or notes.`;
+              enhancedPrompt = `Transcribe all words and sounds that you hear in this recording. Transcribe the words in English accurately. If you only hear background noise or silence, simply write [silence].`;
             } else {
-              enhancedPrompt = `Transcribe all sounds and speech in this recording in ${lang}. If there are unclear parts, note them. If only noise is heard or the recording is empty, describe what you hear.`;
+              enhancedPrompt = `Transcribe all speech in this recording in ${lang} accurately. If there is no speech, just write [silence].`;
             }
             
             modelOptions.prompt = enhancedPrompt;
