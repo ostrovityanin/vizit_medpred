@@ -37,7 +37,7 @@ export const recordingFragments = pgTable("recording_fragments", {
   timestamp: integer("timestamp").notNull(), // Временная метка создания фрагмента
   sessionId: text("session_id").notNull(),  // ID сессии записи
   size: integer("size").notNull(),       // Размер фрагмента в байтах
-  processed: boolean("processed").notNull().default(false), // Был ли фрагмент уже обработан
+  isProcessed: boolean("is_processed").notNull().default(false), // Был ли фрагмент уже обработан
 });
 
 // Схемы для вставки записей
@@ -61,15 +61,7 @@ export const insertUserRecordingSchema = createInsertSchema(userRecordings).pick
   timestamp: true,
 });
 
-export const insertRecordingFragmentSchema = createInsertSchema(recordingFragments).pick({
-  recordingId: true,
-  filename: true,
-  index: true,
-  timestamp: true,
-  sessionId: true,
-  size: true,
-  processed: true,
-});
+export const insertRecordingFragmentSchema = createInsertSchema(recordingFragments);
 
 // Типы для использования в приложении
 export type InsertAdminRecording = z.infer<typeof insertAdminRecordingSchema>;

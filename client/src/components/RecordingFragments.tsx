@@ -28,7 +28,7 @@ export default function RecordingFragments({ recordingId }: RecordingFragmentsPr
   const fetchFragments = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/recording-fragments/${recordingId}`);
+      const response = await fetch(`/api/admin/recordings/${recordingId}/player-fragments`);
       
       if (!response.ok) {
         throw new Error('Не удалось получить фрагменты записи');
@@ -66,9 +66,9 @@ export default function RecordingFragments({ recordingId }: RecordingFragmentsPr
   };
 
   // Скачать фрагмент
-  const downloadFragment = (filename: string) => {
+  const downloadFragment = (fragmentId: number) => {
     // Путь к фрагменту
-    window.open(`/server/fragments/${filename}`, '_blank');
+    window.open(`/api/admin/fragments/${fragmentId}/download`, '_blank');
   };
 
   return (
@@ -143,7 +143,7 @@ export default function RecordingFragments({ recordingId }: RecordingFragmentsPr
                     </td>
                     <td className="px-4 py-2 text-right">
                       <Button
-                        onClick={() => downloadFragment(fragment.filename)}
+                        onClick={() => downloadFragment(fragment.id)}
                         variant="ghost"
                         size="sm"
                         title="Скачать фрагмент"

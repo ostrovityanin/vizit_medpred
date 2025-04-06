@@ -214,4 +214,126 @@ router.delete('/admin/recordings/:id', async (req, res) => {
   }
 });
 
+/**
+ * Получение фрагментов записи
+ * GET /api/admin/recordings/:id/player-fragments
+ */
+router.get('/admin/recordings/:id/player-fragments', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Некорректный ID записи' });
+    }
+    
+    // Получаем запись из хранилища
+    const recording = await req.app.locals.storage.getAdminRecordingById(id);
+    
+    if (!recording) {
+      return res.status(404).json({ error: 'Запись не найдена' });
+    }
+    
+    // Получаем все фрагменты для данной записи, если они есть в хранилище
+    const fragments = await req.app.locals.storage.getRecordingFragments(id) || [];
+    
+    // Фрагменты уже отсортированы по индексу в методе хранилища
+    const sortedFragments = fragments;
+    
+    res.json(sortedFragments);
+  } catch (error) {
+    console.error(`[Admin API] Ошибка при получении фрагментов: ${error.message}`);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Скачивание аудио файла
+ * GET /api/recordings/:id/download
+ */
+router.get('/recordings/:id/download', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Некорректный ID записи' });
+    }
+    
+    // Получаем запись из хранилища
+    const recording = await req.app.locals.storage.getAdminRecordingById(id);
+    
+    if (!recording || !recording.filename) {
+      return res.status(404).json({ error: 'Запись не найдена или не содержит файла' });
+    }
+    
+    // Строим путь к файлу
+    const filePath = path.join(process.cwd(), 'data', 'recordings', recording.filename);
+    
+    // Проверяем, существует ли файл
+    if (!fs.existsSync(filePath)) {
+      console.error(`[Admin API] Файл не найден: ${filePath}`);
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+    
+    // Отправляем файл
+    res.download(filePath, recording.filename, (err) => {
+      if (err) {
+        console.error(`[Admin API] Ошибка отправки файла: ${err.message}`);
+        
+        // Если заголовки уже отправлены, не можем отправить статус ошибки
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Ошибка при скачивании файла' });
+        }
+      }
+    });
+  } catch (error) {
+    console.error(`[Admin API] Ошибка при скачивании записи: ${error.message}`);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
+/**
+ * Скачивание фрагмента записи
+ * GET /api/admin/fragments/:id/download
+ */
+router.get('/admin/fragments/:id/download', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Некорректный ID фрагмента' });
+    }
+    
+    // Получаем фрагмент из хранилища
+    const fragment = await req.app.locals.storage.getFragmentById(id);
+    
+    if (!fragment || !fragment.filename) {
+      return res.status(404).json({ error: 'Фрагмент не найден или не содержит файла' });
+    }
+    
+    // Строим путь к файлу
+    const filePath = path.join(process.cwd(), 'data', 'fragments', fragment.filename);
+    
+    // Проверяем, существует ли файл
+    if (!fs.existsSync(filePath)) {
+      console.error(`[Admin API] Файл фрагмента не найден: ${filePath}`);
+      return res.status(404).json({ error: 'Файл фрагмента не найден' });
+    }
+    
+    // Отправляем файл
+    res.download(filePath, fragment.filename, (err) => {
+      if (err) {
+        console.error(`[Admin API] Ошибка отправки файла фрагмента: ${err.message}`);
+        
+        // Если заголовки уже отправлены, не можем отправить статус ошибки
+        if (!res.headersSent) {
+          res.status(500).json({ error: 'Ошибка при скачивании файла фрагмента' });
+        }
+      }
+    });
+  } catch (error) {
+    console.error(`[Admin API] Ошибка при скачивании фрагмента: ${error.message}`);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
+  }
+});
+
 export default router;

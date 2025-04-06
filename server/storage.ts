@@ -26,6 +26,7 @@ export interface IStorage {
   getRecordingFragments(recordingId: number): Promise<RecordingFragment[]>;
   getFragmentsBySessionId(sessionId: string): Promise<RecordingFragment[]>;
   markFragmentAsProcessed(id: number): Promise<RecordingFragment | undefined>;
+  getFragmentById(id: number): Promise<RecordingFragment | undefined>;
   
   // Поддержка обратной совместимости
   createRecording(recording: InsertAdminRecording): Promise<AdminRecording>;
@@ -311,7 +312,7 @@ export class MemStorage implements IStorage {
     const fragment: RecordingFragment = {
       ...insertFragment,
       id,
-      processed: insertFragment.processed || false
+      isProcessed: insertFragment.isProcessed || false
     };
     this.recordingFragments.set(id, fragment);
     this.saveFragmentsToFile();
@@ -333,12 +334,16 @@ export class MemStorage implements IStorage {
   async markFragmentAsProcessed(id: number): Promise<RecordingFragment | undefined> {
     const fragment = this.recordingFragments.get(id);
     if (fragment) {
-      const updatedFragment = { ...fragment, processed: true };
+      const updatedFragment = { ...fragment, isProcessed: true };
       this.recordingFragments.set(id, updatedFragment);
       this.saveFragmentsToFile();
       return updatedFragment;
     }
     return undefined;
+  }
+  
+  async getFragmentById(id: number): Promise<RecordingFragment | undefined> {
+    return this.recordingFragments.get(id);
   }
   
   // === Методы для обратной совместимости ===
