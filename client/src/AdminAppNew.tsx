@@ -368,7 +368,15 @@ const RecordingsList: React.FC = () => {
   
   // Проверяем формат ответа - если это массив, используем его напрямую
   // иначе ищем свойство recordings
-  const recordings: Recording[] = Array.isArray(data) ? data : data?.recordings || [];
+  let recordings: Recording[] = Array.isArray(data) ? data : data?.recordings || [];
+  
+  // Сортируем записи по timestamp в обратном порядке (новые сверху)
+  recordings = [...recordings].sort((a, b) => {
+    const dateA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const dateB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return dateB - dateA; // Обратный порядок - новые сверху
+  });
+  
   const totalRecordings = Array.isArray(data) ? recordings.length : data?.total || recordings.length;
   const totalPages = Math.ceil(totalRecordings / pageSize);
   
