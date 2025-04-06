@@ -13,6 +13,10 @@ import apiFilesRouter from '../api-files.js';
 import { storage } from '../storage.js';
 import { log } from '../vite.js';
 
+// Импортируем новые маршруты для сравнительной диаризации
+// Используем require вместо import из-за совместимости с форматами
+const diarizationComparisonRoutes = require('./diarization-comparison-routes');
+
 const router = express.Router();
 
 // Маршруты для админ-панели
@@ -29,6 +33,9 @@ router.use('/docs', apiDocsRouter);
 
 // Маршруты для доступа к файлам
 router.use('/files', apiFilesRouter);
+
+// Маршруты для сравнительной диаризации и мульти-модельной транскрипции
+router.use('', diarizationComparisonRoutes);
 
 // Маршруты для пользовательских записей
 router.get('/user-recordings/:username', async (req, res) => {

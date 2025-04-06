@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -72,6 +73,25 @@ interface AudioPlayerState {
   muted: boolean;
   currentRecordingId: number | null;
   currentFragmentId: number | null;
+}
+
+interface DiarizationSegment {
+  speaker: string;
+  start: number;
+  end: number;
+  text: string;
+  whisperText?: string;
+  gpt4oMiniText?: string;
+  gpt4oText?: string;
+}
+
+interface ComparativeTranscription {
+  segments: DiarizationSegment[];
+  whisper?: string;
+  gpt4oMini?: string;
+  gpt4o?: string;
+  originalAudio?: string;
+  processingTime?: number;
 }
 
 // Компонент аудиоплеера
@@ -517,6 +537,8 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('info');
   const [playingFragmentId, setPlayingFragmentId] = useState<number | null>(null);
+  const [comparativeData, setComparativeData] = useState<ComparativeTranscription | null>(null);
+  const [comparativeLoading, setComparativeLoading] = useState(false);
   
   const {
     data: recording,
@@ -586,6 +608,36 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
     setPlayingFragmentId(fragmentId);
   };
   
+  // Загрузка сравнительных данных диаризации
+  const loadComparativeData = async () => {
+    try {
+      setComparativeLoading(true);
+      const response = await fetch(`/api/diarize/compare/recording/${id}`);
+      
+      if (!response.ok) {
+        throw new Error('Ошибка при загрузке сравнительных данных диаризации');
+      }
+      
+      const data = await response.json();
+      setComparativeData(data);
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: error instanceof Error ? error.message : 'Не удалось загрузить сравнительные данные диаризации',
+        variant: 'destructive'
+      });
+    } finally {
+      setComparativeLoading(false);
+    }
+  };
+  
+  // Загружаем сравнительные данные при монтировании компонента
+  useEffect(() => {
+    if (recording && activeTab === 'transcription') {
+      loadComparativeData();
+    }
+  }, [recording, activeTab]);
+  
   const getStatusColor = (status?: string) => {
     switch (status) {
       case 'completed':
@@ -597,6 +649,13 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
       default:
         return 'text-gray-500';
     }
+  };
+  
+  // Форматирование времени для отображения временных меток
+  const formatTime = (timeInSeconds: number) => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
   
   if (isLoading) {
@@ -916,11 +975,11 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
         <TabsContent value="transcription" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Транскрипция</CardTitle>
+              <CardTitle>Обычная транскрипция</CardTitle>
               <CardDescription>
                 {recording.transcription 
-                  ? 'Результат распознавания речи'
-                  : 'Транскрипция отсутствует'}
+                  ? 'Базовый результат распознавания речи'
+                  : 'Базовая транскрипция отсутствует'}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -939,12 +998,16 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
                 variant="outline"
                 onClick={async () => {
                   try {
-                    const response = await fetch(`/api/admin/recordings/${id}/compare`, {
+                    const response = await fetch(`/api/diarize/compare/recording/${id}`, {
                       method: 'POST',
                       headers: {
                         'Content-Type': 'application/json'
                       },
-                      body: JSON.stringify({ language: 'ru' })
+                      body: JSON.stringify({ 
+                        language: 'ru',
+                        minSpeakers: 1,
+                        maxSpeakers: 4 
+                      })
                     });
                     
                     if (!response.ok) {
@@ -957,10 +1020,10 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
                       variant: 'default'
                     });
                     
-                    // Через 5 секунд обновляем данные
+                    // Через 10 секунд обновляем данные
                     setTimeout(() => {
-                      refetch();
-                    }, 5000);
+                      loadComparativeData();
+                    }, 10000);
                   } catch (error) {
                     toast({
                       title: 'Ошибка',
@@ -973,6 +1036,122 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
                 Запустить сравнительную транскрипцию
               </Button>
             </CardFooter>
+          </Card>
+          
+          {/* Раздел сравнительной транскрипции */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Сравнительная транскрипция</CardTitle>
+              <CardDescription>
+                Сравнение результатов работы разных моделей распознавания
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {comparativeLoading ? (
+                <div className="flex justify-center items-center p-6">
+                  <div className="animate-spin mr-2">⚙️</div>
+                  <span>Загрузка сравнительных данных...</span>
+                </div>
+              ) : comparativeData && comparativeData.segments && comparativeData.segments.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-4">
+                    <div className="p-2 bg-blue-100 rounded-md text-center">
+                      <span className="text-xs font-medium">Whisper</span>
+                    </div>
+                    <div className="p-2 bg-green-100 rounded-md text-center">
+                      <span className="text-xs font-medium">GPT-4o Mini</span>
+                    </div>
+                    <div className="p-2 bg-purple-100 rounded-md text-center">
+                      <span className="text-xs font-medium">GPT-4o</span>
+                    </div>
+                  </div>
+                  
+                  {/* Полные транскрипции от разных моделей */}
+                  <Accordion type="single" collapsible className="mb-4">
+                    <AccordionItem value="full-transcriptions">
+                      <AccordionTrigger>Полные транскрипции от разных моделей</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="bg-blue-50 p-3 rounded-md">
+                            <div className="text-xs font-medium mb-1">Whisper:</div>
+                            <div className="whitespace-pre-wrap text-sm">{comparativeData.whisper || "Нет данных"}</div>
+                          </div>
+                          
+                          <div className="bg-green-50 p-3 rounded-md">
+                            <div className="text-xs font-medium mb-1">GPT-4o Mini:</div>
+                            <div className="whitespace-pre-wrap text-sm">{comparativeData.gpt4oMini || "Нет данных"}</div>
+                          </div>
+                          
+                          <div className="bg-purple-50 p-3 rounded-md">
+                            <div className="text-xs font-medium mb-1">GPT-4o:</div>
+                            <div className="whitespace-pre-wrap text-sm">{comparativeData.gpt4o || "Нет данных"}</div>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                  
+                  {/* Сегменты диаризации и результаты транскрипции разными моделями */}
+                  <ScrollArea className="h-[400px]">
+                    <div className="space-y-2">
+                      {comparativeData.segments.map((segment, index) => (
+                        <div key={index} className="border rounded-md p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="text-sm font-medium">
+                              Спикер: {segment.speaker}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatTime(segment.start)} - {formatTime(segment.end)}
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                            <div className="bg-blue-50 p-2 rounded-md">
+                              <div className="whitespace-pre-wrap text-sm">
+                                {segment.whisperText || segment.text || "Нет данных"}
+                              </div>
+                            </div>
+                            
+                            <div className="bg-green-50 p-2 rounded-md">
+                              <div className="whitespace-pre-wrap text-sm">
+                                {segment.gpt4oMiniText || "Нет данных"}
+                              </div>
+                            </div>
+                            
+                            <div className="bg-purple-50 p-2 rounded-md">
+                              <div className="whitespace-pre-wrap text-sm">
+                                {segment.gpt4oText || "Нет данных"}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                  
+                  {/* Информация о времени обработки */}
+                  {comparativeData.processingTime && (
+                    <div className="text-xs text-muted-foreground text-right mt-2">
+                      Время обработки: {(comparativeData.processingTime / 1000).toFixed(2)} сек
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 text-center text-muted-foreground bg-muted/20 rounded-md">
+                  Сравнительные данные отсутствуют.
+                  <div className="mt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={loadComparativeData}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Проверить наличие данных
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>

@@ -12,7 +12,7 @@ import { dirname } from 'path';
 import { storage } from '../../storage';
 import { fragmentManager } from '../../fragments.js';
 import { log } from '../../vite';
-import { transcribeAudio } from '../../openai';
+import { transcribeAudio } from '../../transcription-api';
 import { compareTranscriptionModels } from '../transcription';
 
 // ESM equivalent of __dirname

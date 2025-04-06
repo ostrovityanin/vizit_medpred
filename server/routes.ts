@@ -11,7 +11,8 @@ import { getClientBotInfo, getClientBotUpdates, resolveClientUsername, sendClien
 import { log } from './vite';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { transcribeAudio } from './openai';
+// Import using CommonJS require since the module is not ESM compatible
+const transcriptionAPI = require('./transcription-api');
 import { fragmentManager } from './fragments';
 import { eventLogger } from './event-logger';
 import apiDocsRouter from './api-docs';
@@ -204,7 +205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Распознаем текст из аудио и получаем стоимость
         log('Начинаем распознавание речи...', 'openai');
-        const transcriptionResult = await transcribeAudio(filePath);
+        const transcriptionResult = await transcriptionAPI.transcribeAudio(filePath);
         
         // Извлекаем данные из результата
         let transcriptionText = null;
@@ -453,7 +454,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Выполняем транскрипцию
               const wavPath = path.join(__dirname, 'uploads', wavFilename);
               if (fs.existsSync(wavPath)) {
-                const transcriptionResult = await transcribeAudio(wavPath);
+                const transcriptionResult = await transcriptionAPI.transcribeAudio(wavPath);
                 
                 if (transcriptionResult) {
                   log(`Транскрипция успешно получена при автоматическом объединении для записи ID: ${id}`, 'openai');
@@ -1379,7 +1380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           const wavPath = path.join(__dirname, 'uploads', wavFilename);
           if (fs.existsSync(wavPath)) {
-            const transcriptionResult = await transcribeAudio(wavPath);
+            const transcriptionResult = await transcriptionAPI.transcribeAudio(wavPath);
             
             if (transcriptionResult) {
               log(`Транскрипция успешно получена для записи ID: ${recordingIdNum}`, 'openai');

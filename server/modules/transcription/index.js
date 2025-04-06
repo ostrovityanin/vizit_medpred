@@ -10,7 +10,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import { log } from '../../vite';
-import { transcribeAudio, transcribeWithModel } from '../../openai';
+// Using direct import from openai.ts instead of compat module
+import { transcribeWithModel } from '../../openai';
 
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -58,17 +59,15 @@ export async function transcribe(audioFilePath, options = {}) {
     
     // Выбираем метод транскрипции
     let result;
-    if (model === 'whisper-1' || model === 'default') {
-      result = await transcribeAudio(audioFilePath, language, effectivePrompt);
-    } else {
-      result = await transcribeWithModel(audioFilePath, model, { language, prompt: effectivePrompt });
-    }
+    // Для всех моделей используем универсальный метод transcribeWithModel
+    result = await transcribeWithModel(audioFilePath, model, { language, prompt: effectivePrompt });
     
     // Рассчитываем время обработки
     const processingTime = (Date.now() - startTime) / 1000; // в секундах
     
     // Пост-обработка текста
-    let processedText = result.text || '';
+    // Результат от transcribeWithModel приходит в виде строки, а не объекта
+    let processedText = typeof result === 'string' ? result : (result.text || '');
     
     // Обработка результата для удаления повторений промпта и специальных маркеров
     processedText = cleanTranscriptionOutput(processedText, effectivePrompt);
@@ -92,8 +91,8 @@ export async function transcribe(audioFilePath, options = {}) {
       model,
       language,
       processingTime,
-      tokensProcessed: result.tokensProcessed || 0,
-      cost: result.cost || 0
+      tokensProcessed: typeof result === 'object' && result.tokensProcessed ? result.tokensProcessed : 0,
+      cost: typeof result === 'object' && result.cost ? result.cost : 0
     };
   } catch (error) {
     log(`Ошибка при транскрипции: ${error}`, 'transcription');

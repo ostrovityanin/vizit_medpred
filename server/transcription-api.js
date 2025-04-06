@@ -12,6 +12,7 @@ const FormData = require('form-data');
 const { promisify } = require('util');
 const { exec } = require('child_process');
 const execAsync = promisify(exec);
+const { transcribeWithModel } = require('./openai.compat');
 
 // API ключ OpenAI
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -191,7 +192,7 @@ async function compareTranscriptionModels(audioFilePath, options = {}) {
     
     // Параллельно запускаем транскрипцию с разными моделями
     const transcriptionPromises = models.map(model => {
-      return transcribeWithAudioAPI(optimizedPath, {
+      return transcribeAudio(optimizedPath, {
         ...options,
         model,
         skipOptimization: true // Файл уже оптимизирован
@@ -241,11 +242,25 @@ async function transcribeAudio(audioFilePath, options = {}) {
     
     console.log(`Автоматический выбор модели: ${model} для транскрипции файла ${audioFilePath}`);
     
-    // Выполняем транскрипцию с выбранной моделью
-    return await transcribeWithAudioAPI(audioFilePath, {
-      ...options,
-      model
+    // Начало замера времени
+    const startTime = Date.now();
+    
+    // Используем универсальную функцию транскрипции из модуля openai
+    const transcriptionText = await transcribeWithModel(audioFilePath, model, {
+      language: options.language || 'ru',
+      prompt: options.prompt || ''
     });
+    
+    // Конец замера времени
+    const endTime = Date.now();
+    const processingTime = (endTime - startTime) / 1000; // в секундах
+    
+    // Формируем результат в формате, совместимом с предыдущей версией API
+    return {
+      text: transcriptionText,
+      model,
+      processingTime
+    };
   } catch (error) {
     console.error('Ошибка при транскрипции:', error.message);
     
@@ -253,10 +268,24 @@ async function transcribeAudio(audioFilePath, options = {}) {
     // пробуем с базовой моделью whisper-1
     if (error.response && error.response.status === 404) {
       console.log('Пробуем с базовой моделью whisper-1');
-      return await transcribeWithAudioAPI(audioFilePath, {
-        ...options,
-        model: 'whisper-1'
-      });
+      try {
+        const startTime = Date.now();
+        const transcriptionText = await transcribeWithModel(audioFilePath, 'whisper-1', {
+          language: options.language || 'ru',
+          prompt: options.prompt || ''
+        });
+        const endTime = Date.now();
+        const processingTime = (endTime - startTime) / 1000;
+        
+        return {
+          text: transcriptionText,
+          model: 'whisper-1',
+          processingTime
+        };
+      } catch (fallbackError) {
+        console.error('Ошибка при транскрипции с запасной моделью:', fallbackError.message);
+        throw fallbackError;
+      }
     }
     
     throw error;
