@@ -27,6 +27,7 @@ export interface IStorage {
   getFragmentsBySessionId(sessionId: string): Promise<RecordingFragment[]>;
   markFragmentAsProcessed(id: number): Promise<RecordingFragment | undefined>;
   getFragmentById(id: number): Promise<RecordingFragment | undefined>;
+  updateFragment(id: number, fragment: RecordingFragment): Promise<RecordingFragment | undefined>;
   
   // Поддержка обратной совместимости
   createRecording(recording: InsertAdminRecording): Promise<AdminRecording>;
@@ -344,6 +345,15 @@ export class MemStorage implements IStorage {
   
   async getFragmentById(id: number): Promise<RecordingFragment | undefined> {
     return this.recordingFragments.get(id);
+  }
+  
+  async updateFragment(id: number, fragment: RecordingFragment): Promise<RecordingFragment | undefined> {
+    if (this.recordingFragments.has(id)) {
+      this.recordingFragments.set(id, fragment);
+      this.saveFragmentsToFile();
+      return fragment;
+    }
+    return undefined;
   }
   
   async getAllFragments(): Promise<RecordingFragment[]> {
