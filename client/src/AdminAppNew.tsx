@@ -483,16 +483,22 @@ const RecordingsList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     {recording.fileExists ? (
-                      <div className="w-36">
-                        {/* Добавляем настоящий аудиоплеер здесь */}
-                        <div className="flex flex-col gap-1">
-                          <audio 
-                            src={`/api/admin/recordings/${recording.id}/audio`} 
-                            controls 
-                            className="w-full h-10"
-                            controlsList="nodownload noplaybackrate"
-                          />
-                        </div>
+                      <div className="w-48">
+                        {/* Кнопка для воспроизведения аудио */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full flex items-center justify-center"
+                          onClick={() => {
+                            const url = `/api/admin/recordings/${recording.id}/audio`;
+                            const audio = new Audio(url);
+                            audio.play().catch(err => {
+                              console.error("Ошибка воспроизведения:", err);
+                            });
+                          }}
+                        >
+                          <Play className="h-4 w-4 mr-2" /> Воспроизвести
+                        </Button>
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">Нет аудио</div>
