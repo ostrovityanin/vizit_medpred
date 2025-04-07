@@ -1,201 +1,268 @@
 /**
- * Тест сравнительной диаризации с транскрипцией разными моделями
+ * Тестирование сравнения диаризации и транскрипции
  * 
- * Этот скрипт тестирует новый эндпоинт /api/diarize/compare, который:
- * 1. Выполняет диаризацию (определяет разных говорящих)
- * 2. Транскрибирует каждый сегмент тремя разными моделями (whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe)
- * 3. Сравнивает результаты транскрипции для каждого сегмента
+ * Этот скрипт тестирует API сервиса сравнения диаризации и транскрипции,
+ * проверяя работу всего процесса от старта сервиса до получения результатов.
  */
 
 import axios from 'axios';
-import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
-import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
+import FormData from 'form-data';
+import { exec as execCallback } from 'child_process';
+import { promisify } from 'util';
 
-// Базовый URL API
-const API_URL = 'http://localhost:5000/api';
+const exec = promisify(execCallback);
+
+// Получаем путь к текущей директории
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Конфигурация
+const API_BASE_URL = 'http://localhost:5000/api/diarization';
+const TEST_AUDIO_DIR = path.join(__dirname, 'test_audio');
+
+// Проверяем, существует ли директория для тестовых аудио
+if (!fs.existsSync(TEST_AUDIO_DIR)) {
+  console.log('Creating test audio directory...');
+  fs.mkdirSync(TEST_AUDIO_DIR, { recursive: true });
+}
 
 /**
- * Выполнение сравнительной диаризации с транскрипцией через API
- * @param {string} audioFilePath Путь к аудиофайлу
- * @param {Object} options Дополнительные опции
- * @returns {Promise<Object>} Результаты сравнительной диаризации
+ * Проверяет статус сервиса диаризации
+ * @returns {Promise<object>} Статус сервиса
  */
-async function testDiarizationCompareAPI(audioFilePath, options = {}) {
+async function checkServiceStatus() {
   try {
-    console.log(`Тестирование сравнительной диаризации для файла: ${path.basename(audioFilePath)}`);
-    
-    // Проверка существования файла
-    if (!fs.existsSync(audioFilePath)) {
-      throw new Error(`Файл не найден: ${audioFilePath}`);
-    }
-    
-    const formData = new FormData();
-    formData.append('audio', fs.createReadStream(audioFilePath));
-    
-    // Добавляем опции
-    if (options.minSpeakers) formData.append('min_speakers', options.minSpeakers);
-    if (options.maxSpeakers) formData.append('max_speakers', options.maxSpeakers);
-    if (options.language) formData.append('language', options.language);
-    
-    // Отправляем запрос
-    console.log('Отправка запроса на сравнительную диаризацию...');
-    const startTime = Date.now();
-    
-    const response = await axios.post(`${API_URL}/diarize/compare`, formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
-    
-    const endTime = Date.now();
-    const processingTime = (endTime - startTime) / 1000;
-    
-    console.log(`Запрос выполнен за ${processingTime.toFixed(2)} сек`);
-    
-    // Выводим результаты
-    if (response.data.segments && response.data.segments.length > 0) {
-      console.log(`\nНайдено ${response.data.segments.length} сегментов речи от ${response.data.num_speakers} говорящих:`);
-      
-      // Подготовка статистики по моделям
-      const modelStats = {};
-      const models = ['whisper-1', 'gpt-4o-mini-transcribe', 'gpt-4o-transcribe'];
-      
-      models.forEach(model => {
-        if (response.data.model_results && response.data.model_results[model]) {
-          const avgTime = response.data.model_results[model].avg_processing_time;
-          console.log(`\nМодель ${model}:`);
-          console.log(`Среднее время обработки: ${avgTime.toFixed(2)} сек`);
-          console.log(`Полная транскрипция:\n${response.data.model_results[model].full_text}\n`);
-        }
-      });
-      
-      // Вывод первых двух сегментов для примера
-      const sampleSegments = response.data.segments.slice(0, 2);
-      
-      console.log('\nПримеры сегментов:');
-      sampleSegments.forEach((segment, idx) => {
-        console.log(`\nСегмент ${idx + 1} (Говорящий ${segment.speaker}):`);
-        console.log(`Время: ${segment.start.toFixed(2)}с - ${segment.end.toFixed(2)}с (длительность: ${(segment.end - segment.start).toFixed(2)}с)`);
-        
-        if (segment.transcriptions) {
-          console.log('Сравнение транскрипций:');
-          
-          models.forEach(model => {
-            if (segment.transcriptions[model]) {
-              console.log(`- ${model} (${segment.transcriptions[model].processingTime.toFixed(2)}с): ${segment.transcriptions[model].text}`);
-            }
-          });
-        }
-      });
-    } else {
-      console.log('Сегменты речи не найдены или произошла ошибка при обработке.');
-    }
-    
+    console.log('Checking diarization service status...');
+    const response = await axios.get(`${API_BASE_URL}/status`);
+    console.log('Service status:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Ошибка при тестировании сравнительной диаризации:');
-    if (error.response) {
-      console.error(`Статус ошибки: ${error.response.status}`);
-      console.error('Ответ сервера:', error.response.data);
-    } else {
-      console.error(error.message);
+    console.error('Error checking service status:', error.message);
+    return { status: 'error', message: error.message };
+  }
+}
+
+/**
+ * Запускает сервис диаризации, если он еще не запущен
+ * @returns {Promise<boolean>} Успешно ли запущен сервис
+ */
+async function startServiceIfNeeded() {
+  const status = await checkServiceStatus();
+  
+  if (status.status === 'running') {
+    console.log('Service is already running.');
+    return true;
+  }
+  
+  try {
+    console.log('Starting diarization service...');
+    const response = await axios.post(`${API_BASE_URL}/start`, {
+      simplified: true
+    });
+    
+    console.log('Service start result:', response.data);
+    return response.data.status === 'success';
+  } catch (error) {
+    console.error('Error starting service:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Получает список доступных моделей транскрипции
+ * @returns {Promise<array>} Список моделей
+ */
+async function getAvailableModels() {
+  try {
+    console.log('Getting available transcription models...');
+    const response = await axios.get(`${API_BASE_URL}/models`);
+    console.log('Available models:', response.data.models);
+    return response.data.models;
+  } catch (error) {
+    console.error('Error getting models:', error.message);
+    return [];
+  }
+}
+
+/**
+ * Выполняет процесс диаризации и транскрипции для аудиофайла
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @returns {Promise<object>} Результаты обработки
+ */
+async function processAudioFile(audioFilePath) {
+  try {
+    console.log(`Processing audio file: ${audioFilePath}`);
+    
+    // Проверяем, что файл существует
+    if (!fs.existsSync(audioFilePath)) {
+      throw new Error(`File not found: ${audioFilePath}`);
     }
+    
+    // Создаем FormData для отправки файла
+    const formData = new FormData();
+    formData.append('audio_file', fs.createReadStream(audioFilePath));
+    formData.append('minSpeakers', '1');
+    formData.append('maxSpeakers', '5');
+    formData.append('models', 'whisper-1,gpt-4o-mini-transcribe');
+    formData.append('saveResults', 'true');
+    
+    // Отправляем запрос
+    console.log('Sending request to process audio...');
+    const response = await axios.post(`${API_BASE_URL}/process`, formData, {
+      headers: formData.getHeaders(),
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 60000 // 60 секунд на обработку
+    });
+    
+    console.log('Processing completed.');
+    return response.data;
+  } catch (error) {
+    console.error('Error processing audio file:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+    }
+    return { status: 'error', message: error.message };
+  }
+}
+
+/**
+ * Создает тестовый аудиофайл с синусоидой определенной частоты
+ * @param {string} outputPath Путь для сохранения файла
+ * @param {number} frequency Частота тона в Гц
+ * @param {number} duration Длительность в секундах
+ * @returns {Promise<string>} Путь к созданному файлу
+ */
+async function generateTestAudio(outputPath, frequency = 440, duration = 5) {
+  try {
+    console.log(`Generating test audio file: ${outputPath}`);
+    
+    // Создаем команду FFmpeg для генерации синусоидального тона
+    const command = `ffmpeg -y -f lavfi -i "sine=frequency=${frequency}:duration=${duration}" -ar 16000 -ac 1 -c:a libmp3lame -b:a 32k "${outputPath}"`;
+    
+    // Выполняем команду
+    await exec(command);
+    
+    console.log(`Test audio file generated: ${outputPath}`);
+    return outputPath;
+  } catch (error) {
+    console.error('Error generating test audio:', error.message);
     throw error;
   }
 }
 
 /**
- * Генерация тестового файла, если не указан путь к существующему
- * @returns {Promise<string>} Путь к тестовому файлу
+ * Создает тестовый аудиофайл с "диалогом" (чередующиеся тоны)
+ * @param {string} outputPath Путь для сохранения файла
+ * @returns {Promise<string>} Путь к созданному файлу
  */
-async function prepareTestFile() {
-  // Проверяем существующие тестовые файлы
-  const testAudioDir = './test_audio';
-  const possibleFiles = [
-    `${testAudioDir}/multi_speaker.mp3`,  // Сгенерированный файл с несколькими говорящими
-    `${testAudioDir}/sample.mp3`,         // Простой тестовый файл
-    `${testAudioDir}/test_dialog.mp3`     // Пользовательский тестовый файл
-  ];
-  
-  // Проверка существования директории
-  if (!fs.existsSync(testAudioDir)) {
-    fs.mkdirSync(testAudioDir, { recursive: true });
-  }
-  
-  // Проверяем наличие существующих файлов
-  for (const file of possibleFiles) {
-    if (fs.existsSync(file)) {
-      console.log(`Используем существующий тестовый файл: ${file}`);
-      return file;
-    }
-  }
-  
-  // Если ни один файл не найден, генерируем новый
-  console.log('Генерация нового тестового файла...');
-  
-  // Запускаем процесс генерации напрямую
+async function generateTestDialog(outputPath) {
   try {
-    // Запускаем скрипт генерации и ждем его завершения
-    await new Promise((resolve, reject) => {
-      const generateProcess = spawn('node', ['generate-test-audio-v2.js']);
-      
-      generateProcess.stdout.on('data', (data) => {
-        console.log(`Генерация: ${data.toString().trim()}`);
-      });
-      
-      generateProcess.stderr.on('data', (data) => {
-        console.error(`Ошибка генерации: ${data.toString().trim()}`);
-      });
-      
-      generateProcess.on('close', (code) => {
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(`Процесс генерации завершился с кодом: ${code}`));
-        }
-      });
-    });
+    console.log(`Generating test dialog audio: ${outputPath}`);
     
-    // После запуска проверяем, появились ли файлы
-    for (const file of possibleFiles) {
-      if (fs.existsSync(file)) {
-        console.log(`Успешно сгенерирован тестовый файл: ${file}`);
-        return file;
-      }
+    // Создаем временные файлы для каждого говорящего
+    const speaker1File = path.join(TEST_AUDIO_DIR, 'temp_speaker1.mp3');
+    const speaker2File = path.join(TEST_AUDIO_DIR, 'temp_speaker2.mp3');
+    const silenceFile = path.join(TEST_AUDIO_DIR, 'temp_silence.mp3');
+    
+    // Генерируем аудио для каждого говорящего и тишину
+    await generateTestAudio(speaker1File, 440, 2); // Ля первой октавы, 2 секунды
+    await generateTestAudio(speaker2File, 880, 1.5); // Ля второй октавы, 1.5 секунды
+    
+    // Создаем команду FFmpeg для генерации тишины
+    const silenceCommand = `ffmpeg -y -f lavfi -i "anullsrc=r=16000:cl=mono:d=1" -ar 16000 -ac 1 -c:a libmp3lame -b:a 32k "${silenceFile}"`;
+    
+    // Выполняем команду для создания тишины
+    await exec(silenceCommand);
+    
+    // Создаем список файлов для объединения
+    const fileList = path.join(TEST_AUDIO_DIR, 'file_list.txt');
+    const fileContent = `file '${speaker1File.replace(/\\/g, '/')}'
+file '${silenceFile.replace(/\\/g, '/')}'
+file '${speaker2File.replace(/\\/g, '/')}'
+file '${silenceFile.replace(/\\/g, '/')}'
+file '${speaker1File.replace(/\\/g, '/')}'
+file '${silenceFile.replace(/\\/g, '/')}'
+file '${speaker2File.replace(/\\/g, '/')}'`;
+    
+    fs.writeFileSync(fileList, fileContent);
+    
+    // Объединяем файлы
+    const concatCommand = `ffmpeg -y -f concat -safe 0 -i "${fileList}" -c copy "${outputPath}"`;
+    
+    await exec(concatCommand);
+    
+    // Удаляем временные файлы
+    try {
+      fs.unlinkSync(speaker1File);
+      fs.unlinkSync(speaker2File);
+      fs.unlinkSync(silenceFile);
+      fs.unlinkSync(fileList);
+    } catch (cleanupError) {
+      console.warn('Warning: Error cleaning up temporary files:', cleanupError.message);
     }
     
-    throw new Error('Файлы были сгенерированы, но не найдены в ожидаемых местах');
+    console.log(`Test dialog audio generated: ${outputPath}`);
+    return outputPath;
   } catch (error) {
-    console.error('Ошибка при генерации тестового файла:', error);
-    throw new Error('Невозможно сгенерировать или найти тестовый файл. Пожалуйста, укажите путь к существующему аудиофайлу.');
+    console.error('Error generating test dialog:', error.message);
+    throw error;
   }
 }
 
 /**
- * Основная функция
+ * Основная функция для запуска тестирования
  */
-async function main() {
+async function runTest() {
   try {
-    // Получаем путь к тестовому файлу из аргументов или используем тестовый
-    const testFilePath = process.argv[2] || await prepareTestFile();
+    console.log('=== Starting diarization comparison test ===');
     
-    // Тестируем сравнительную диаризацию
-    await testDiarizationCompareAPI(testFilePath, {
-      minSpeakers: 2,
-      maxSpeakers: 4,
-      language: 'ru'
-    });
+    // Запускаем сервис диаризации, если нужно
+    const serviceStarted = await startServiceIfNeeded();
+    if (!serviceStarted) {
+      console.error('Failed to start diarization service. Aborting test.');
+      return;
+    }
     
-    console.log('\nТест успешно завершен');
+    // Получаем список доступных моделей
+    await getAvailableModels();
+    
+    // Генерируем тестовый аудиофайл с диалогом
+    const testAudioPath = path.join(TEST_AUDIO_DIR, 'test_dialog.mp3');
+    await generateTestDialog(testAudioPath);
+    
+    // Обрабатываем аудиофайл
+    const result = await processAudioFile(testAudioPath);
+    
+    if (result.status === 'success') {
+      console.log('=== Test Successful ===');
+      console.log('Processing completed successfully.');
+      console.log(`Number of speakers detected: ${result.results.audioInfo.numSpeakers}`);
+      console.log(`Number of segments: ${result.results.segments.length}`);
+      
+      // Выводим информацию о моделях транскрипции
+      console.log('\nTranscription Results:');
+      
+      Object.entries(result.results.transcriptions).forEach(([model, transcription]) => {
+        console.log(`\n${model}:`);
+        console.log(`Text: ${transcription.text}`);
+        console.log(`Processing time: ${transcription.processingTime}ms`);
+      });
+    } else {
+      console.error('=== Test Failed ===');
+      console.error('Error message:', result.message);
+      if (result.error) {
+        console.error('Error details:', result.error);
+      }
+    }
   } catch (error) {
-    console.error('Ошибка при выполнении теста:', error);
-    process.exit(1);
+    console.error('=== Test Error ===');
+    console.error('Unhandled error during test:', error.message);
   }
 }
 
-// Запускаем скрипт
-main();
+// Запускаем тестирование
+runTest();

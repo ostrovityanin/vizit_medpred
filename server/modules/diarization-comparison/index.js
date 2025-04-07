@@ -1,342 +1,279 @@
 /**
- * Модуль для сравнительной диаризации и мульти-модельной транскрипции
+ * Модуль сравнения диаризации и транскрипции
  * 
- * Этот модуль выполняет следующие функции:
- * 1. Получает аудиофайл и выполняет диаризацию (разделение на говорящих)
- * 2. Для каждого сегмента делает транскрипцию с использованием трех моделей:
- *    - whisper-1 (OpenAI)
- *    - gpt-4o-mini-transcribe (OpenAI)
- *    - gpt-4o-transcribe (OpenAI)
- * 3. Возвращает результаты в формате, удобном для сравнения
+ * Этот модуль предоставляет API для:
+ * 1. Управления микросервисом диаризации
+ * 2. Сравнения результатов транскрипции от разных моделей
+ * 3. Объединения результатов диаризации и транскрипции
  */
 
-import fs from 'fs';
 import path from 'path';
-import { promisify } from 'util';
-import { exec as execCb, spawn } from 'child_process';
-import { v4 as uuidv4 } from 'uuid';
-import axios from 'axios';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import * as diarizationService from './diarization-service.js';
+import * as transcriptionApi from '../../transcription-api.js';
 
-// Преобразуем callback-версию exec в Promise
-const exec = promisify(execCb);
-
-// Получаем путь к текущему файлу и директории (для ESM совместимости)
+// Получаем путь к текущей директории (для ES модулей)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Динамически импортируем функции из модуля OpenAI
-let openaiModule = null;
+// Директории для временных файлов и результатов
+const TEMP_DIR = path.join(__dirname, '..', '..', '..', 'temp');
+const RESULTS_DIR = path.join(__dirname, '..', '..', '..', 'data', 'comparison_results');
 
-async function getOpenAIModule() {
-  if (!openaiModule) {
-    openaiModule = await import('../../openai.compat.js');
+// Создаем директории, если они не существуют
+[TEMP_DIR, RESULTS_DIR].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-  return openaiModule;
-}
-
-// Пути для временных файлов
-const TEMP_DIR = path.join(process.cwd(), 'temp');
-const SEGMENTS_DIR = path.join(TEMP_DIR, 'segments');
-
-// Убедимся, что временные директории существуют
-if (!fs.existsSync(TEMP_DIR)) {
-  fs.mkdirSync(TEMP_DIR, { recursive: true });
-}
-if (!fs.existsSync(SEGMENTS_DIR)) {
-  fs.mkdirSync(SEGMENTS_DIR, { recursive: true });
-}
+});
 
 /**
- * Функция для выполнения диаризации аудиофайла
- * @param {string} audioPath Путь к аудиофайлу
- * @param {Object} options Дополнительные опции
- * @returns {Promise<Object>} Результаты диаризации
+ * Проверяет статус сервиса диаризации
+ * @returns {Promise<object>} Информация о состоянии сервиса
  */
-async function performDiarization(audioPath, options = {}) {
-  try {
-    const {
-      minSpeakers = 1,
-      maxSpeakers = 10,
-      outputFormat = 'json'
-    } = options;
-    
-    console.log(`[diarization-comparison] Запуск диаризации для файла: ${audioPath}`);
-    
-    // Полный путь к Python скрипту (от корня проекта)
-    const pythonScript = path.resolve(process.cwd(), 'server', 'simple-diarization.py');
-    const outputPath = path.join(TEMP_DIR, `diarization-${uuidv4()}.json`);
-    
-    console.log(`[diarization-comparison] Проверка наличия скрипта: ${pythonScript}`);
-    if (!fs.existsSync(pythonScript)) {
-      throw new Error(`Скрипт диаризации не найден: ${pythonScript}`);
-    }
-    
-    // Запускаем Python скрипт для диаризации
-    const command = `python3 "${pythonScript}" --audio_file "${audioPath}" --output_file "${outputPath}" --min_speakers ${minSpeakers} --max_speakers ${maxSpeakers} --format ${outputFormat}`;
-    
-    console.log(`[diarization-comparison] Выполнение команды: ${command}`);
-    
-    const { stdout, stderr } = await exec(command);
-    
-    if (stderr && !stderr.includes("Tensorflow")) {
-      console.error(`[diarization-comparison] Ошибка при выполнении диаризации: ${stderr}`);
-    }
-    
-    console.log(`[diarization-comparison] Диаризация завершена: ${stdout}`);
-    
-    // Проверяем, создался ли файл с результатами
-    if (!fs.existsSync(outputPath)) {
-      throw new Error('Не удалось получить результаты диаризации');
-    }
-    
-    // Читаем результаты диаризации
-    const diarizationResults = JSON.parse(fs.readFileSync(outputPath, 'utf8'));
-    
-    // Удаляем временный файл
-    fs.unlinkSync(outputPath);
-    
-    return diarizationResults;
-  } catch (error) {
-    console.error(`[diarization-comparison] Ошибка при диаризации: ${error.message}`);
-    throw error;
-  }
-}
-
-/**
- * Функция для разделения аудио на сегменты по результатам диаризации
- * @param {string} audioPath Путь к аудиофайлу
- * @param {Array} segments Сегменты диаризации
- * @returns {Promise<Array>} Пути к созданным файлам сегментов
- */
-async function extractAudioSegments(audioPath, segments) {
-  const segmentFiles = [];
+async function checkDiarizationServiceStatus() {
+  const isRunning = await diarizationService.isServiceRunning();
   
-  for (const [index, segment] of segments.entries()) {
-    try {
-      const { start, end, speaker } = segment;
-      const duration = end - start;
-      
-      // Пропускаем слишком короткие сегменты
-      if (duration < 0.1) {
-        console.log(`[diarization-comparison] Пропуск слишком короткого сегмента ${index}`);
-        continue;
-      }
-      
-      const segmentFilename = `segment_${speaker}_${index}_${uuidv4()}.mp3`;
-      const segmentPath = path.join(SEGMENTS_DIR, segmentFilename);
-      
-      // Используем FFmpeg для извлечения сегмента
-      const command = `ffmpeg -i "${audioPath}" -ss ${start} -t ${duration} -c:a libmp3lame -q:a 4 "${segmentPath}" -y`;
-      
-      console.log(`[diarization-comparison] Извлечение сегмента ${index}: ${command}`);
-      
-      await exec(command);
-      
-      // Проверяем, что файл сегмента создался
-      if (fs.existsSync(segmentPath)) {
-        segmentFiles.push({
-          path: segmentPath,
-          speaker: speaker,
-          start: start,
-          end: end,
-          duration: duration,
-          index: index
-        });
-      } else {
-        console.error(`[diarization-comparison] Не удалось создать файл сегмента: ${segmentPath}`);
-      }
-    } catch (error) {
-      console.error(`[diarization-comparison] Ошибка при извлечении сегмента ${index}: ${error.message}`);
-    }
-  }
-  
-  return segmentFiles;
-}
-
-/**
- * Функция для прямой транскрипции с использованием GPT-4o Audio API
- * @param {string} audioPath Путь к аудиофайлу
- * @param {string} model Модель для транскрипции ('gpt-4o-mini' или 'gpt-4o')
- * @returns {Promise<string>} Результат транскрипции
- */
-async function transcribeWithGPT4o(audioPath, model) {
-  try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    
-    if (!apiKey) {
-      throw new Error('Отсутствует ключ API OpenAI');
-    }
-    
-    // Определяем модель для API
-    const apiModel = model === 'gpt-4o-mini' ? 'gpt-4o-mini' : 'gpt-4o';
-    
-    console.log(`[diarization-comparison] Транскрипция файла ${audioPath} с моделью ${apiModel}`);
-    
-    // Чтение аудиофайла в base64
-    const audioData = fs.readFileSync(audioPath);
-    const base64Audio = audioData.toString('base64');
-    
-    // Запрос к OpenAI API
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: apiModel,
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Пожалуйста, сделайте транскрипцию этого аудио. Это русская речь.' },
-              {
-                type: 'input_audio',
-                input_audio: `data:audio/mp3;base64,${base64Audio}`
-              }
-            ]
-          }
-        ],
-        temperature: 0,
-        max_tokens: 4096
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        }
-      }
-    );
-    
-    // Получаем текст из ответа
-    const transcription = response.data.choices[0].message.content;
-    
-    return transcription;
-  } catch (error) {
-    console.error(`[diarization-comparison] Ошибка при транскрипции с GPT-4o: ${error.message}`);
-    if (error.response) {
-      console.error('Детали ошибки API:', error.response.data);
-    }
-    throw error;
-  }
-}
-
-/**
- * Функция для выполнения нескольких расшифровок одного сегмента разными моделями
- * @param {Object} segment Информация о сегменте
- * @returns {Promise<Object>} Результаты расшифровок
- */
-async function transcribeSegmentWithMultipleModels(segment) {
-  try {
-    console.log(`[diarization-comparison] Начало транскрипции сегмента ${segment.index} (говорящий ${segment.speaker})`);
-    
-    // Получаем модуль OpenAI для использования его функций
-    const openaiModule = await getOpenAIModule();
-    
-    // Параллельно запускаем транскрипцию тремя разными моделями
-    const [whisperResult, gpt4oMiniResult, gpt4oResult] = await Promise.allSettled([
-      // 1. Whisper-1 API
-      openaiModule.transcribeWithWhisper(segment.path),
-      
-      // 2. GPT-4o-mini Audio
-      transcribeWithGPT4o(segment.path, 'gpt-4o-mini'),
-      
-      // 3. GPT-4o Audio
-      transcribeWithGPT4o(segment.path, 'gpt-4o')
-    ]);
-    
-    // Собираем результаты, обрабатывая возможные ошибки
+  if (isRunning) {
+    const healthInfo = await diarizationService.checkServiceHealth();
     return {
-      ...segment,
-      transcriptions: {
-        whisper: whisperResult.status === 'fulfilled' ? whisperResult.value : 'Ошибка транскрипции',
-        gpt4o_mini: gpt4oMiniResult.status === 'fulfilled' ? gpt4oMiniResult.value : 'Ошибка транскрипции',
-        gpt4o: gpt4oResult.status === 'fulfilled' ? gpt4oResult.value : 'Ошибка транскрипции'
-      },
-      transcriptionStatus: {
-        whisper: whisperResult.status,
-        gpt4o_mini: gpt4oMiniResult.status,
-        gpt4o: gpt4oResult.status
-      }
+      status: 'running',
+      health: healthInfo || { status: 'unknown' },
+      message: 'Diarization service is running.'
+    };
+  } else {
+    return {
+      status: 'stopped',
+      health: null,
+      message: 'Diarization service is not running.'
+    };
+  }
+}
+
+/**
+ * Запускает сервис диаризации
+ * @param {boolean} useSimplifiedVersion Использовать ли упрощенную версию
+ * @returns {Promise<object>} Результат запуска
+ */
+async function startDiarizationService(useSimplifiedVersion = true) {
+  const started = await diarizationService.startService(useSimplifiedVersion);
+  
+  if (started) {
+    const healthInfo = await diarizationService.checkServiceHealth();
+    return {
+      status: 'success',
+      health: healthInfo,
+      message: 'Diarization service started successfully.'
+    };
+  } else {
+    return {
+      status: 'error',
+      health: null,
+      message: 'Failed to start diarization service.'
+    };
+  }
+}
+
+/**
+ * Останавливает сервис диаризации
+ * @returns {Promise<object>} Результат остановки
+ */
+async function stopDiarizationService() {
+  const stopped = await diarizationService.stopService();
+  
+  return {
+    status: stopped ? 'success' : 'error',
+    message: stopped ? 'Diarization service stopped successfully.' : 'Failed to stop diarization service.'
+  };
+}
+
+/**
+ * Выполняет диаризацию аудиофайла
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {object} options Дополнительные параметры
+ * @returns {Promise<object>} Результат диаризации
+ */
+async function performDiarization(audioFilePath, options = {}) {
+  try {
+    const result = await diarizationService.diarizeAudio(audioFilePath, options);
+    return {
+      status: 'success',
+      diarization: result,
+      message: 'Diarization completed successfully.'
     };
   } catch (error) {
-    console.error(`[diarization-comparison] Ошибка при мульти-модельной транскрипции: ${error.message}`);
-    throw error;
+    return {
+      status: 'error',
+      error: error.message,
+      message: 'Failed to perform diarization.'
+    };
   }
 }
 
 /**
- * Очистка временных файлов сегментов
- * @param {Array} segmentFiles Массив путей к файлам сегментов
+ * Выполняет транскрипцию аудиофайла с использованием разных моделей
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {string[]} models Список моделей для транскрипции
+ * @param {string} language Код языка (необязательно)
+ * @returns {Promise<object>} Результаты транскрипции от разных моделей
  */
-function cleanupSegmentFiles(segmentFiles) {
-  for (const segment of segmentFiles) {
-    try {
-      if (fs.existsSync(segment.path)) {
-        fs.unlinkSync(segment.path);
-        console.log(`[diarization-comparison] Удален временный файл: ${segment.path}`);
-      }
-    } catch (error) {
-      console.error(`[diarization-comparison] Ошибка при удалении файла ${segment.path}: ${error.message}`);
-    }
-  }
-}
-
-/**
- * Основная функция для выполнения диаризации и сравнительной транскрипции
- * @param {string} audioPath Путь к аудиофайлу
- * @param {Object} options Дополнительные опции
- * @returns {Promise<Object>} Результаты диаризации и транскрипции
- */
-async function performDiarizationAndMultiTranscription(audioPath, options = {}) {
-  let segmentFiles = [];
-  
+async function performMultiModelTranscription(audioFilePath, models = [], language = null) {
   try {
-    console.log(`[diarization-comparison] Начало обработки файла: ${audioPath}`);
+    // Модели по умолчанию, если не указаны
+    const modelsToUse = models.length > 0 ? models : [
+      'whisper-1',
+      'gpt-4o-mini-transcribe',
+      'gpt-4o-transcribe'
+    ];
     
-    // 1. Выполняем диаризацию
-    const diarizationResults = await performDiarization(audioPath, options);
+    console.log(`Performing transcription with models: ${modelsToUse.join(', ')}`);
     
-    // 2. Разбиваем аудио на сегменты по говорящим
-    segmentFiles = await extractAudioSegments(audioPath, diarizationResults.segments);
+    // Выполняем транскрипцию с каждой моделью
+    const results = {};
+    const errors = {};
     
-    console.log(`[diarization-comparison] Создано ${segmentFiles.length} сегментов для транскрипции`);
+    for (const model of modelsToUse) {
+      try {
+        console.log(`Transcribing with model: ${model}`);
+        
+        const transcription = await transcriptionApi.transcribeAudio(audioFilePath, model, language);
+        
+        results[model] = {
+          text: transcription.text,
+          duration: transcription.duration,
+          processingTime: transcription.processingTime,
+          timestamp: new Date().toISOString()
+        };
+      } catch (modelError) {
+        console.error(`Error transcribing with model ${model}:`, modelError);
+        errors[model] = modelError.message;
+      }
+    }
     
-    // 3. Выполняем расшифровку каждого сегмента тремя моделями
-    const transcriptionPromises = segmentFiles.map(segment => 
-      transcribeSegmentWithMultipleModels(segment)
+    return {
+      status: Object.keys(results).length > 0 ? 'success' : 'error',
+      transcriptions: results,
+      errors: Object.keys(errors).length > 0 ? errors : undefined,
+      message: Object.keys(results).length > 0 
+        ? `Transcription completed with ${Object.keys(results).length}/${modelsToUse.length} models.`
+        : 'Failed to transcribe with any model.'
+    };
+  } catch (error) {
+    return {
+      status: 'error',
+      error: error.message,
+      message: 'Failed to perform transcription.'
+    };
+  }
+}
+
+/**
+ * Объединяет результаты диаризации и транскрипции
+ * @param {object} diarizationResult Результат диаризации
+ * @param {object} transcriptionResults Результаты транскрипции от разных моделей
+ * @returns {object} Объединенные результаты
+ */
+function combineResults(diarizationResult, transcriptionResults) {
+  const combinedResults = {
+    status: 'success',
+    timestamp: new Date().toISOString(),
+    audioInfo: {
+      duration: diarizationResult.duration,
+      numSpeakers: diarizationResult.num_speakers
+    },
+    segments: diarizationResult.segments,
+    transcriptions: {}
+  };
+  
+  // Добавляем полные тексты транскрипций для каждой модели
+  Object.keys(transcriptionResults).forEach(model => {
+    combinedResults.transcriptions[model] = {
+      text: transcriptionResults[model].text,
+      processingTime: transcriptionResults[model].processingTime
+    };
+  });
+  
+  return combinedResults;
+}
+
+/**
+ * Выполняет полный процесс диаризации и транскрипции аудиофайла
+ * @param {string} audioFilePath Путь к аудиофайлу
+ * @param {object} options Дополнительные параметры
+ * @returns {Promise<object>} Комбинированные результаты
+ */
+async function processAudioFile(audioFilePath, options = {}) {
+  try {
+    // Проверяем состояние сервиса диаризации
+    const serviceStatus = await checkDiarizationServiceStatus();
+    
+    if (serviceStatus.status !== 'running') {
+      console.log('Starting diarization service...');
+      const startResult = await startDiarizationService(true);
+      
+      if (startResult.status !== 'success') {
+        return {
+          status: 'error',
+          error: 'Failed to start diarization service',
+          serviceStatus: startResult
+        };
+      }
+    }
+    
+    // Выполняем диаризацию
+    console.log('Performing diarization...');
+    const diarizationResult = await performDiarization(audioFilePath, options);
+    
+    if (diarizationResult.status !== 'success') {
+      return diarizationResult;
+    }
+    
+    // Выполняем транскрипцию с разными моделями
+    console.log('Performing transcription with multiple models...');
+    const transcriptionResult = await performMultiModelTranscription(
+      audioFilePath, 
+      options.models,
+      options.language
     );
     
-    const segmentsWithTranscriptions = await Promise.all(transcriptionPromises);
+    if (transcriptionResult.status !== 'success') {
+      return transcriptionResult;
+    }
     
-    // 4. Формируем итоговый результат
-    const result = {
-      metadata: {
-        original_file: audioPath,
-        processing_time: new Date().toISOString(),
-        num_speakers: diarizationResults.num_speakers,
-        total_segments: segmentsWithTranscriptions.length
-      },
-      segments: segmentsWithTranscriptions.map(segment => ({
-        speaker: segment.speaker,
-        start: segment.start,
-        end: segment.end,
-        duration: segment.duration,
-        index: segment.index,
-        transcriptions: segment.transcriptions,
-        status: segment.transcriptionStatus
-      }))
+    // Объединяем результаты
+    const combinedResults = combineResults(
+      diarizationResult.diarization,
+      transcriptionResult.transcriptions
+    );
+    
+    // Сохраняем результаты в файл, если указано имя файла
+    if (options.outputFilename) {
+      const outputPath = path.join(RESULTS_DIR, options.outputFilename);
+      fs.writeFileSync(outputPath, JSON.stringify(combinedResults, null, 2));
+      console.log(`Results saved to ${outputPath}`);
+    }
+    
+    return {
+      status: 'success',
+      results: combinedResults,
+      message: 'Audio processing completed successfully.'
     };
-    
-    return result;
   } catch (error) {
-    console.error(`[diarization-comparison] Ошибка при обработке: ${error.message}`);
-    throw error;
-  } finally {
-    // Очищаем временные файлы сегментов
-    cleanupSegmentFiles(segmentFiles);
+    return {
+      status: 'error',
+      error: error.message,
+      message: 'Failed to process audio file.'
+    };
   }
 }
 
-// Экспорт в ESM формате
 export default {
-  performDiarizationAndMultiTranscription
+  checkDiarizationServiceStatus,
+  startDiarizationService,
+  stopDiarizationService,
+  performDiarization,
+  performMultiModelTranscription,
+  processAudioFile
 };
