@@ -164,6 +164,7 @@ const AudioPlayer: React.FC<{
       
       if (fragmentId) {
         audioUrl = `/api/admin/fragments/${fragmentId}/download`;
+        console.log(`[AudioPlayer] Загрузка фрагмента ID=${fragmentId}`);
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
@@ -171,6 +172,7 @@ const AudioPlayer: React.FC<{
         }));
       } else {
         audioUrl = `/api/admin/recordings/${recordingId}/download`;
+        console.log(`[AudioPlayer] Загрузка записи ID=${recordingId}`);
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
@@ -180,6 +182,22 @@ const AudioPlayer: React.FC<{
       
       // Если источник изменился, обновляем его
       if (audioElement.src !== audioUrl) {
+        console.log(`[AudioPlayer] Новый источник аудио: ${audioUrl}`);
+        
+        // Добавляем обработчик ошибок
+        const handleError = (event: ErrorEvent) => {
+          console.error(`[AudioPlayer] Ошибка загрузки аудио: ${audioUrl}`, event);
+          // Пробуем добавить суффикс в URL для сброса кэша
+          if (!audioUrl.includes('?t=')) {
+            console.log(`[AudioPlayer] Пробуем загрузить с некэшированным URL`);
+            audioElement.src = `${audioUrl}?t=${Date.now()}`;
+            audioElement.load();
+          }
+        };
+        
+        // Добавляем слушатель событий для отладки
+        audioElement.addEventListener('error', handleError, { once: true });
+        
         audioElement.src = audioUrl;
         audioElement.load();
         setPlayerState(prev => ({
@@ -484,16 +502,37 @@ const RecordingsList: React.FC = () => {
                   <TableCell>
                     {recording.fileExists ? (
                       <div className="flex items-center">
-                        {/* Кнопка для воспроизведения аудио */}
+                        {/* Кнопка для воспроизведения аудио с обработкой ошибок */}
                         <Button
                           variant="default"
                           size="sm"
                           className="bg-blue-500 hover:bg-blue-600 text-white"
                           onClick={() => {
                             const url = `/api/admin/recordings/${recording.id}/download`;
+                            console.log(`Попытка воспроизведения аудио: ${url}`);
+                            
                             const audio = new Audio(url);
+                            audio.onerror = (err) => {
+                              console.error("Ошибка воспроизведения:", err);
+                              toast({
+                                title: 'Ошибка',
+                                description: 'Не удалось воспроизвести аудио. Проверьте, существует ли файл.',
+                                variant: 'destructive'
+                              });
+                            };
+                            
+                            // Добавляем событие загрузки данных для подтверждения загрузки
+                            audio.onloadeddata = () => {
+                              console.log('Аудио успешно загружено');
+                            };
+                            
                             audio.play().catch(err => {
                               console.error("Ошибка воспроизведения:", err);
+                              toast({
+                                title: 'Ошибка',
+                                description: 'Не удалось воспроизвести аудио: ' + err.message,
+                                variant: 'destructive'
+                              });
                             });
                           }}
                         >

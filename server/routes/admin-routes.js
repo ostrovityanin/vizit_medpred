@@ -268,14 +268,61 @@ router.get('/recordings/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Запись не найдена или не содержит файла' });
     }
     
-    // Строим путь к файлу
-    const filePath = path.join(process.cwd(), 'data', 'recordings', recording.filename);
+    // Формируем список путей для поиска
+    let possiblePaths = [
+      path.join(process.cwd(), 'data', 'recordings', recording.filename)
+    ];
+    
+    // Если в имени файла уже есть "combined-" - добавляем путь к server/fragments
+    if (recording.filename.startsWith('combined-')) {
+      possiblePaths.push(path.join(process.cwd(), 'server', 'fragments', recording.filename));
+      possiblePaths.push(path.join(process.cwd(), 'data', 'fragments_symlink', recording.filename));
+      console.log(`[Admin API] Файл записи имеет формат объединенного, добавляем пути к fragments`);
+    }
+    
+    // Пробуем найти по ID сессии (если доступно)
+    try {
+      // Получаем фрагменты записи, чтобы узнать ID сессии
+      const fragments = await req.app.locals.storage.getRecordingFragments(id);
+      if (fragments && fragments.length > 0) {
+        const sessionId = fragments[0].sessionId;
+        const combinedFilename = `combined-${sessionId}.webm`;
+        
+        // Добавляем пути с объединенным файлом по ID сессии
+        possiblePaths.push(path.join(process.cwd(), 'server', 'fragments', combinedFilename));
+        possiblePaths.push(path.join(process.cwd(), 'data', 'fragments_symlink', combinedFilename));
+        possiblePaths.push(path.join(process.cwd(), 'data', 'fragments', combinedFilename));
+        
+        console.log(`[Admin API] Добавлены пути для поиска объединенного файла по сессии: ${sessionId}`);
+      }
+    } catch (sessionError) {
+      console.error(`[Admin API] Ошибка при поиске ID сессии: ${sessionError.message}`);
+    }
+    
+    // Ищем файл в возможных местах
+    let filePath = null;
+    for (const checkPath of possiblePaths) {
+      if (fs.existsSync(checkPath)) {
+        filePath = checkPath;
+        console.log(`[Admin API] Файл записи найден: ${filePath}`);
+        break;
+      }
+    }
+    
+    if (!filePath) {
+      filePath = possiblePaths[0]; // Для сообщения об ошибке используем первый путь
+      console.log(`[Admin API] Не удалось найти файл записи, используем путь по умолчанию: ${filePath}`);
+    }
     
     // Проверяем, существует ли файл
     if (!fs.existsSync(filePath)) {
-      console.error(`[Admin API] Файл не найден: ${filePath}`);
+      console.error(`[Admin API] Файл не найден по путям:
+        - ${path.join(process.cwd(), 'data', 'recordings', recording.filename)}
+        - ${filePath}`);
       return res.status(404).json({ error: 'Файл не найден' });
     }
+    
+    console.log(`[Admin API] Отправляем файл записи: ${filePath}`);
     
     // Отправляем файл
     res.download(filePath, recording.filename, (err) => {
@@ -313,14 +360,36 @@ router.get('/fragments/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Фрагмент не найден или не содержит файла' });
     }
     
-    // Строим путь к файлу
-    const filePath = path.join(process.cwd(), 'data', 'fragments', fragment.filename);
+    // Пробуем найти в различных директориях
+    const possiblePaths = [
+      path.join(process.cwd(), 'data', 'fragments', fragment.filename),
+      path.join(process.cwd(), 'server', 'fragments', fragment.filename),
+      path.join(process.cwd(), 'data', 'fragments_symlink', fragment.filename)
+    ];
+    
+    let filePath = null;
+    for (const checkPath of possiblePaths) {
+      if (fs.existsSync(checkPath)) {
+        filePath = checkPath;
+        console.log(`[Admin API] Файл фрагмента найден: ${filePath}`);
+        break;
+      }
+    }
+    
+    if (!filePath) {
+      filePath = possiblePaths[0]; // Для сообщения об ошибке используем первый путь
+      console.log(`[Admin API] Не удалось найти файл фрагмента, используем путь по умолчанию: ${filePath}`);
+    }
     
     // Проверяем, существует ли файл
     if (!fs.existsSync(filePath)) {
-      console.error(`[Admin API] Файл фрагмента не найден: ${filePath}`);
+      console.error(`[Admin API] Файл фрагмента не найден по путям:
+        - ${path.join(process.cwd(), 'data', 'fragments', fragment.filename)}
+        - ${path.join(process.cwd(), 'server', 'fragments', fragment.filename)}`);
       return res.status(404).json({ error: 'Файл фрагмента не найден' });
     }
+    
+    console.log(`[Admin API] Отправляем фрагмент: ${filePath}`);
     
     // Отправляем файл
     res.download(filePath, fragment.filename, (err) => {
