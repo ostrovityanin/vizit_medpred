@@ -19,12 +19,14 @@ import { useEffect } from "react";
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={AdminNew} />
+      <Route path="/home" component={Home} />
       <Route path="/recordings" component={Recordings} />
       <Route path="/client-bot-test" component={ClientBotTest} />
-      <Route path="/admin" component={Admin} />
-      <Route path="/admin-panel" component={Admin} />
+      <Route path="/admin" component={AdminNew} />
+      <Route path="/admin-panel" component={AdminNew} />
       <Route path="/admin-new" component={AdminNew} />
+      <Route path="/admin-old" component={Admin} />
       <Route path="/admin/recordings/:id" component={AdminNew} />
       <Route path="/user-recordings" component={UserRecordings} />
       <Route path="/architecture" component={Architecture} />
