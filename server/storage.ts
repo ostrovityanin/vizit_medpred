@@ -346,6 +346,10 @@ export class MemStorage implements IStorage {
     return this.recordingFragments.get(id);
   }
   
+  async getAllFragments(): Promise<RecordingFragment[]> {
+    return Array.from(this.recordingFragments.values());
+  }
+  
   // === Методы для обратной совместимости ===
   
   async createRecording(recording: InsertAdminRecording): Promise<AdminRecording> {

@@ -236,11 +236,92 @@ router.get('/recordings/:id/player-fragments', async (req, res) => {
       return res.status(404).json({ error: 'Запись не найдена' });
     }
     
-    // Получаем все фрагменты для данной записи, если они есть в хранилище
-    const fragments = await req.app.locals.storage.getRecordingFragments(id) || [];
+    console.log(`[Admin API] Получаем фрагменты для записи #${id}`);
     
-    // Фрагменты уже отсортированы по индексу в методе хранилища
-    const sortedFragments = fragments;
+    // Получаем все фрагменты для данной записи по ID
+    let fragments = await req.app.locals.storage.getRecordingFragments(id) || [];
+    console.log(`[Admin API] По recordingId=${id} найдено ${fragments.length} фрагментов`);
+    
+    // Если фрагментов нет, попробуем поискать их по filename
+    if (fragments.length === 0 && recording.filename) {
+      // Извлекаем UUID из имени файла (например, 12e774e4-0792-48e3-bc9d-d9637a1e2fc8.wav)
+      const filenameWithoutExt = recording.filename.split('.')[0];
+      console.log(`[Admin API] Ищем фрагменты по имени файла: ${filenameWithoutExt}`);
+      
+      // Получаем все фрагменты из хранилища
+      const allFragments = await req.app.locals.storage.getAllFragments();
+      console.log(`[Admin API] Всего фрагментов в системе: ${allFragments.length}`);
+      
+      // Ищем фрагменты, в имени которых содержится UUID из имени файла записи
+      const matchingFragments = allFragments.filter(fragment => {
+        return fragment.filename && (
+          fragment.filename.includes(filenameWithoutExt) || 
+          (fragment.sessionId && fragment.sessionId.includes(filenameWithoutExt))
+        );
+      });
+      
+      if (matchingFragments.length > 0) {
+        console.log(`[Admin API] Найдено ${matchingFragments.length} фрагментов по имени файла`);
+        fragments = matchingFragments;
+      }
+      
+      // Если фрагментов все еще нет, попробуем поискать по шаблонам имен файлов
+      if (fragments.length === 0) {
+        // Проверяем наличие файлов в папке фрагментов
+        const fragmentsDir = path.join(process.cwd(), 'server', 'fragments');
+        if (fs.existsSync(fragmentsDir)) {
+          const files = fs.readdirSync(fragmentsDir);
+          console.log(`[Admin API] Файлов в директории fragments: ${files.length}`);
+          
+          // Ищем файлы с похожими шаблонами имен
+          const combinedFiles = files.filter(file => file.startsWith('combined-'));
+          const fragmentFiles = files.filter(file => file.startsWith('fragment-'));
+          
+          console.log(`[Admin API] Найдено ${combinedFiles.length} объединенных файлов и ${fragmentFiles.length} фрагментов`);
+          
+          // Если мы нашли похожие файлы, создаем "виртуальные" записи фрагментов
+          const virtualFragments = [];
+          
+          // Сначала обрабатываем combined-файлы
+          combinedFiles.forEach((file, index) => {
+            const filePath = path.join(fragmentsDir, file);
+            const stats = fs.statSync(filePath);
+            
+            virtualFragments.push({
+              id: 9000 + index, // Используем большие ID, чтобы избежать конфликтов
+              recordingId: id,
+              filename: file,
+              index: 0,
+              timestamp: new Date().toISOString(),
+              sessionId: file.replace('combined-', '').split('.')[0],
+              size: stats.size,
+              isProcessed: true,
+              isVirtual: true
+            });
+          });
+          
+          // Добавляем фрагменты, если нашли какие-то файлы
+          if (virtualFragments.length > 0) {
+            console.log(`[Admin API] Создано ${virtualFragments.length} виртуальных записей фрагментов`);
+            fragments = virtualFragments;
+          }
+        }
+      }
+    }
+    
+    // Обновляем запись с информацией о количестве фрагментов
+    if (fragments.length > 0 && (!recording.fragmentsCount || recording.fragmentsCount !== fragments.length)) {
+      const updatedRecording = {
+        ...recording,
+        fragmentsCount: fragments.length,
+        fragments: fragments.map(f => f.id)
+      };
+      await req.app.locals.storage.updateRecording(updatedRecording);
+      console.log(`[Admin API] Обновлена запись #${id} с количеством фрагментов: ${fragments.length}`);
+    }
+    
+    // Сортируем фрагменты по индексу
+    const sortedFragments = fragments.sort((a, b) => (a.index || 0) - (b.index || 0));
     
     res.json(sortedFragments);
   } catch (error) {

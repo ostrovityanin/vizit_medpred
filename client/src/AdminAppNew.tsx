@@ -53,6 +53,7 @@ interface Recording {
   fragmentsCount: number;
   canMergeFragments: boolean;
   fileExists: boolean;
+  fragments?: number[]; // ID фрагментов, связанных с записью
 }
 
 interface RecordingFragment {
