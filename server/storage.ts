@@ -346,20 +346,6 @@ export class MemStorage implements IStorage {
     return this.recordingFragments.get(id);
   }
   
-  // ВАЖНО: Не восстанавливать этот метод, т.к. он может повлиять на работу MedPredRuBot
-  // async updateFragment(id: number, fragment: RecordingFragment): Promise<RecordingFragment | undefined> {
-  //   if (this.recordingFragments.has(id)) {
-  //     this.recordingFragments.set(id, fragment);
-  //     this.saveFragmentsToFile();
-  //     return fragment;
-  //   }
-  //   return undefined;
-  // }
-  
-  async getAllFragments(): Promise<RecordingFragment[]> {
-    return Array.from(this.recordingFragments.values());
-  }
-  
   // === Методы для обратной совместимости ===
   
   async createRecording(recording: InsertAdminRecording): Promise<AdminRecording> {

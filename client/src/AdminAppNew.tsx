@@ -53,7 +53,6 @@ interface Recording {
   fragmentsCount: number;
   canMergeFragments: boolean;
   fileExists: boolean;
-  fragments?: number[]; // ID фрагментов, связанных с записью
 }
 
 interface RecordingFragment {
@@ -164,16 +163,14 @@ const AudioPlayer: React.FC<{
       let audioUrl;
       
       if (fragmentId) {
-        audioUrl = `/api/admin/fragments/${fragmentId}/download`;
-        console.log(`[AudioPlayer] Загрузка фрагмента ID=${fragmentId}`);
+        audioUrl = `/api/admin/recordings/${recordingId}/fragments/${fragmentId}/audio`;
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
           currentFragmentId: fragmentId
         }));
       } else {
-        audioUrl = `/api/admin/recordings/${recordingId}/download`;
-        console.log(`[AudioPlayer] Загрузка записи ID=${recordingId}`);
+        audioUrl = `/api/admin/recordings/${recordingId}/audio`;
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
@@ -183,22 +180,6 @@ const AudioPlayer: React.FC<{
       
       // Если источник изменился, обновляем его
       if (audioElement.src !== audioUrl) {
-        console.log(`[AudioPlayer] Новый источник аудио: ${audioUrl}`);
-        
-        // Добавляем обработчик ошибок
-        const handleError = (event: ErrorEvent) => {
-          console.error(`[AudioPlayer] Ошибка загрузки аудио: ${audioUrl}`, event);
-          // Пробуем добавить суффикс в URL для сброса кэша
-          if (!audioUrl.includes('?t=')) {
-            console.log(`[AudioPlayer] Пробуем загрузить с некэшированным URL`);
-            audioElement.src = `${audioUrl}?t=${Date.now()}`;
-            audioElement.load();
-          }
-        };
-        
-        // Добавляем слушатель событий для отладки
-        audioElement.addEventListener('error', handleError, { once: true });
-        
         audioElement.src = audioUrl;
         audioElement.load();
         setPlayerState(prev => ({
@@ -437,57 +418,44 @@ const RecordingsList: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-64">Информация</TableHead>
+              <TableHead className="w-12">ID</TableHead>
+              <TableHead>Дата</TableHead>
+              <TableHead>От кого</TableHead>
+              <TableHead>Кому</TableHead>
+              <TableHead className="w-24">Длит.</TableHead>
+              <TableHead className="w-24">Размер</TableHead>
               <TableHead className="w-24">Статус</TableHead>
-              <TableHead className="w-28">Аудио</TableHead>
+              <TableHead className="w-12">Фраг.</TableHead>
               <TableHead className="text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {recordings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center">
+                <TableCell colSpan={9} className="text-center">
                   Записи не найдены
                 </TableCell>
               </TableRow>
             ) : (
               recordings.map(recording => (
                 <TableRow key={recording.id}>
+                  <TableCell>{recording.id}</TableCell>
                   <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">#{recording.id}</span>
-                        <span className="text-sm">
-                          {recording.timestamp 
-                            ? format(new Date(recording.timestamp), 'dd.MM.yyyy HH:mm')
-                            : 'Нет даты'}
-                        </span>
-                      </div>
-                      <div className="flex flex-col text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">От: {recording.senderUsername || 'Неизвестно'}</span>
-                          <span className="text-muted-foreground">Кому: {recording.targetUsername || 'Неизвестно'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>
-                            <Clock className="h-3 w-3 inline mr-1" />
-                            {recording.duration 
-                              ? `${Math.floor(recording.duration / 60)}:${String(Math.floor(recording.duration % 60)).padStart(2, '0')}`
-                              : '0:00'}
-                          </span>
-                          <span>
-                            <FileAudio className="h-3 w-3 inline mr-1" />
-                            {recording.fileSize 
-                              ? `${(recording.fileSize / 1024).toFixed(1)} KB`
-                              : '0 KB'}
-                          </span>
-                          <span>
-                            <span className="mr-1">Фраг.:</span>
-                            {recording.fragmentsCount || 0}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                    {recording.timestamp 
+                      ? format(new Date(recording.timestamp), 'dd.MM.yyyy HH:mm')
+                      : 'Нет даты'}
+                  </TableCell>
+                  <TableCell>{recording.senderUsername || 'Неизвестно'}</TableCell>
+                  <TableCell>{recording.targetUsername || 'Неизвестно'}</TableCell>
+                  <TableCell>
+                    {recording.duration 
+                      ? `${Math.floor(recording.duration / 60)}:${String(Math.floor(recording.duration % 60)).padStart(2, '0')}`
+                      : '0:00'}
+                  </TableCell>
+                  <TableCell>
+                    {recording.fileSize 
+                      ? `${(recording.fileSize / 1024).toFixed(1)} KB`
+                      : '0 KB'}
                   </TableCell>
                   <TableCell>
                     <Badge variant={
@@ -500,72 +468,7 @@ const RecordingsList: React.FC = () => {
                        'Ошибка'}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center">
-                        {/* Кнопка для проигрывания аудио */}
-                        <Button
-                          variant="default"
-                          size="sm"
-                          className="bg-blue-500 hover:bg-blue-600 text-white"
-                          onClick={() => {
-                            // Формируем URL для аудио
-                            const url = `/api/admin/recordings/${recording.id}/download?t=${Date.now()}`;
-                            console.log(`Попытка воспроизведения аудио: ${url}`);
-                            
-                            // Создаем и настраиваем элемент аудио
-                            const audio = new Audio(url);
-                            
-                            // Обработка ошибок
-                            audio.onerror = (err) => {
-                              console.error("Ошибка воспроизведения:", err);
-                              toast({
-                                title: 'Ошибка аудио',
-                                description: 'Не удалось воспроизвести аудио. Попробуйте открыть детали записи.',
-                                variant: 'destructive'
-                              });
-                            };
-                            
-                            // Добавляем событие загрузки данных для подтверждения загрузки
-                            audio.onloadeddata = () => {
-                              console.log('Аудио успешно загружено и готово к воспроизведению');
-                              toast({
-                                title: 'Аудио загружено',
-                                description: `Длительность: ${Math.floor(audio.duration)} сек.`,
-                                variant: 'default'
-                              });
-                            };
-                            
-                            // Запускаем воспроизведение
-                            audio.play().catch(err => {
-                              console.error("Ошибка при вызове play():", err);
-                              toast({
-                                title: 'Ошибка воспроизведения',
-                                description: 'Не удалось запустить воспроизведение: ' + (err.message || 'Неизвестная ошибка'),
-                                variant: 'destructive'
-                              });
-                            });
-                          }}
-                        >
-                          <Play className="h-4 w-4 mr-1" /> Слушать
-                        </Button>
-                      </div>
-                      
-                      {/* Дополнительная информация */}
-                      <div className="text-xs flex gap-2">
-                        <span 
-                          className={`${recording.fileExists ? 'text-green-500' : 'text-red-500'}`}
-                        >
-                          {recording.fileExists ? '✓ Файл существует' : '✗ Нет файла'}
-                        </span>
-                        {recording.fragments && recording.fragments.length > 0 && (
-                          <span className="text-blue-500">
-                            ✓ Есть фрагменты
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
+                  <TableCell>{recording.fragmentsCount || 0}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
                       <Button
@@ -573,7 +476,7 @@ const RecordingsList: React.FC = () => {
                         size="icon"
                         asChild
                       >
-                        <Link href={`/admin-new?recordingId=${recording.id}`}>
+                        <Link href={`/admin/recordings/${recording.id}`}>
                           <FileAudio className="h-4 w-4" />
                         </Link>
                       </Button>
@@ -768,7 +671,7 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin-new">
+            <Link href="/admin/recordings">
               Назад к списку
             </Link>
           </Button>
@@ -1367,7 +1270,7 @@ const DashboardStats: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" asChild>
-                <Link href="/admin-new">
+                <Link href="/admin/recordings">
                   <FileAudio className="h-4 w-4 mr-2" />
                   Записи
                 </Link>
@@ -1389,14 +1292,7 @@ const DashboardStats: React.FC = () => {
 
 // Главный компонент админ-панели
 const AdminAppNew: React.FC = () => {
-  const [location, setLocation] = useLocation();
-  
-  // Если мы находимся на корневом маршруте /, перенаправляем на /admin-new
-  useEffect(() => {
-    if (location === '/') {
-      setLocation('/admin-new');
-    }
-  }, [location, setLocation]);
+  const [location] = useLocation();
   
   return (
     <div className="container mx-auto p-4 max-w-7xl">
@@ -1410,14 +1306,14 @@ const AdminAppNew: React.FC = () => {
                 Панель управления
               </Link>
             </Button>
-            <Button variant={location.includes('/admin-new/') ? 'default' : 'outline'} asChild>
-              <Link href="/admin-new">
+            <Button variant={location.includes('/admin/recordings') ? 'default' : 'outline'} asChild>
+              <Link href="/admin/recordings">
                 <FileAudio className="h-4 w-4 mr-2" />
                 Записи
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/admin-new">
+              <Link href="/">
                 <HomeIcon className="h-4 w-4 mr-2" />
                 Главная страница
               </Link>
@@ -1431,9 +1327,10 @@ const AdminAppNew: React.FC = () => {
         <Switch>
           <Route path="/admin-new" component={RecordingsList} />
           <Route path="/admin" component={DashboardStats} />
-          <Route path="/admin-new/:id">
+          <Route path="/admin/recordings/:id">
             {(params) => <RecordingDetail id={parseInt(params.id, 10)} />}
           </Route>
+          <Route path="/admin/recordings" component={RecordingsList} />
         </Switch>
       </main>
     </div>
