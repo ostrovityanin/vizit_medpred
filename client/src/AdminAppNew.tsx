@@ -420,7 +420,7 @@ const RecordingsList: React.FC = () => {
             <TableRow>
               <TableHead className="w-64">Информация</TableHead>
               <TableHead className="w-24">Статус</TableHead>
-              <TableHead className="w-24">Аудио</TableHead>
+              <TableHead className="w-28">Аудио</TableHead>
               <TableHead className="text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
@@ -483,12 +483,12 @@ const RecordingsList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     {recording.fileExists ? (
-                      <div className="w-48">
+                      <div className="flex items-center">
                         {/* Кнопка для воспроизведения аудио */}
                         <Button
-                          variant="outline"
+                          variant="default"
                           size="sm"
-                          className="w-full flex items-center justify-center"
+                          className="bg-blue-500 hover:bg-blue-600 text-white"
                           onClick={() => {
                             const url = `/api/admin/recordings/${recording.id}/audio`;
                             const audio = new Audio(url);
@@ -497,7 +497,7 @@ const RecordingsList: React.FC = () => {
                             });
                           }}
                         >
-                          <Play className="h-4 w-4 mr-2" /> Воспроизвести
+                          <Play className="h-4 w-4 mr-1" /> Слушать
                         </Button>
                       </div>
                     ) : (
