@@ -497,7 +497,7 @@ const RecordingsList: React.FC = () => {
                         size="icon"
                         asChild
                       >
-                        <Link href={`/admin/recordings/${recording.id}`}>
+                        <Link href={`/admin-new?recordingId=${recording.id}`}>
                           <FileAudio className="h-4 w-4" />
                         </Link>
                       </Button>
@@ -692,7 +692,7 @@ const RecordingDetail: React.FC<{ id: number }> = ({ id }) => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href="/admin/recordings">
+            <Link href="/admin-new">
               Назад к списку
             </Link>
           </Button>
@@ -1291,7 +1291,7 @@ const DashboardStats: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-2 gap-2">
               <Button variant="outline" asChild>
-                <Link href="/admin/recordings">
+                <Link href="/admin-new">
                   <FileAudio className="h-4 w-4 mr-2" />
                   Записи
                 </Link>
@@ -1327,8 +1327,8 @@ const AdminAppNew: React.FC = () => {
                 Панель управления
               </Link>
             </Button>
-            <Button variant={location.includes('/admin/recordings') ? 'default' : 'outline'} asChild>
-              <Link href="/admin/recordings">
+            <Button variant={location.includes('/admin-new/') ? 'default' : 'outline'} asChild>
+              <Link href="/admin-new">
                 <FileAudio className="h-4 w-4 mr-2" />
                 Записи
               </Link>
@@ -1348,10 +1348,9 @@ const AdminAppNew: React.FC = () => {
         <Switch>
           <Route path="/admin-new" component={RecordingsList} />
           <Route path="/admin" component={DashboardStats} />
-          <Route path="/admin/recordings/:id">
+          <Route path="/admin-new/:id">
             {(params) => <RecordingDetail id={parseInt(params.id, 10)} />}
           </Route>
-          <Route path="/admin/recordings" component={RecordingsList} />
         </Switch>
       </main>
     </div>
