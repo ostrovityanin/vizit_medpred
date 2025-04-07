@@ -1,5 +1,5 @@
 /**
- * Быстрый тест сервиса диаризации с использованием простого тестового аудиофайла
+ * Тестирование доступности сервиса диаризации
  */
 
 import axios from 'axios';
@@ -7,8 +7,6 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import path from 'path';
-import fs from 'fs';
-import FormData from 'form-data';
 
 // Определение путей для ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -17,59 +15,6 @@ const __dirname = dirname(__filename);
 // URL и порт сервиса диаризации
 const DIARIZATION_SERVICE_URL = 'http://localhost:5050';
 const SERVICE_DIR = path.join(__dirname, 'services', 'audio-diarization');
-
-// Путь к тестовому аудиофайлу
-const TEST_AUDIO_DIR = path.join(__dirname, 'test_audio');
-const TEST_AUDIO_FILE = path.join(TEST_AUDIO_DIR, 'test_simple.mp3');
-const RESULT_FILE = 'diarization_result_simple.json';
-
-// Создаем директории, если не существуют
-function ensureDirectoryExists(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`✅ Создана директория: ${dir}`);
-  }
-}
-
-/**
- * Создает простой тональный сигнал с помощью ffmpeg
- * @param {string} outputPath Путь для сохранения выходного файла
- * @param {number} frequency Частота тона (Гц)
- * @param {number} duration Длительность (секунды)
- */
-async function generateTestAudio(outputPath, frequency = 440, duration = 2) {
-  return new Promise((resolve, reject) => {
-    ensureDirectoryExists(path.dirname(outputPath));
-    
-    console.log(`🔊 Создание тестового аудио (${frequency} Гц, ${duration} сек)...`);
-    
-    const ffmpeg = spawn('ffmpeg', [
-      '-y',
-      '-f', 'lavfi',
-      '-i', `sine=frequency=${frequency}:duration=${duration}`,
-      '-c:a', 'libmp3lame',
-      '-b:a', '32k',
-      '-ac', '1',
-      '-ar', '16000',
-      outputPath
-    ]);
-    
-    ffmpeg.stderr.on('data', (data) => {
-      // FFmpeg пишет лог в stderr, необязательно это ошибка
-      // console.log(`[FFmpeg] ${data.toString().trim()}`);
-    });
-    
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        console.log(`✅ Создан тестовый аудиофайл: ${outputPath}`);
-        resolve(outputPath);
-      } else {
-        console.error(`❌ Ошибка при создании аудиофайла, код: ${code}`);
-        reject(new Error(`Ошибка FFmpeg с кодом ${code}`));
-      }
-    });
-  });
-}
 
 /**
  * Запускает микросервис диаризации и возвращает процесс
@@ -163,54 +108,6 @@ async function startDiarizationService() {
 }
 
 /**
- * Тестирование диаризации с очень коротким аудио
- * @param {string} audioFile Путь к аудиофайлу
- * @param {string} serviceUrl URL сервиса диаризации
- */
-async function testSimpleDiarization(audioFile, serviceUrl) {
-  try {
-    console.log(`🔍 Тестирование простой диаризации для файла: ${audioFile}`);
-    
-    // Формируем данные для отправки
-    const formData = new FormData();
-    formData.append('audio_file', fs.createReadStream(audioFile));
-    
-    console.log('🚀 Отправка запроса на диаризацию...');
-    
-    // Увеличиваем таймаут для обработки больших файлов
-    const response = await axios.post(`${serviceUrl}/diarize`, formData, {
-      headers: formData.getHeaders(),
-      timeout: 30000, // Увеличенный таймаут в 30 секунд для долгой обработки
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
-    
-    console.log('✅ Запрос успешно обработан');
-    console.log('\n📊 Результаты диаризации:');
-    console.log(JSON.stringify(response.data, null, 2));
-    
-    // Сохраняем результаты в файл
-    fs.writeFileSync(RESULT_FILE, JSON.stringify(response.data, null, 2));
-    console.log(`✅ Результаты сохранены в файл: ${RESULT_FILE}`);
-    
-    return response.data;
-  } catch (error) {
-    console.error(`❌ Ошибка при тестировании диаризации:`);
-    
-    if (error.response) {
-      console.error(`   - Статус: ${error.response.status}`);
-      console.error(`   - Сообщение: ${JSON.stringify(error.response.data)}`);
-    } else if (error.request) {
-      console.error(`   - ${error.message}`);
-    } else {
-      console.error(`   - ${error.message}`);
-    }
-    
-    throw error;
-  }
-}
-
-/**
  * Останавливает процесс микросервиса
  * @param {Object} serviceInfo Информация о сервисе
  */
@@ -228,33 +125,45 @@ function stopDiarizationService(serviceInfo) {
 }
 
 /**
- * Главная функция для запуска всего процесса тестирования
+ * Главная функция для проверки доступности сервиса
  */
-async function runQuickTest() {
-  console.log('🔬 Запуск быстрого тестирования диаризации\n');
+async function runHealthTest() {
+  console.log('🔬 Проверка доступности сервиса диаризации\n');
   
   let serviceInfo = null;
   
   try {
-    // Шаг 1: Генерируем простой тестовый аудиофайл
-    await generateTestAudio(TEST_AUDIO_FILE, 440, 2);
-    
-    // Шаг 2: Запускаем микросервис диаризации
+    // Шаг 1: Запускаем микросервис диаризации
     serviceInfo = await startDiarizationService();
     
-    // Шаг 3: Тестируем диаризацию
-    await testSimpleDiarization(TEST_AUDIO_FILE, serviceInfo.url);
+    // Шаг 2: Повторно проверяем здоровье сервиса с интервалом в 1 секунду
+    for (let i = 0; i < 5; i++) {
+      try {
+        const response = await axios.get(`${DIARIZATION_SERVICE_URL}/health`, { timeout: 1000 });
+        console.log(`\n📊 Проверка #${i+1}:`);
+        console.log(`   - Статус: ${response.data.status}`);
+        console.log(`   - Время работы: ${response.data.uptime.toFixed(2)} сек`);
+        console.log(`   - Временная метка: ${response.data.timestamp}`);
+      } catch (error) {
+        console.error(`❌ Ошибка при проверке #${i+1}: ${error.message}`);
+      }
+      
+      if (i < 4) {
+        console.log(`\n⏳ Ожидание 1 секунду...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
     
-    console.log('\n✅ Тестирование успешно завершено');
+    console.log('\n✅ Тестирование доступности успешно завершено');
   } catch (error) {
     console.error(`\n❌ Ошибка при выполнении тестирования: ${error.message}`);
   } finally {
-    // Шаг 4: Останавливаем микросервис
+    // Шаг 3: Останавливаем микросервис
     if (serviceInfo) {
       stopDiarizationService(serviceInfo);
     }
   }
 }
 
-// Запускаем быстрое тестирование
-runQuickTest();
+// Запускаем тестирование доступности
+runHealthTest();

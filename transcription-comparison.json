@@ -1,0 +1,19 @@
+[
+  {
+    "model": "whisper-1",
+    "duration": 0.8,
+    "transcript": "Редактор субтитров А.Семкин Корректор А.Егорова"
+  },
+  {
+    "model": "gpt-4o",
+    "duration": 0,
+    "transcript": "Ошибка: Request failed with status code 400",
+    "error": true
+  },
+  {
+    "model": "gpt-4o-mini",
+    "duration": 0,
+    "transcript": "Ошибка: Request failed with status code 400",
+    "error": true
+  }
+]

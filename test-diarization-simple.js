@@ -1,14 +1,19 @@
 /**
- * Быстрый тест сервиса диаризации с использованием простого тестового аудиофайла
+ * Упрощенный скрипт для тестирования диаризации
+ * 
+ * Этот скрипт:
+ * 1. Запускает микросервис диаризации
+ * 2. Выполняет тестирование диаризации
+ * 3. Останавливает микросервис
  */
 
+import fs from 'fs';
+import path from 'path';
 import axios from 'axios';
-import { spawn } from 'child_process';
+import FormData from 'form-data';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import path from 'path';
-import fs from 'fs';
-import FormData from 'form-data';
+import { spawn } from 'child_process';
 
 // Определение путей для ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -19,57 +24,7 @@ const DIARIZATION_SERVICE_URL = 'http://localhost:5050';
 const SERVICE_DIR = path.join(__dirname, 'services', 'audio-diarization');
 
 // Путь к тестовому аудиофайлу
-const TEST_AUDIO_DIR = path.join(__dirname, 'test_audio');
-const TEST_AUDIO_FILE = path.join(TEST_AUDIO_DIR, 'test_simple.mp3');
-const RESULT_FILE = 'diarization_result_simple.json';
-
-// Создаем директории, если не существуют
-function ensureDirectoryExists(dir) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    console.log(`✅ Создана директория: ${dir}`);
-  }
-}
-
-/**
- * Создает простой тональный сигнал с помощью ffmpeg
- * @param {string} outputPath Путь для сохранения выходного файла
- * @param {number} frequency Частота тона (Гц)
- * @param {number} duration Длительность (секунды)
- */
-async function generateTestAudio(outputPath, frequency = 440, duration = 2) {
-  return new Promise((resolve, reject) => {
-    ensureDirectoryExists(path.dirname(outputPath));
-    
-    console.log(`🔊 Создание тестового аудио (${frequency} Гц, ${duration} сек)...`);
-    
-    const ffmpeg = spawn('ffmpeg', [
-      '-y',
-      '-f', 'lavfi',
-      '-i', `sine=frequency=${frequency}:duration=${duration}`,
-      '-c:a', 'libmp3lame',
-      '-b:a', '32k',
-      '-ac', '1',
-      '-ar', '16000',
-      outputPath
-    ]);
-    
-    ffmpeg.stderr.on('data', (data) => {
-      // FFmpeg пишет лог в stderr, необязательно это ошибка
-      // console.log(`[FFmpeg] ${data.toString().trim()}`);
-    });
-    
-    ffmpeg.on('close', (code) => {
-      if (code === 0) {
-        console.log(`✅ Создан тестовый аудиофайл: ${outputPath}`);
-        resolve(outputPath);
-      } else {
-        console.error(`❌ Ошибка при создании аудиофайла, код: ${code}`);
-        reject(new Error(`Ошибка FFmpeg с кодом ${code}`));
-      }
-    });
-  });
-}
+const TEST_AUDIO_FILE = path.join(__dirname, 'test_audio', 'test.mp3');
 
 /**
  * Запускает микросервис диаризации и возвращает процесс
@@ -163,50 +118,66 @@ async function startDiarizationService() {
 }
 
 /**
- * Тестирование диаризации с очень коротким аудио
+ * Тестирование диаризации аудио
  * @param {string} audioFile Путь к аудиофайлу
- * @param {string} serviceUrl URL сервиса диаризации
  */
-async function testSimpleDiarization(audioFile, serviceUrl) {
+async function testDiarization(audioFile) {
   try {
-    console.log(`🔍 Тестирование простой диаризации для файла: ${audioFile}`);
+    console.log(`🔍 Тестирование диаризации для файла: ${audioFile}`);
     
-    // Формируем данные для отправки
+    if (!fs.existsSync(audioFile)) {
+      console.error(`❌ Файл не найден: ${audioFile}`);
+      return;
+    }
+    
     const formData = new FormData();
     formData.append('audio_file', fs.createReadStream(audioFile));
+    formData.append('min_speakers', 2);
+    formData.append('max_speakers', 5);
     
-    console.log('🚀 Отправка запроса на диаризацию...');
+    console.log(`🚀 Отправка запроса на диаризацию...`);
     
-    // Увеличиваем таймаут для обработки больших файлов
-    const response = await axios.post(`${serviceUrl}/diarize`, formData, {
-      headers: formData.getHeaders(),
-      timeout: 30000, // Увеличенный таймаут в 30 секунд для долгой обработки
-      maxContentLength: Infinity,
-      maxBodyLength: Infinity
-    });
+    const response = await axios.post(
+      `${DIARIZATION_SERVICE_URL}/diarize`,
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+        },
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
+      }
+    );
     
-    console.log('✅ Запрос успешно обработан');
-    console.log('\n📊 Результаты диаризации:');
-    console.log(JSON.stringify(response.data, null, 2));
+    console.log(`✅ Диаризация выполнена успешно:`);
+    console.log(`   - Количество говорящих: ${response.data.num_speakers}`);
+    console.log(`   - Длительность аудио: ${response.data.duration.toFixed(2)} сек`);
+    console.log(`   - Количество сегментов: ${response.data.segments.length}`);
     
-    // Сохраняем результаты в файл
-    fs.writeFileSync(RESULT_FILE, JSON.stringify(response.data, null, 2));
-    console.log(`✅ Результаты сохранены в файл: ${RESULT_FILE}`);
+    // Выводим первые 3 сегмента для примера
+    console.log(`\n📝 Примеры сегментов:`);
+    
+    const sampleSegments = response.data.segments.slice(0, 3);
+    for (const segment of sampleSegments) {
+      console.log(`   - Говорящий ${segment.speaker}, с ${segment.start.toFixed(2)}с до ${segment.end.toFixed(2)}с (${(segment.end - segment.start).toFixed(2)}с)`);
+    }
+    
+    // Сохраняем полный результат в файл
+    const resultPath = path.join(__dirname, 'diarization-result.json');
+    fs.writeFileSync(resultPath, JSON.stringify(response.data, null, 2));
+    
+    console.log(`\n💾 Полный результат сохранен в файл: ${resultPath}`);
     
     return response.data;
   } catch (error) {
     console.error(`❌ Ошибка при тестировании диаризации:`);
     
     if (error.response) {
-      console.error(`   - Статус: ${error.response.status}`);
+      console.error(`   - Статус ошибки: ${error.response.status}`);
       console.error(`   - Сообщение: ${JSON.stringify(error.response.data)}`);
-    } else if (error.request) {
-      console.error(`   - ${error.message}`);
     } else {
       console.error(`   - ${error.message}`);
     }
-    
-    throw error;
   }
 }
 
@@ -230,31 +201,35 @@ function stopDiarizationService(serviceInfo) {
 /**
  * Главная функция для запуска всего процесса тестирования
  */
-async function runQuickTest() {
-  console.log('🔬 Запуск быстрого тестирования диаризации\n');
+async function runFullTest() {
+  console.log('🔬 Запуск упрощенного тестирования диаризации\n');
   
   let serviceInfo = null;
   
   try {
-    // Шаг 1: Генерируем простой тестовый аудиофайл
-    await generateTestAudio(TEST_AUDIO_FILE, 440, 2);
+    // Проверяем наличие тестового файла
+    if (!fs.existsSync(TEST_AUDIO_FILE)) {
+      console.error(`❌ Тестовый файл не найден: ${TEST_AUDIO_FILE}`);
+      console.log(`💡 Сначала создайте тестовый файл: node generate-quick-test-audio.js`);
+      return;
+    }
     
-    // Шаг 2: Запускаем микросервис диаризации
+    // Шаг 1: Запускаем микросервис диаризации
     serviceInfo = await startDiarizationService();
     
-    // Шаг 3: Тестируем диаризацию
-    await testSimpleDiarization(TEST_AUDIO_FILE, serviceInfo.url);
+    // Шаг 2: Выполняем тестирование диаризации
+    await testDiarization(TEST_AUDIO_FILE);
     
     console.log('\n✅ Тестирование успешно завершено');
   } catch (error) {
     console.error(`\n❌ Ошибка при выполнении тестирования: ${error.message}`);
   } finally {
-    // Шаг 4: Останавливаем микросервис
+    // Шаг 3: Останавливаем микросервис
     if (serviceInfo) {
       stopDiarizationService(serviceInfo);
     }
   }
 }
 
-// Запускаем быстрое тестирование
-runQuickTest();
+// Запускаем упрощенное тестирование
+runFullTest();

@@ -1,5 +1,5 @@
 /**
- * Быстрый тест сервиса диаризации с использованием простого тестового аудиофайла
+ * Тестирование упрощенной версии сервиса диаризации
  */
 
 import axios from 'axios';
@@ -21,7 +21,7 @@ const SERVICE_DIR = path.join(__dirname, 'services', 'audio-diarization');
 // Путь к тестовому аудиофайлу
 const TEST_AUDIO_DIR = path.join(__dirname, 'test_audio');
 const TEST_AUDIO_FILE = path.join(TEST_AUDIO_DIR, 'test_simple.mp3');
-const RESULT_FILE = 'diarization_result_simple.json';
+const RESULT_FILE = 'diarization_result_simplified.json';
 
 // Создаем директории, если не существуют
 function ensureDirectoryExists(dir) {
@@ -37,7 +37,7 @@ function ensureDirectoryExists(dir) {
  * @param {number} frequency Частота тона (Гц)
  * @param {number} duration Длительность (секунды)
  */
-async function generateTestAudio(outputPath, frequency = 440, duration = 2) {
+async function generateTestAudio(outputPath, frequency = 440, duration = 1) {
   return new Promise((resolve, reject) => {
     ensureDirectoryExists(path.dirname(outputPath));
     
@@ -72,15 +72,15 @@ async function generateTestAudio(outputPath, frequency = 440, duration = 2) {
 }
 
 /**
- * Запускает микросервис диаризации и возвращает процесс
+ * Запускает упрощенный микросервис диаризации и возвращает процесс
  * @returns {Promise<Object>} Объект с информацией о процессе
  */
-async function startDiarizationService() {
+async function startSimplifiedDiarizationService() {
   return new Promise((resolve, reject) => {
-    console.log('🚀 Запуск микросервиса диаризации...');
+    console.log('🚀 Запуск упрощенного микросервиса диаризации...');
     
     const python = process.platform === 'win32' ? 'python' : 'python3';
-    const serviceProcess = spawn(python, ['run.py'], {
+    const serviceProcess = spawn(python, ['run_simplified.py'], {
       cwd: SERVICE_DIR,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: {
@@ -113,6 +113,7 @@ async function startDiarizationService() {
           clearInterval(checkInterval);
           console.log(`✅ Сервис диаризации доступен после ${attempts} попытки`);
           console.log(`   - Статус: ${response.data.status}`);
+          console.log(`   - Сервис: ${response.data.service}`);
           console.log(`   - Время работы: ${response.data.uptime.toFixed(2)} сек`);
           
           // Возвращаем объект с процессом и информацией
@@ -163,13 +164,13 @@ async function startDiarizationService() {
 }
 
 /**
- * Тестирование диаризации с очень коротким аудио
+ * Тестирование диаризации с упрощенным сервисом
  * @param {string} audioFile Путь к аудиофайлу
  * @param {string} serviceUrl URL сервиса диаризации
  */
-async function testSimpleDiarization(audioFile, serviceUrl) {
+async function testSimplifiedDiarization(audioFile, serviceUrl) {
   try {
-    console.log(`🔍 Тестирование простой диаризации для файла: ${audioFile}`);
+    console.log(`🔍 Тестирование диаризации для файла: ${audioFile}`);
     
     // Формируем данные для отправки
     const formData = new FormData();
@@ -177,10 +178,10 @@ async function testSimpleDiarization(audioFile, serviceUrl) {
     
     console.log('🚀 Отправка запроса на диаризацию...');
     
-    // Увеличиваем таймаут для обработки больших файлов
+    // Отправляем запрос с таймаутом 5 секунд (должно хватить для упрощенной версии)
     const response = await axios.post(`${serviceUrl}/diarize`, formData, {
       headers: formData.getHeaders(),
-      timeout: 30000, // Увеличенный таймаут в 30 секунд для долгой обработки
+      timeout: 5000,
       maxContentLength: Infinity,
       maxBodyLength: Infinity
     });
@@ -228,22 +229,22 @@ function stopDiarizationService(serviceInfo) {
 }
 
 /**
- * Главная функция для запуска всего процесса тестирования
+ * Главная функция для запуска упрощенного тестирования
  */
-async function runQuickTest() {
-  console.log('🔬 Запуск быстрого тестирования диаризации\n');
+async function runSimplifiedTest() {
+  console.log('🔬 Запуск тестирования упрощенной диаризации\n');
   
   let serviceInfo = null;
   
   try {
     // Шаг 1: Генерируем простой тестовый аудиофайл
-    await generateTestAudio(TEST_AUDIO_FILE, 440, 2);
+    await generateTestAudio(TEST_AUDIO_FILE, 440, 1);
     
-    // Шаг 2: Запускаем микросервис диаризации
-    serviceInfo = await startDiarizationService();
+    // Шаг 2: Запускаем упрощенный микросервис диаризации
+    serviceInfo = await startSimplifiedDiarizationService();
     
-    // Шаг 3: Тестируем диаризацию
-    await testSimpleDiarization(TEST_AUDIO_FILE, serviceInfo.url);
+    // Шаг 3: Тестируем диаризацию с упрощенным сервисом
+    await testSimplifiedDiarization(TEST_AUDIO_FILE, serviceInfo.url);
     
     console.log('\n✅ Тестирование успешно завершено');
   } catch (error) {
@@ -256,5 +257,5 @@ async function runQuickTest() {
   }
 }
 
-// Запускаем быстрое тестирование
-runQuickTest();
+// Запускаем упрощенное тестирование
+runSimplifiedTest();
