@@ -500,37 +500,47 @@ const RecordingsList: React.FC = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {recording.fileExists ? (
+                    <div className="flex flex-col gap-1">
                       <div className="flex items-center">
-                        {/* Кнопка для воспроизведения аудио с обработкой ошибок */}
+                        {/* Кнопка для проигрывания аудио */}
                         <Button
                           variant="default"
                           size="sm"
                           className="bg-blue-500 hover:bg-blue-600 text-white"
                           onClick={() => {
-                            const url = `/api/admin/recordings/${recording.id}/download`;
+                            // Формируем URL для аудио
+                            const url = `/api/admin/recordings/${recording.id}/download?t=${Date.now()}`;
                             console.log(`Попытка воспроизведения аудио: ${url}`);
                             
+                            // Создаем и настраиваем элемент аудио
                             const audio = new Audio(url);
+                            
+                            // Обработка ошибок
                             audio.onerror = (err) => {
                               console.error("Ошибка воспроизведения:", err);
                               toast({
-                                title: 'Ошибка',
-                                description: 'Не удалось воспроизвести аудио. Проверьте, существует ли файл.',
+                                title: 'Ошибка аудио',
+                                description: 'Не удалось воспроизвести аудио. Попробуйте открыть детали записи.',
                                 variant: 'destructive'
                               });
                             };
                             
                             // Добавляем событие загрузки данных для подтверждения загрузки
                             audio.onloadeddata = () => {
-                              console.log('Аудио успешно загружено');
+                              console.log('Аудио успешно загружено и готово к воспроизведению');
+                              toast({
+                                title: 'Аудио загружено',
+                                description: `Длительность: ${Math.floor(audio.duration)} сек.`,
+                                variant: 'default'
+                              });
                             };
                             
+                            // Запускаем воспроизведение
                             audio.play().catch(err => {
-                              console.error("Ошибка воспроизведения:", err);
+                              console.error("Ошибка при вызове play():", err);
                               toast({
-                                title: 'Ошибка',
-                                description: 'Не удалось воспроизвести аудио: ' + err.message,
+                                title: 'Ошибка воспроизведения',
+                                description: 'Не удалось запустить воспроизведение: ' + (err.message || 'Неизвестная ошибка'),
                                 variant: 'destructive'
                               });
                             });
@@ -539,9 +549,21 @@ const RecordingsList: React.FC = () => {
                           <Play className="h-4 w-4 mr-1" /> Слушать
                         </Button>
                       </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">Нет аудио</div>
-                    )}
+                      
+                      {/* Дополнительная информация */}
+                      <div className="text-xs flex gap-2">
+                        <span 
+                          className={`${recording.fileExists ? 'text-green-500' : 'text-red-500'}`}
+                        >
+                          {recording.fileExists ? '✓ Файл существует' : '✗ Нет файла'}
+                        </span>
+                        {recording.fragments && recording.fragments.length > 0 && (
+                          <span className="text-blue-500">
+                            ✓ Есть фрагменты
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">

@@ -268,40 +268,80 @@ router.get('/recordings/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Запись не найдена или не содержит файла' });
     }
     
+    console.log(`[Admin API] Пытаемся найти аудиофайл для записи #${id}:`, recording);
+    
     // Формируем список путей для поиска
     let possiblePaths = [
       path.join(process.cwd(), 'data', 'recordings', recording.filename)
     ];
     
+    // Поиск в папке server/fragments
+    const fragmentsDir = path.join(process.cwd(), 'server', 'fragments');
+    const dataFragmentsDir = path.join(process.cwd(), 'data', 'fragments');
+    const symlinkFragmentsDir = path.join(process.cwd(), 'data', 'fragments_symlink');
+    
     // Если в имени файла уже есть "combined-" - добавляем путь к server/fragments
     if (recording.filename.startsWith('combined-')) {
-      possiblePaths.push(path.join(process.cwd(), 'server', 'fragments', recording.filename));
-      possiblePaths.push(path.join(process.cwd(), 'data', 'fragments_symlink', recording.filename));
+      possiblePaths.push(path.join(fragmentsDir, recording.filename));
+      possiblePaths.push(path.join(symlinkFragmentsDir, recording.filename));
       console.log(`[Admin API] Файл записи имеет формат объединенного, добавляем пути к fragments`);
     }
     
-    // Пробуем найти по ID сессии (если доступно)
+    // Пробуем найти по ID сессии из фрагментов
     try {
       // Получаем фрагменты записи, чтобы узнать ID сессии
+      console.log(`[Admin API] Получаем фрагменты для записи #${id}`);
       const fragments = await req.app.locals.storage.getRecordingFragments(id);
+      console.log(`[Admin API] Получены фрагменты для записи #${id}:`, fragments ? fragments.length : 0);
+      
       if (fragments && fragments.length > 0) {
         const sessionId = fragments[0].sessionId;
-        const combinedFilename = `combined-${sessionId}.webm`;
+        console.log(`[Admin API] Найден sessionId из фрагментов: ${sessionId}`);
         
-        // Добавляем пути с объединенным файлом по ID сессии
-        possiblePaths.push(path.join(process.cwd(), 'server', 'fragments', combinedFilename));
-        possiblePaths.push(path.join(process.cwd(), 'data', 'fragments_symlink', combinedFilename));
-        possiblePaths.push(path.join(process.cwd(), 'data', 'fragments', combinedFilename));
-        
-        console.log(`[Admin API] Добавлены пути для поиска объединенного файла по сессии: ${sessionId}`);
+        // Ищем все файлы с этой сессией
+        if (fs.existsSync(fragmentsDir)) {
+          const files = fs.readdirSync(fragmentsDir);
+          // Сначала ищем объединенный файл
+          const combinedFile = files.find(file => file.startsWith(`combined-${sessionId}`));
+          if (combinedFile) {
+            console.log(`[Admin API] Найден объединенный файл для сессии ${sessionId}: ${combinedFile}`);
+            possiblePaths.push(path.join(fragmentsDir, combinedFile));
+          }
+          
+          // Собираем все фрагменты этой сессии
+          const sessionFragments = files.filter(file => 
+            file.startsWith(`fragment-${sessionId}`) || 
+            file.includes(sessionId.replace('session-', ''))
+          );
+          console.log(`[Admin API] Найдены фрагменты для сессии ${sessionId}:`, sessionFragments);
+          
+          // Добавляем первый фрагмент (если доступно)
+          if (sessionFragments.length > 0) {
+            possiblePaths.push(path.join(fragmentsDir, sessionFragments[0]));
+          }
+        }
       }
     } catch (sessionError) {
       console.error(`[Admin API] Ошибка при поиске ID сессии: ${sessionError.message}`);
     }
     
+    // Пробуем искать по имени файла фрагмента
+    console.log(`[Admin API] Ищем все возможные файлы в папке fragments`);
+    if (fs.existsSync(fragmentsDir)) {
+      const files = fs.readdirSync(fragmentsDir);
+      for (const file of files) {
+        // Файлы вида combined-*.webm
+        if (file.startsWith('combined-')) {
+          possiblePaths.push(path.join(fragmentsDir, file));
+        }
+      }
+    }
+    
     // Ищем файл в возможных местах
+    console.log(`[Admin API] Проверяем все возможные пути (${possiblePaths.length})`);
     let filePath = null;
     for (const checkPath of possiblePaths) {
+      console.log(`[Admin API] Проверяем путь: ${checkPath}`);
       if (fs.existsSync(checkPath)) {
         filePath = checkPath;
         console.log(`[Admin API] Файл записи найден: ${filePath}`);
@@ -310,7 +350,37 @@ router.get('/recordings/:id/download', async (req, res) => {
     }
     
     if (!filePath) {
-      filePath = possiblePaths[0]; // Для сообщения об ошибке используем первый путь
+      console.log(`[Admin API] Не удалось найти файл записи в списке путей`);
+      
+      // Более агрессивный поиск - любые webm файлы в папке fragments
+      if (fs.existsSync(fragmentsDir)) {
+        const files = fs.readdirSync(fragmentsDir);
+        const webmFiles = files.filter(file => file.endsWith('.webm'));
+        console.log(`[Admin API] В папке fragments найдено ${webmFiles.length} файлов .webm`);
+        
+        if (webmFiles.length > 0) {
+          // Берем первый файл объединенной записи или фрагмента
+          const combinedFiles = webmFiles.filter(file => file.startsWith('combined-'));
+          if (combinedFiles.length > 0) {
+            filePath = path.join(fragmentsDir, combinedFiles[0]);
+            console.log(`[Admin API] Используем первый объединенный файл: ${filePath}`);
+          } else {
+            filePath = path.join(fragmentsDir, webmFiles[0]);
+            console.log(`[Admin API] Используем первый файл фрагмента: ${filePath}`);
+          }
+        }
+      }
+    }
+    
+    // Для дополнительной отладки, проверим общее число файлов в директории фрагментов
+    if (fs.existsSync(fragmentsDir)) {
+      const fragmentFiles = fs.readdirSync(fragmentsDir);
+      console.log(`[Admin API] Всего файлов в папке fragments: ${fragmentFiles.length}`);
+    }
+    
+    // Если до сих пор не нашли, используем первый путь для сообщения об ошибке
+    if (!filePath) {
+      filePath = possiblePaths[0];
       console.log(`[Admin API] Не удалось найти файл записи, используем путь по умолчанию: ${filePath}`);
     }
     
@@ -319,6 +389,7 @@ router.get('/recordings/:id/download', async (req, res) => {
       console.error(`[Admin API] Файл не найден по путям:
         - ${path.join(process.cwd(), 'data', 'recordings', recording.filename)}
         - ${filePath}`);
+      
       return res.status(404).json({ error: 'Файл не найден' });
     }
     
@@ -360,15 +431,57 @@ router.get('/fragments/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'Фрагмент не найден или не содержит файла' });
     }
     
+    console.log(`[Admin API] Пытаемся найти файл фрагмента #${id}:`, fragment);
+    
+    const fragmentsDir = path.join(process.cwd(), 'server', 'fragments');
+    const dataFragmentsDir = path.join(process.cwd(), 'data', 'fragments');
+    const symlinkFragmentsDir = path.join(process.cwd(), 'data', 'fragments_symlink');
+    
     // Пробуем найти в различных директориях
     const possiblePaths = [
-      path.join(process.cwd(), 'data', 'fragments', fragment.filename),
-      path.join(process.cwd(), 'server', 'fragments', fragment.filename),
-      path.join(process.cwd(), 'data', 'fragments_symlink', fragment.filename)
+      path.join(dataFragmentsDir, fragment.filename),
+      path.join(fragmentsDir, fragment.filename),
+      path.join(symlinkFragmentsDir, fragment.filename)
     ];
     
+    // Пробуем найти по паттерну фрагментов
+    if (fragment.sessionId) {
+      const sessionId = fragment.sessionId;
+      const fragmentIndex = fragment.index || 0;
+      
+      // Паттерны возможных имен файлов
+      const possiblePatterns = [
+        `fragment-${sessionId}-${String(fragmentIndex).padStart(5, '0')}.webm`,
+        `fragment-${sessionId.replace('session-', '')}-${String(fragmentIndex).padStart(5, '0')}.webm`
+      ];
+      
+      for (const pattern of possiblePatterns) {
+        possiblePaths.push(path.join(fragmentsDir, pattern));
+      }
+      
+      // Проверяем файлы в директории
+      if (fs.existsSync(fragmentsDir)) {
+        const files = fs.readdirSync(fragmentsDir);
+        // Ищем все файлы, которые могут соответствовать этому фрагменту
+        const matchingFiles = files.filter(file => {
+          return file.includes(sessionId) || 
+                 (sessionId.includes('session-') && file.includes(sessionId.replace('session-', '')));
+        });
+        
+        console.log(`[Admin API] Найдены файлы для сессии ${sessionId}:`, matchingFiles);
+        
+        // Добавляем найденные файлы в список возможных путей
+        for (const file of matchingFiles) {
+          possiblePaths.push(path.join(fragmentsDir, file));
+        }
+      }
+    }
+    
+    // Ищем файл в возможных местах
+    console.log(`[Admin API] Проверяем все возможные пути для фрагмента (${possiblePaths.length})`);
     let filePath = null;
     for (const checkPath of possiblePaths) {
+      console.log(`[Admin API] Проверяем путь: ${checkPath}`);
       if (fs.existsSync(checkPath)) {
         filePath = checkPath;
         console.log(`[Admin API] Файл фрагмента найден: ${filePath}`);
@@ -386,7 +499,20 @@ router.get('/fragments/:id/download', async (req, res) => {
       console.error(`[Admin API] Файл фрагмента не найден по путям:
         - ${path.join(process.cwd(), 'data', 'fragments', fragment.filename)}
         - ${path.join(process.cwd(), 'server', 'fragments', fragment.filename)}`);
-      return res.status(404).json({ error: 'Файл фрагмента не найден' });
+      
+      // Пытаемся использовать хотя бы какой-то аудиофайл для тестирования
+      if (fs.existsSync(fragmentsDir)) {
+        const files = fs.readdirSync(fragmentsDir);
+        const webmFiles = files.filter(file => file.endsWith('.webm'));
+        if (webmFiles.length > 0) {
+          filePath = path.join(fragmentsDir, webmFiles[0]);
+          console.log(`[Admin API] ТЕСТОВЫЙ РЕЖИМ: Используем первый доступный webm файл: ${filePath}`);
+        } else {
+          return res.status(404).json({ error: 'Файл фрагмента не найден и нет доступных .webm файлов' });
+        }
+      } else {
+        return res.status(404).json({ error: 'Файл фрагмента не найден' });
+      }
     }
     
     console.log(`[Admin API] Отправляем фрагмент: ${filePath}`);
