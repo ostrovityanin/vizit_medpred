@@ -18,7 +18,7 @@ import { compareTranscriptionModels } from '../transcription';
 // ESM equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const UPLOADS_DIR = path.join(dirname(dirname(dirname(__dirname))), 'uploads');
+const UPLOADS_DIR = path.join(process.cwd(), 'data', 'recordings');
 
 /**
  * Получает все записи для админ-панели
@@ -190,7 +190,7 @@ export async function deleteAdminRecording(recordingId) {
     
     for (const fragment of fragments) {
       if (fragment.filename) {
-        const fragmentPath = path.join(UPLOADS_DIR, fragment.filename);
+        const fragmentPath = path.join(process.cwd(), 'data', 'fragments', fragment.filename);
         if (fs.existsSync(fragmentPath)) {
           fs.unlinkSync(fragmentPath);
           log(`Удален файл фрагмента: ${fragmentPath}`, 'admin');
@@ -396,7 +396,7 @@ export async function getAdminStats() {
     // Рассчитываем размер фрагментов
     for (const fragment of fragments) {
       if (fragment.filename) {
-        const fragmentPath = path.join(UPLOADS_DIR, fragment.filename);
+        const fragmentPath = path.join(process.cwd(), 'data', 'fragments', fragment.filename);
         if (fs.existsSync(fragmentPath)) {
           try {
             const stats = fs.statSync(fragmentPath);

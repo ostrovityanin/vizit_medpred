@@ -163,14 +163,14 @@ const AudioPlayer: React.FC<{
       let audioUrl;
       
       if (fragmentId) {
-        audioUrl = `/api/admin/recordings/${recordingId}/fragments/${fragmentId}/audio`;
+        audioUrl = `/api/admin/fragments/${fragmentId}/download`;
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
           currentFragmentId: fragmentId
         }));
       } else {
-        audioUrl = `/api/admin/recordings/${recordingId}/audio`;
+        audioUrl = `/api/admin/recordings/${recordingId}/download`;
         setPlayerState(prev => ({
           ...prev,
           currentRecordingId: recordingId,
@@ -490,7 +490,7 @@ const RecordingsList: React.FC = () => {
                           size="sm"
                           className="bg-blue-500 hover:bg-blue-600 text-white"
                           onClick={() => {
-                            const url = `/api/admin/recordings/${recording.id}/audio`;
+                            const url = `/api/admin/recordings/${recording.id}/download`;
                             const audio = new Audio(url);
                             audio.play().catch(err => {
                               console.error("Ошибка воспроизведения:", err);
