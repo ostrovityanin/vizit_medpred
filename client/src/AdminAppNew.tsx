@@ -1313,7 +1313,14 @@ const DashboardStats: React.FC = () => {
 
 // Главный компонент админ-панели
 const AdminAppNew: React.FC = () => {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  
+  // Если мы находимся на корневом маршруте /, перенаправляем на /admin-new
+  useEffect(() => {
+    if (location === '/') {
+      setLocation('/admin-new');
+    }
+  }, [location, setLocation]);
   
   return (
     <div className="container mx-auto p-4 max-w-7xl">
@@ -1334,7 +1341,7 @@ const AdminAppNew: React.FC = () => {
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/">
+              <Link href="/admin-new">
                 <HomeIcon className="h-4 w-4 mr-2" />
                 Главная страница
               </Link>
