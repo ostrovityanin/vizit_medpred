@@ -9,7 +9,6 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
-import { exec } from 'child_process';
 
 const router = express.Router();
 
@@ -616,146 +615,10 @@ router.get('/fragments/:id/download', async (req, res) => {
   }
 });
 
-/**
- * Объединение фрагментов записи
- * POST /api/admin/recordings/:id/merge-fragments
- */
-router.post('/recordings/:id/merge-fragments', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    
-    if (isNaN(id)) {
-      return res.status(400).json({ error: 'Некорректный ID записи' });
-    }
-    
-    const { sessionId, forceProcess = false } = req.body;
-    
-    // Получаем запись из хранилища
-    const recording = await req.app.locals.storage.getAdminRecordingById(id);
-    
-    if (!recording) {
-      return res.status(404).json({ error: 'Запись не найдена' });
-    }
-    
-    console.log(`[Admin API] Запрос на объединение фрагментов для записи #${id}`, { sessionId, forceProcess });
-    
-    // Получаем фрагменты для данной записи
-    let fragments = await req.app.locals.storage.getRecordingFragments(id);
-    console.log(`[Admin API] Найдено ${fragments.length} фрагментов по ID записи`);
-    
-    // Если фрагменты не найдены по ID записи и предоставлен sessionId, ищем по sessionId
-    if (fragments.length === 0 && sessionId) {
-      fragments = await req.app.locals.storage.getFragmentsBySessionId(sessionId);
-      console.log(`[Admin API] Найдено ${fragments.length} фрагментов по sessionId: ${sessionId}`);
-      
-      // Связываем найденные фрагменты с записью
-      if (fragments.length > 0) {
-        for (const fragment of fragments) {
-          // Если фрагмент еще не связан с этой записью, обновляем его
-          if (fragment.recordingId !== id) {
-            const updatedFragment = { ...fragment, recordingId: id };
-            await req.app.locals.storage.updateFragment(fragment.id, updatedFragment);
-            console.log(`[Admin API] Фрагмент #${fragment.id} связан с записью #${id}`);
-          }
-        }
-        
-        // Обновляем запись с количеством фрагментов
-        const updatedRecording = { 
-          ...recording, 
-          fragmentsCount: fragments.length,
-          fragments: fragments.map(f => f.id)
-        };
-        await req.app.locals.storage.updateRecording(updatedRecording);
-      }
-    }
-    
-    if (fragments.length === 0) {
-      return res.status(404).json({ error: 'Фрагменты для объединения не найдены' });
-    }
-    
-    // Если у нас есть фрагменты, попробуем объединить их
-    // Сортируем фрагменты по индексу
-    fragments.sort((a, b) => a.index - b.index);
-    
-    const fragmentsDir = path.join(process.cwd(), 'server', 'fragments');
-    let fragmentFiles = [];
-    
-    // Проверяем существование файлов фрагментов
-    for (const fragment of fragments) {
-      const filePath = path.join(fragmentsDir, fragment.filename);
-      if (fs.existsSync(filePath)) {
-        fragmentFiles.push({ path: filePath, index: fragment.index });
-      } else {
-        console.log(`[Admin API] Файл фрагмента не найден: ${filePath}`);
-      }
-    }
-    
-    if (fragmentFiles.length === 0) {
-      return res.status(404).json({ error: 'Файлы фрагментов не найдены' });
-    }
-    
-    // Создаем объединенный файл
-    const fragmentSessionId = fragments[0].sessionId;
-    const outputFilename = `combined-${fragmentSessionId}.webm`;
-    const outputPath = path.join(fragmentsDir, outputFilename);
-    
-    console.log(`[Admin API] Объединение ${fragmentFiles.length} фрагментов в файл: ${outputPath}`);
-    
-    // Используем ffmpeg для объединения файлов
-    try {
-      // Создаем временный файл со списком файлов для объединения
-      const listFilePath = path.join(fragmentsDir, `${fragmentSessionId}-list.txt`);
-      const fileList = fragmentFiles.map(f => `file '${f.path.replace(/'/g, "'\\''")}'`).join('\n');
-      fs.writeFileSync(listFilePath, fileList);
-      
-      // Выполняем команду ffmpeg
-      const ffmpegCmd = `ffmpeg -f concat -safe 0 -i "${listFilePath}" -c copy "${outputPath}"`;
-      console.log(`[Admin API] Выполнение команды: ${ffmpegCmd}`);
-      
-      const { stdout, stderr } = await new Promise((resolve, reject) => {
-        exec(ffmpegCmd, (error, stdout, stderr) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve({ stdout, stderr });
-          }
-        });
-      });
-      
-      // Удаляем временный файл списка
-      fs.unlinkSync(listFilePath);
-      
-      console.log(`[Admin API] Объединение завершено. STDOUT: ${stdout}`);
-      if (stderr) {
-        console.log(`[Admin API] STDERR: ${stderr}`);
-      }
-      
-      // Обновляем запись с информацией об объединенном файле
-      const stats = fs.statSync(outputPath);
-      const updatedRecording = {
-        ...recording,
-        filename: outputFilename,
-        fileExists: true,
-        fileSize: stats.size,
-        status: 'completed',
-        canMergeFragments: false
-      };
-      
-      await req.app.locals.storage.updateRecording(updatedRecording);
-      
-      res.json({
-        success: true,
-        recording: updatedRecording,
-        message: `Объединено ${fragmentFiles.length} фрагментов в файл ${outputFilename}`
-      });
-    } catch (ffmpegError) {
-      console.error(`[Admin API] Ошибка при объединении фрагментов: ${ffmpegError.message}`);
-      res.status(500).json({ error: `Ошибка при объединении фрагментов: ${ffmpegError.message}` });
-    }
-  } catch (error) {
-    console.error(`[Admin API] Ошибка при объединении фрагментов: ${error.message}`);
-    res.status(500).json({ error: 'Внутренняя ошибка сервера' });
-  }
-});
+// ВАЖНО: Не изменять этот код, т.к. он может повлиять на работу MedPredRuBot
+// Маршрут для объединения фрагментов будет реализован позже
+// router.post('/recordings/:id/merge-fragments', async (req, res) => {
+//   // ...
+// });
 
 export default router;
