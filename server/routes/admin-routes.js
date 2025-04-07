@@ -46,7 +46,7 @@ const upload = multer({
  * Получение списка всех записей
  * GET /api/admin/recordings
  */
-router.get('/admin/recordings', async (req, res) => {
+router.get('/recordings', async (req, res) => {
   try {
     // Получаем записи из хранилища асинхронно
     // Это согласуется с типами IStorage в storage.ts
@@ -63,6 +63,9 @@ router.get('/admin/recordings', async (req, res) => {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     });
     
+    // Добавим подробное логирование для отладки
+    console.log(`[Admin API] Возвращаем ${sortedRecordings.length} записей`);
+    
     res.json(sortedRecordings);
   } catch (error) {
     console.error(`[Admin API] Ошибка при получении записей: ${error.message}`);
@@ -74,7 +77,7 @@ router.get('/admin/recordings', async (req, res) => {
  * Получение информации о конкретной записи
  * GET /api/admin/recordings/:id
  */
-router.get('/admin/recordings/:id', async (req, res) => {
+router.get('/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -100,7 +103,7 @@ router.get('/admin/recordings/:id', async (req, res) => {
  * Загрузка аудиофайла
  * POST /api/admin/recordings/upload
  */
-router.post('/admin/recordings/upload', upload.single('file'), async (req, res) => {
+router.post('/recordings/upload', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Файл не был загружен' });
@@ -137,7 +140,7 @@ router.post('/admin/recordings/upload', upload.single('file'), async (req, res) 
  * Обновление информации о записи
  * PATCH /api/admin/recordings/:id
  */
-router.patch('/admin/recordings/:id', async (req, res) => {
+router.patch('/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -177,7 +180,7 @@ router.patch('/admin/recordings/:id', async (req, res) => {
  * Удаление записи
  * DELETE /api/admin/recordings/:id
  */
-router.delete('/admin/recordings/:id', async (req, res) => {
+router.delete('/recordings/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -218,7 +221,7 @@ router.delete('/admin/recordings/:id', async (req, res) => {
  * Получение фрагментов записи
  * GET /api/admin/recordings/:id/player-fragments
  */
-router.get('/admin/recordings/:id/player-fragments', async (req, res) => {
+router.get('/recordings/:id/player-fragments', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
@@ -295,7 +298,7 @@ router.get('/recordings/:id/download', async (req, res) => {
  * Скачивание фрагмента записи
  * GET /api/admin/fragments/:id/download
  */
-router.get('/admin/fragments/:id/download', async (req, res) => {
+router.get('/fragments/:id/download', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     
