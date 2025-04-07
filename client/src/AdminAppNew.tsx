@@ -418,45 +418,57 @@ const RecordingsList: React.FC = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12">ID</TableHead>
-              <TableHead>Дата</TableHead>
-              <TableHead>От кого</TableHead>
-              <TableHead>Кому</TableHead>
-              <TableHead className="w-24">Длит.</TableHead>
-              <TableHead className="w-24">Размер</TableHead>
+              <TableHead className="w-64">Информация</TableHead>
               <TableHead className="w-24">Статус</TableHead>
-              <TableHead className="w-12">Фраг.</TableHead>
-              <TableHead>Аудио</TableHead>
+              <TableHead className="w-24">Аудио</TableHead>
               <TableHead className="text-right">Действия</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {recordings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center">
+                <TableCell colSpan={4} className="text-center">
                   Записи не найдены
                 </TableCell>
               </TableRow>
             ) : (
               recordings.map(recording => (
                 <TableRow key={recording.id}>
-                  <TableCell>{recording.id}</TableCell>
                   <TableCell>
-                    {recording.timestamp 
-                      ? format(new Date(recording.timestamp), 'dd.MM.yyyy HH:mm')
-                      : 'Нет даты'}
-                  </TableCell>
-                  <TableCell>{recording.senderUsername || 'Неизвестно'}</TableCell>
-                  <TableCell>{recording.targetUsername || 'Неизвестно'}</TableCell>
-                  <TableCell>
-                    {recording.duration 
-                      ? `${Math.floor(recording.duration / 60)}:${String(Math.floor(recording.duration % 60)).padStart(2, '0')}`
-                      : '0:00'}
-                  </TableCell>
-                  <TableCell>
-                    {recording.fileSize 
-                      ? `${(recording.fileSize / 1024).toFixed(1)} KB`
-                      : '0 KB'}
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">#{recording.id}</span>
+                        <span className="text-sm">
+                          {recording.timestamp 
+                            ? format(new Date(recording.timestamp), 'dd.MM.yyyy HH:mm')
+                            : 'Нет даты'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">От: {recording.senderUsername || 'Неизвестно'}</span>
+                          <span className="text-muted-foreground">Кому: {recording.targetUsername || 'Неизвестно'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            {recording.duration 
+                              ? `${Math.floor(recording.duration / 60)}:${String(Math.floor(recording.duration % 60)).padStart(2, '0')}`
+                              : '0:00'}
+                          </span>
+                          <span>
+                            <FileAudio className="h-3 w-3 inline mr-1" />
+                            {recording.fileSize 
+                              ? `${(recording.fileSize / 1024).toFixed(1)} KB`
+                              : '0 KB'}
+                          </span>
+                          <span>
+                            <span className="mr-1">Фраг.:</span>
+                            {recording.fragmentsCount || 0}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge variant={
@@ -469,22 +481,18 @@ const RecordingsList: React.FC = () => {
                        'Ошибка'}
                     </Badge>
                   </TableCell>
-                  <TableCell>{recording.fragmentsCount || 0}</TableCell>
                   <TableCell>
                     {recording.fileExists ? (
-                      <div className="w-32">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => {
-                            const url = `/api/admin/recordings/${recording.id}/audio`;
-                            const audio = new Audio(url);
-                            audio.play();
-                          }}
-                        >
-                          <Play className="h-3 w-3 mr-1" /> Слушать
-                        </Button>
+                      <div className="w-36">
+                        {/* Добавляем настоящий аудиоплеер здесь */}
+                        <div className="flex flex-col gap-1">
+                          <audio 
+                            src={`/api/admin/recordings/${recording.id}/audio`} 
+                            controls 
+                            className="w-full h-10"
+                            controlsList="nodownload noplaybackrate"
+                          />
+                        </div>
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">Нет аудио</div>
